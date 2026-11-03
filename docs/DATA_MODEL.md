@@ -1,0 +1,163 @@
+# データモデル / 永続化フォーマット（v3 / P4画像・A/B）
+
+**実装の正本は `src/core/types.ts` に置き、この文書と同期する。** 日付はISO 8601文字列、IDはUUID、Seedは整数へ丸めず文字列保存。
+
+```ts
+type Channel = 'positive' | 'negative';
+interface LibraryEntry {
+  id: string;
+  title: string;                 // 日本語可
+  raw: string;                   // NovelAIのプロンプト原文を改変せず保存
+  defaultChannel: Channel;
+  categoryId: string | null;
+  tags: string[];
+  description: string;
+  previewImageIds: string[];      // 実画像は別ストア
+  createdAt: string;
+  updatedAt: string;
+}
+interface GroupMember {
+  id: string;                     // 同じライブラリエントリの複数参照を許す
+  entryId: string;
+  enabled: boolean;              // multiのON/OFF。exclusiveでも保存可（選択ではない）
+  rawSnapshot: string;           // ライブラリ変更・削除後の保険
+  overrideRaw?: string;          // ワークスペース限定変更
+}
+interface PromptGroup {
+  id: string;
+  name: string;
+  channel: Channel;
+  mode: 'multi' | 'exclusive';
+  enabled: boolean;
+  members: GroupMember[];
+  selectedMemberId: string | null; // exclusive用
+}
+interface PromptWorkspace {
+  id: string;
+  title: string;
+  groups: PromptGroup[];        // 表示=コンパイル順（チャネルごと）
+  freeformPositive: string;
+  freeformNegative: string;
+  updatedAt: string;
+  appliedPresetId?: string;     // 適用元。snapshot内には含めない
+}
+interface Preset {
+  id: string;
+  name: string;
+  sourceWorkspaceId: string;
+  workspaceSnapshot: PromptWorkspace;
+  createdAt: string;
+  updatedAt: string;
+}
+interface Variant {
+  id: string;
+  label: 'A' | 'B';
+  presetId: string | null;       // 由来。削除後もsnapshotは再現可
+  workspaceSnapshot: PromptWorkspace;
+  compiled: { positive: string; negative: string };
+  settings: GenerationSettings;
+  imageId: string | null;
+}
+interface GenerationSettings {
+  seed: string | null;
+  model: string | null;
+  width: number | null;
+  height: number | null;
+  steps: number | null;
+  sampler: string | null;
+  guidance: number | null;
+  cfgRescale: number | null;
+  imageCount: number | null;
+  imageToImage: string | null;
+  referenceImages: string | null;
+  extrasConfirmed: boolean;
+  extra: Record<string, string | number | boolean | null>;
+  evidence: 'manual' | 'png-metadata' | 'unknown';
+}
+interface Experiment {
+  id: string;
+  name: string;
+  variantA: Variant;
+  variantB: Variant;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 必須制約
+
+1. `GroupMember.id`はインスタンスID、`entryId`は辞書ID。両者を混同しない。
+2. `exclusive`では`selectedMemberId`のみ出力対象。`multi`では`member.enabled === true`のみ。
+3. `group.enabled === false`なら内部状態に関係なく出力ゼロ。再ON時には元の状態へ戻る。
+4. 実際の文字列は`overrideRaw ?? rawSnapshot`で再現し、必要時だけ辞書最新版へ更新。`rawSnapshot`は適用時に必ず埋め込む。
+5. PresetやVariantはsnapshotであり、元ワークスペースへの参照を通じて勝手に変化しない。
+6. deleted Entryを参照するワークスペースでも既存snapshotにより復元できる。
+7. 設定比較の未知値は「一致」に見なさない。
+
+## 現在のストア
+
+- `libraryEntries` / `categories` / `workspaces` / `presets` / `experiments` / `images` / `imageOriginals` / `imageThumbnails` / `metadata`。
+- image binaryは原本PNGとサムネイルを別に持ち、参照カウント/削除時の孤立blobを清掃。
+- 現在のJSONは `format: 'nai-prompt-workbench'`, `schemaVersion: 3`, `imageBinariesIncluded: false`, `exportedAt`, `payload: {...}`。v1/v2入力も検証・正規化して読み込み、書出しはv3。
+
+## JSONインポートの注意
+
+- 画像はP1のテキストJSONには**含まない**。UIにその旨明示。
+- import前にサマリーを提示して`merge`/`replace`選択。初期は衝突IDへの安全なリネームもしくは明示エラーを優先。
+- サイズ上限（暫定10MB）、レコード件数上限（暫定10000件）、JSONの深さ制限を設定。入力のHTMLは実行しない。
+- 失敗時は元のDBを変更しない。成功時だけコミット。
+
+## P1時点の実装（DB v1）
+
+- `Category = { id: UUID, name: string }`。削除時は対応するライブラリ項目を未分類 (`categoryId: null`) にする。部品snapshotは変更しない。
+- `WorkbenchData = { libraryEntries, categories, workspaces, settings, ...safeFields }`。
+- 設定は `activeWorkspaceId: UUID | null` と `librarySort: 'title' | 'updatedAt'`。P1では設定もIndexedDBに含め、1トランザクションで保存・復元する。
+- DB名 `nai-prompt-workbench`、DB version / `schemaVersion` は1。P1で作成するstoreは `libraryEntries` / `categories` / `workspaces` / `metadata` のみ。後続のstoreは未作成。
+- metadata: `schemaVersion`、楽観的排他用 `revision`、`settings`、安全な未知payloadフィールド `extra`、レコード配列順 `order`、取込直前の復旧データ `previousImport`（1世代）。グループ・部品順はworkspace内の配列で保持する。
+- 初回起動は空。デモは設定のボタンを押したときだけ挿入する。旧版データのmigrationはまだなく、未知のDB/JSONバージョンは拒否する。将来のmigrationは実行前バックアップが必要。
+- P1 JSON payloadにはカテゴリと設定を含む。スターターfixtureの省略された `categories` / `settings` だけは空配列・既定設定で補う。空の `presets` / `experiments` / `images` は保持し、実データを含むものは未対応として拒否する。
+- 入力上限: UTF-8 10MiB、入れ子32、ライブラリ/カテゴリ/workspace/グループ/部品の**合計**10000レコード、1配列10000要素、JSON全体400000要素。UUID重複、構造参照切れ、型、チャンネル、選択方式、日時を検証する。
+- タイトル/カテゴリ名200文字、原文100万文字、説明10000文字、タグ100件（各100文字）。原文は保存時にtrimしない。
+- mergeはID衝突をエラーとし、現在の設定・既存の未知payloadフィールドを優先する。replaceは入力設定を含め全置換。いずれも確認後に変更前データを同一トランザクションで退避し、失敗時は変更しない。
+- 安全な未知フィールドはpayload・レコード・設定に保持する。`__proto__` / `constructor` / `prototype` 等の危険なキー、非JSON値、過大な入力は拒否する。
+- 破損時は自動削除・自動初期化しない。UIでエラーを表示し、復旧用ファイルを出力できる。schemaVersion/revisionが正常なv1 DBは、検証済みJSONから確認付きで復旧できる。未知バージョンや破損したschemaVersion/revisionは変更せず停止する。
+
+## P2時点の追加フィールド（DB v1）
+
+`PromptSpan = { id: UUID, text: string, enabled: boolean }`。
+
+- workspaceに`freeformPositiveSpans?: PromptSpan[]` / `freeformNegativeSpans?: PromptSpan[]`。
+- memberに`overrideSpans?: PromptSpan[]`。対応する原文は`overrideRaw ?? rawSnapshot`。
+- 省略時はP1と完全に同じコンパイル。P1のDBとJSONをそのまま読み込む。DB/schemaVersionは1を維持し、store変更・migration・既存データの書換えは行わない。
+- 配列が存在する場合は空配列不可。textは空文字不可、全span連結が対応原文と完全一致、disabled runの境界が安全であることを検証する。spanのUUIDも全レコードと一意であり、合計10000レコードの制限に含む。
+- ON/OFFと元テキストをJSONに含め、P2のexport/importとIDB再開で復元。旧P1ビルドは追加フィールドを解釈できないため、P2で作成したコメント付きデータのダウングレード運用は対応しない。
+- site document UUID、field token、確認ticket、site読取り結果/復旧用原文はパネル・Content Scriptのメモリ内のみ。DB・バックアップには自動保存しない。ユーザーの明示的な「自由入力へ取り込む」操作でだけworkspaceへコピーする。
+
+## P3時点のプリセット（旧DB/JSON v2）
+
+- `WorkbenchData`に`presets: Preset[]`を追加。v1では省略または空配列のみ許可していたため、旧データは空配列へ正規化する。この時点では画像・experimentsの実データは未対応だった。
+- workspaceの`appliedPresetId?: UUID`は保存済みプリセットとの比較用。通常workspaceからは存在するpresetを参照する。削除時は同じ操作でbindingを解除する。
+- presetの`workspaceSnapshot`は原文・自由入力・グループ/部品の順序・enabled・selectedMemberId・P2 spanを含む深いコピー。snapshotの`appliedPresetId`は禁止し、他presetへの依存を作らない。`sourceWorkspaceId === workspaceSnapshot.id`はprovenanceであり、現在のworkspaceを参照して展開しない。
+- preset record IDはlive資産と一意。snapshot内部のworkspace/group/member/span IDは**snapshotごとの独立scope**で一意とする。同じsourceから保存・複製したsnapshot間でIDが一致するのは正しい。全snapshotを含む総レコード上限10000と10MiBを維持。
+- 別workspaceへの適用では、対象workspaceのID・タイトルを保ち、外部live資産と衝突する内部IDだけを再採番する。selectedMemberId/spanも対応付けを保つ。新workspace復元時はroot IDを新規作成。辞書entryIdは変更しない。
+- dirty比較はrootのID/タイトル/updatedAt/appliedPresetIdと内部インスタンスIDを除く。グループ順・全候補・原文・OFF状態・spanは比較する。ID再採番後も意味的に同じsnapshotは一致とする。
+- 辞書の削除/原文変更、作成元workspaceの削除は診断として表示し、保存原文でコンパイルする。欠けたselectedMemberIdや不正snapshot、存在しないappliedPresetId、snapshot内preset参照、オブジェクト循環は検証で拒否。
+- DB version / metadata.schemaVersionは2、storeは`libraryEntries` / `categories` / `workspaces` / `presets` / `metadata`。配列順はmetadata.orderで保持。
+- v1→v2はversionchange transaction内で元の全record/metadataを読み、v1検証後に`migrationBackup:v1`へ保存完了してからpresets storeとmetadataを更新する。revisionも1増加する。失敗時はstore構成・DB version・全データをv1にrollbackする。
+- migration backupは一度だけ保持し、既存previousImportバックアップは残す。設定から移行前の資産をv2 JSONとして書出し・取込可能。元metadataを含む完全な退避もDB内に保持する。失敗時の原DBはそのまま残し、読み取れた復旧用snapshotをUIから出力できる。
+- 復旧dumpは通常import用JSONとは別。破損DBの循環・BigInt・非有限数・過深な構造は診断用文字列として明示する。正常な資産JSONは改変せず、不正データを自動修復して取り込まない。
+- 新規DBは直接v2。未知の将来版は拒否。移行失敗時は自動初期化・自動上書きしない。旧P1/P2ビルドへのDBダウングレードには対応しない。
+
+
+## P4画像・A/B（DB/JSON v3）
+
+- WorkbenchDataに`experiments: Experiment[]`, `images: ImageRecord[]`を追加。旧データは空配列に正規化する。v1/v2の非空images/experimentsは実装されていなかったので拒否する。
+- `Experiment`はupdatedAtを追加し、A/Bそれぞれの完全workspace snapshotと合成済み両channelを保存。snapshotのappliedPresetIdは禁止、由来はvariant.presetIdに分離し、参照先削除は許容。固定文字列と共通composeの結果が一致しないimportは拒否。循環、ID重複、画像参照欠落も拒否する。
+- 生成設定はnullを不明とし、Seedは数字文字列（最大100桁）。model/size/steps/sampler/guidance/cfgRescale/imageCount/img2img/reference/extraを比較する。`extrasConfirmed`は未取得の追加条件を一致扱いしないための確認。evidenceはunknown/manual/png-metadata。型を検証してから保存する。
+- `ImageRecord`: UUID、SHA-256（全PNGバイト列、64桁hex、一意）、name、mime=image/png、width/height、byteLength、thumbnailBytes、createdAt、metadata。metadataはpositive/negative（null可）、promptEvidence（optional unknown/manual/png-metadata）、GenerationSettings、textsの文字列辞書、warnings。手入力注記は原本バイト列と区別して保持する。
+- `images`にメタデータのみ、`imageOriginals`と`imageThumbnails`に`{id, blob, hash, width, height, byteLength, thumbnailBytes}`を保存。thumbnailは最大256px。バイナリ保存前にハッシュ/寸法/バイト数/PNG構造を再検証し、全資産・画像・revision・backupを同一transactionでcommitする。非同期hash処理はtransaction開始前。
+- v1/v2→v3は元record/metadataを`migrationBackup:v1`/`:v2`へ保存した後に追加storeを作成。失敗時はversion/store/data全てrollback。旧previousImportや既存migration backupは保持する。
+- Blob読取り時も現在snapshotのhash/寸法/バイト数とbindingを照合し、同一IDに違うmetadataを復元した際の古い画像の誤表示を防ぐ。不整合は欠落として通知し、同一PNG再取込で寸法/サイズを修復する。
+- JSON v3は画像メタデータ・比較を含み`imageBinariesIncluded:false`。原本/thumbnailを含む形式はまだ非対応。別端末復元時の欠落はimageBlobのundefinedで検知し、同一ハッシュの再取込でIDを維持して修復。
+- Undo/RedoはBlobを履歴へコピーせず、metadata/associationのみ記録する。削除後のBlobはUndo用に保持。明示purgeは現在データと全履歴、取込前backupで参照されるIDを保護する。未保存Blobは保存キュー内で保持し、quota後のretryでも再利用。
+- PNG上限20MiB/各辺8192px/16,777,216px。テキストは入力・展開後とも256KiB、128チャンク、PNG全体4096チャンク。CRC、終端、圧縮方式、デコードを検査。NovelAI固有のパーサは実サンプル未取得によりunknown fallback。標準テキストは安全な文字列のまま保持する。

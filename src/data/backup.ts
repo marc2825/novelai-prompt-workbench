@@ -1,0 +1,28 @@
+import type { BackupDocument, WorkbenchData } from '../core/types';
+import { FORMAT, MAX_BYTES, SCHEMA_VERSION, ValidationError, validateData } from './validation';
+
+export function exportBackup(data: WorkbenchData, now: string): string {
+  const document: BackupDocument = { format: FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: now, imageBinariesIncluded: false, payload: validateData(data) };
+  const result = JSON.stringify(document, null, 2);
+  if (new TextEncoder().encode(result).byteLength > MAX_BYTES) {
+    const compact = JSON.stringify(document);
+    if (new TextEncoder().encode(compact).byteLength > MAX_BYTES) throw new ValidationError('バックアップが10MiBを超えています');
+    return compact;
+  }
+  return result;
+}
+
+export function prepareImport(current: WorkbenchData, incoming: WorkbenchData, mode: 'merge' | 'replace'): WorkbenchData {
+  const validated = validateData(incoming);
+  if (mode === 'replace') return validated;
+  // Duplicate IDs are explicitly rejected, including identical records. Never overwrite silently.
+  return validateData({ ...validated, ...current,
+    libraryEntries: [...current.libraryEntries, ...validated.libraryEntries],
+    categories: [...current.categories, ...validated.categories],
+    workspaces: [...current.workspaces, ...validated.workspaces],
+    presets: [...current.presets, ...validated.presets],
+    experiments: [...current.experiments, ...validated.experiments],
+    images: [...current.images, ...validated.images],
+    settings: { ...validated.settings, ...current.settings },
+  });
+}

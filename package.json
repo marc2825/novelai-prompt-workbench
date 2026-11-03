@@ -1,0 +1,38 @@
+{
+  "name": "novelai-prompt-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unofficial local-first NovelAI image prompt library and composer",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "postinstall": "wxt prepare",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "fixture": "vite --host 127.0.0.1 --port 4173 --strictPort"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@wxt-dev/module-react": "1.2.2",
+    "fake-indexeddb": "6.2.7",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "wxt": "0.21.5"
+  }
+}

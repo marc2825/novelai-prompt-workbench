@@ -1,0 +1,27 @@
+{
+  "format": "nai-prompt-workbench",
+  "schemaVersion": 1,
+  "exportedAt": "2026-11-03T00:00:00Z",
+  "payload": {
+    "libraryEntries": [
+      {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "title": "黒髪ロング",
+        "raw": "black hair, long hair",
+        "defaultChannel": "positive",
+        "categoryId": null,
+        "tags": [
+          "hair",
+          "black"
+        ],
+        "description": "黒髪ロングの例",
+        "previewImageIds": [],
+        "createdAt": "2026-11-03T00:00:00Z",
+        "updatedAt": "2026-11-03T00:00:00Z"
+      }
+    ],
+    "workspaces": [],
+    "presets": [],
+    "experiments": []
+  }
+}
