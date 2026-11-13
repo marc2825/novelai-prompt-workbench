@@ -1,6 +1,7 @@
 import type { BackupDocument, PromptSpan, WorkbenchData } from '../core/types';
 import { compileWorkspace } from '../core/compose';
 import { assertCommentSpans } from '../core/comments';
+import { normalizeShuffle, validateRecoveries } from './shuffle';
 
 export const FORMAT = 'nai-prompt-workbench';
 export const SCHEMA_VERSION = 3;
@@ -212,7 +213,10 @@ export function validateData(input: unknown): WorkbenchData {
   const settings = object(data.settings ?? { activeWorkspaceId: null, librarySort: 'title' }, 'settings');
   oneOf(settings.librarySort, ['title', 'updatedAt'], 'settings.librarySort');
   if (settings.activeWorkspaceId !== null && !workspaceIds.has(settings.activeWorkspaceId)) fail('settings.activeWorkspaceId', 'ワークスペースが存在しません');
-  const result = { ...data, categories, presets, experiments, images, settings } as unknown as WorkbenchData;
+  // Prompt Shuffle data is optional and versioned independently (docs/shuffle/data-model.md).
+  const shuffle = data.shuffle === undefined ? undefined : normalizeShuffle(data.shuffle);
+  const shuffleRecovery = data.shuffleRecovery === undefined ? undefined : validateRecoveries(data.shuffleRecovery);
+  const result = { ...data, categories, presets, experiments, images, settings, ...(shuffle ? { shuffle } : {}), ...(shuffleRecovery ? { shuffleRecovery } : {}) } as unknown as WorkbenchData;
   if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_BYTES) fail('payload', '10MiBを超えています');
   return structuredClone(result);
 }

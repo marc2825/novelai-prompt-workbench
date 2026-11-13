@@ -1,5 +1,31 @@
 # 実装ステータス
 
+## Prompt Shuffle（2026-11-14）
+
+| Phase | 状態 | 内容 |
+|---|---|---|
+| 0 Audit / ハーネス | 完了 | 調査結果と方針を `docs/shuffle/architecture.md` に記録。AGENTS.md統合、CLAUDE.md、Skill `novelai-prompt-shuffle` |
+| 1 Core Engine | 実装・単体PASS | 型、Seeded PRNG、Pure/Bag/Weighted、直前・直近N件回避、役割割当、制約、カテゴリ置換の合成、モデル制限、`|`構文、生成カウンタ |
+| 2 UI / 手動Apply | 実装・Mock E2E PASS | シャッフルタブ、キャラクター/テンプレート/プール/カメラ管理、現在・次回プレビュー、Shuffle Now、Apply/Restore、履歴、設定export/import |
+| 3 NovelAI連携 | **fixtureのみ検証／実サイト非対応** | 複数欄プロトコル、能力検出、欄数照合、CAS・rollback・readback。実adapterは読取り専用のまま、キャラクター欄・モデル・生成検知・位置は能力false |
+| 4 生成連動 | **fixtureのみ検証／実サイトは手動記録** | lease付きオブザーバ、job IDでの重複排除、再読込・再描画・失敗の除外、生成中は待機、編集検出で停止、手動+1の代替 |
+| 5 品質 | 完了 | 下記の全コマンドPASS、ドキュメント更新 |
+
+検証（Node 24.21.0 / pnpm 10.34.5 / Playwright 1.64.1 Chromium）:
+
+| コマンド | 結果 |
+|---|---|
+| `corepack pnpm test` | **246件 PASS / 16ファイル**（既存184 + シャッフル62） |
+| `corepack pnpm typecheck` | PASS |
+| `corepack pnpm build` | PASS（権限は `sidePanel` のみ、entrypoint追加なし） |
+| `corepack pnpm test:e2e` | **46件 PASS**（既存37 + シャッフル9） |
+
+E2E環境: Playwright 1.64.1用Chromiumを `playwright install` で取得し、root権限なしで不足共有ライブラリ（libnspr4/libnss3/libasound2）を `apt-get download` + `dpkg -x` で作業用ディレクトリに展開して `LD_LIBRARY_PATH` に指定した。依存・lockfileの変更なし。
+
+未検証・未実装: 実NovelAIでの書込み・キャラクター欄・生成検知・モデル検出・Character Positions（すべて無効/非対応として表示）。プリセットごとのプロファイル、バリエーション数推定、類似度ベースの構図回避。詳細は `docs/shuffle/limitations.md`。commit/push は行っていない。
+
+---
+
 更新: 2026-11-03（Asia/Tokyo）。ユーザー指定の**P4画像管理・手動A/B比較を実装**。既存資料のP3-Bに相当する。P0〜P3の機能・データを維持し、実NovelAIのwriteは無効のまま。
 
 | Phase | 状態 | 内容 |

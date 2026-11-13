@@ -1,33 +1,64 @@
 import type { Channel } from '../../core/types';
-import type { NovelAIAdapter } from './adapter';
-import { failure, MAX_PROMPT_LENGTH, type Capabilities, type FieldSnapshot, type Result, type WriteMode } from './protocol';
+import { parseFieldKey, type FieldKey } from '../../core/shuffle/fields';
+import type { NovelAIAdapter, PromptFieldsAdapter } from './adapter';
+import { visible } from './dom-visibility';
+import { DomGenerationObserver, type GenerationProfile } from './generation';
+import { failure, MAX_PROMPT_LENGTH, type Capabilities, type FieldCapability, type FieldSnapshot, type FieldsDescription, type Result, type WriteMode } from './protocol';
+
+export { visible };
 
 export interface VerifiedTextareaProfile {
   id: string;
   evidence: string;
   selectors: Record<Channel, string>;
-}
-
-export function visible(element: Element): boolean {
-  const view = element.ownerDocument.defaultView;
-  if (!view || !element.isConnected || !element.getClientRects().length || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
-  const style = view.getComputedStyle(element);
-  return style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse';
+  /** Character prompt textareas; `{n}` is replaced by the 1-based slot number. */
+  characters?: { max: number; selectors: Record<Channel, string> };
+  /** Element whose trimmed text is the model label. */
+  model?: { selector: string };
+  generation?: GenerationProfile;
 }
 
 // Only verified profiles may use this adapter. Production has no textarea profile.
 export class TextareaAdapter implements NovelAIAdapter {
   private readonly tokens = new WeakMap<Element, string>();
-  constructor(private readonly document: Document, private readonly profile: VerifiedTextareaProfile) {}
+  readonly fields: PromptFieldsAdapter;
+  readonly generation?: DomGenerationObserver;
+  constructor(private readonly document: Document, private readonly profile: VerifiedTextareaProfile) {
+    this.fields = {
+      describe: () => this.describe(),
+      readField: async field => this.readElement(this.findField(field)),
+      writeField: (field, expected, next) => this.writeElement(() => this.findField(field), expected, next, 'replace'),
+    };
+    if (profile.generation) this.generation = new DomGenerationObserver(document, profile.generation);
+  }
 
+  private selector(field: FieldKey): string | null {
+    const parsed = parseFieldKey(field);
+    if (parsed.kind === 'base') return this.profile.selectors[parsed.channel];
+    const characters = this.profile.characters;
+    if (!characters || parsed.index > characters.max) return null;
+    return characters.selectors[parsed.channel].replaceAll('{n}', String(parsed.index));
+  }
+  private other(field: FieldKey): string | null {
+    const parsed = parseFieldKey(field);
+    const flipped: Channel = parsed.channel === 'positive' ? 'negative' : 'positive';
+    return this.selector(parsed.kind === 'base' ? `base:${flipped}` : `character:${parsed.index}:${flipped}`);
+  }
+  private findField(field: FieldKey): Result<{ element: HTMLTextAreaElement }> {
+    const selector = this.selector(field);
+    if (!selector) return failure('UNSUPPORTED', 'このサイト連携ではキャラクター欄を扱えません');
+    return this.findBy(selector, this.other(field));
+  }
   private find(channel: Channel): Result<{ element: HTMLTextAreaElement }> {
-    const matches = Array.from(this.document.querySelectorAll(this.profile.selectors[channel])).filter(visible);
+    return this.findBy(this.profile.selectors[channel], this.profile.selectors[channel === 'positive' ? 'negative' : 'positive']);
+  }
+  private findBy(selector: string, otherSelector: string | null): Result<{ element: HTMLTextAreaElement }> {
+    const matches = Array.from(this.document.querySelectorAll(selector)).filter(visible);
     if (!matches.length) return failure('NOT_FOUND', '入力欄が見つかりません。コピーを使用してください');
     if (matches.length !== 1) return failure('AMBIGUOUS', '入力欄の候補が複数あるため書き込みません');
     const element = matches[0]!;
     if (!(element instanceof this.document.defaultView!.HTMLTextAreaElement)) return failure('UNSUPPORTED', '確認済みのtextareaではありません');
-    const other = Array.from(this.document.querySelectorAll(this.profile.selectors[channel === 'positive' ? 'negative' : 'positive']));
-    if (other.includes(element)) return failure('AMBIGUOUS', 'チャンネルの入力欄が重複しています');
+    if (otherSelector && Array.from(this.document.querySelectorAll(otherSelector)).includes(element)) return failure('AMBIGUOUS', 'チャンネルの入力欄が重複しています');
     if (element.disabled || element.readOnly) return failure('UNSUPPORTED', '入力欄は無効または読取り専用です');
     return { ok: true, element };
   }
@@ -36,6 +67,11 @@ export class TextareaAdapter implements NovelAIAdapter {
     let token = this.tokens.get(element);
     if (!token) { token = crypto.randomUUID(); this.tokens.set(element, token); }
     return { raw: element.value, start: element.selectionStart, end: element.selectionEnd, token };
+  }
+  private readElement(found: Result<{ element: HTMLTextAreaElement }>): Result<{ snapshot: FieldSnapshot }> {
+    if (!found.ok) return found;
+    if (found.element.value.length > MAX_PROMPT_LENGTH) return failure('UNSUPPORTED', '入力が100万文字を超えています');
+    return { ok: true, snapshot: this.snapshot(found.element) };
   }
 
   async capabilities(): Promise<Capabilities> {
@@ -47,15 +83,37 @@ export class TextareaAdapter implements NovelAIAdapter {
     return result;
   }
 
+  private async describe(): Promise<Omit<FieldsDescription, 'positions' | 'generation'>> {
+    const capability = (field: FieldKey): FieldCapability => {
+      const found = this.findField(field);
+      return { canRead: found.ok, canWrite: found.ok, reason: found.ok ? this.profile.evidence : found.reason };
+    };
+    let slots = 0;
+    let writable = true;
+    const max = this.profile.characters?.max ?? 0;
+    while (slots < max && this.findField(`character:${slots + 1}:positive`).ok) {
+      slots++;
+      writable &&= this.findField(`character:${slots}:negative`).ok;
+    }
+    const modelElements = this.profile.model ? Array.from(this.document.querySelectorAll(this.profile.model.selector)).filter(visible) : [];
+    const label = modelElements.length === 1 ? (modelElements[0]!.textContent ?? '').trim().slice(0, 200) || null : null;
+    return {
+      base: { positive: capability('base:positive'), negative: capability('base:negative') },
+      characters: { slots, canRead: slots > 0, canWrite: slots > 0 && writable, reason: !this.profile.characters ? 'このサイト連携ではキャラクター欄を扱えません' : slots ? this.profile.evidence : 'キャラクター欄が見つかりません' },
+      model: { label, reason: label ? this.profile.evidence : 'モデル表示を一意に特定できません' },
+    };
+  }
+
   async read(channel: Channel): Promise<Result<{ snapshot: FieldSnapshot }>> {
-    const found = this.find(channel);
-    if (!found.ok) return found;
-    if (found.element.value.length > MAX_PROMPT_LENGTH) return failure('UNSUPPORTED', '入力が100万文字を超えています');
-    return { ok: true, snapshot: this.snapshot(found.element) };
+    return this.readElement(this.find(channel));
   }
 
   async write(channel: Channel, expected: FieldSnapshot, next: string, mode: WriteMode): Promise<Result<{ snapshot: FieldSnapshot }>> {
-    const found = this.find(channel);
+    return this.writeElement(() => this.find(channel), expected, next, mode);
+  }
+
+  private async writeElement(locate: () => Result<{ element: HTMLTextAreaElement }>, expected: FieldSnapshot, next: string, mode: WriteMode): Promise<Result<{ snapshot: FieldSnapshot }>> {
+    const found = locate();
     if (!found.ok) return found;
     const element = found.element;
     const current = this.snapshot(element);
@@ -73,13 +131,13 @@ export class TextareaAdapter implements NovelAIAdapter {
       dispatch(next);
       // Verify after controlled state has had time to restore/rerender the input.
       await new Promise<void>(resolve => view.setTimeout(resolve, 80));
-      const after = this.find(channel);
+      const after = locate();
       if (!after.ok || after.element !== element || element.value !== next) return failure('VERIFY_FAILED', '再読取りが反映内容と一致しません。自動再試行せず、サイトの現在値を確認してください');
       element.setSelectionRange(Math.min(current.start, next.length), Math.min(current.end, next.length));
       return { ok: true, snapshot: this.snapshot(element) };
     } catch {
       // Restore only our own unchanged write; never overwrite a concurrent edit.
-      const after = this.find(channel);
+      const after = locate();
       if (after.ok && after.element === element && element.value === next) {
         try { dispatch(expected.raw); } catch { /* Report failure, never retry generation. */ }
       }

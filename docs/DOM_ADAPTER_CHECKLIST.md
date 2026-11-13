@@ -49,3 +49,7 @@
 - `TextareaAdapter`は検証済みprofileを明示注入するローカルReact fixture専用。profileは`src/platform/novelai/testing.ts`に分離し、製品entryからimportしない。
 
 未確認: ログイン後のDOM、UI言語切替、Character Prompts、装飾・マクロの原文抽出、実サイトのinput/changeイベント、書込み→blur→再描画後の保持。チェックリストの書込み手順は未実施なので、実NovelAIの挿入/置換を完了扱いにしない。ユーザー確認を伴う実機検証後に別のwrite profileを追加する。
+
+## Prompt Shuffle（2026-11-14）
+
+実サイトへのアクセスは行っていない。次は**未調査**で、製品adapterでは扱わない（能力false）: Character Prompts欄（追加/削除ボタン・各欄のエディタ構造・UC欄）、モデル選択表示、生成ボタンの状態と完了表示、Character Positionsのキャンバス。調査・検証手順は `docs/shuffle/site-adapter.md` の「実NovelAI対応を追加する手順」。

@@ -13,9 +13,10 @@ import { SiteConnection } from './SiteConnection';
 import { Presets, PresetStatus } from './Presets';
 import { recoveryJson } from '../data/recovery';
 import { Comparisons } from './Comparisons';
+import { Shuffle } from './Shuffle';
 
-type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定';
-const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', '比較', '設定'];
+type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル';
+const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', '比較', '設定', 'シャッフル'];
 
 export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const workbench = useWorkbench();
@@ -64,6 +65,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         {tab === '設定' && <Settings workbench={workbench} />}
         {tab === 'プリセット' && <Presets workbench={workbench} onEdit={() => setTab('ワークスペース')} />}
         {tab === '比較' && <Comparisons workbench={workbench} onDraftChange={setComparisonDraft} />}
+        {tab === 'シャッフル' && <Shuffle workbench={workbench} siteClient={siteClient} />}
       </div>
       <section className="panel stack preview" aria-label="ライブプレビュー"><div className="group-head"><h2>出力プレビュー</h2><small>{workspace?.title ?? '構成なし'}</small></div>
         {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}><label>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}<textarea readOnly rows={3} value={compiled[channel]} /></label><button type="button" onClick={() => void copy(channel)}>{channel === 'positive' ? 'Positiveをコピー' : 'Negativeをコピー'}</button></div>)}

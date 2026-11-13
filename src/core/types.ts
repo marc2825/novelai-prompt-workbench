@@ -1,3 +1,5 @@
+import type { ShuffleData, ShuffleRecovery } from './shuffle/types';
+
 export type Channel = 'positive' | 'negative';
 export type SelectionMode = 'multi' | 'exclusive';
 
@@ -38,6 +40,10 @@ export interface WorkbenchData {
   experiments: Experiment[];
   images: ImageRecord[];
   settings: Settings;
+  /** Prompt Shuffle state (optional; absent = empty). Has its own schemaVersion. */
+  shuffle?: ShuffleData;
+  /** Quarantined unreadable shuffle data found at load time, kept for manual recovery. */
+  shuffleRecovery?: ShuffleRecovery[];
   // Forward-compatible, inert JSON fields survive backup/restore.
   [key: string]: unknown;
 }

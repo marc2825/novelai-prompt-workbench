@@ -161,3 +161,8 @@ interface Experiment {
 - JSON v3は画像メタデータ・比較を含み`imageBinariesIncluded:false`。原本/thumbnailを含む形式はまだ非対応。別端末復元時の欠落はimageBlobのundefinedで検知し、同一ハッシュの再取込でIDを維持して修復。
 - Undo/RedoはBlobを履歴へコピーせず、metadata/associationのみ記録する。削除後のBlobはUndo用に保持。明示purgeは現在データと全履歴、取込前backupで参照されるIDを保護する。未保存Blobは保存キュー内で保持し、quota後のretryでも再利用。
 - PNG上限20MiB/各辺8192px/16,777,216px。テキストは入力・展開後とも256KiB、128チャンク、PNG全体4096チャンク。CRC、終端、圧縮方式、デコードを検査。NovelAI固有のパーサは実サンプル未取得によりunknown fallback。標準テキストは安全な文字列のまま保持する。
+
+## Prompt Shuffle（DB/JSON v3のまま追加）
+
+- `WorkbenchData.shuffle?: ShuffleData`（独自 `schemaVersion: 1`）と `shuffleRecovery?: ShuffleRecovery[]`。`metadata.extra` に保存され、同じtransaction・revision・JSONバックアップに含まれる。
+- 型・不変条件・移行・隔離・merge規則は `docs/shuffle/data-model.md`、正本は `src/core/shuffle/types.ts` と `src/data/shuffle.ts`。

@@ -1,5 +1,6 @@
 import type { BackupDocument, WorkbenchData } from '../core/types';
 import { FORMAT, MAX_BYTES, SCHEMA_VERSION, ValidationError, validateData } from './validation';
+import { mergeShuffle } from './shuffle';
 
 export function exportBackup(data: WorkbenchData, now: string): string {
   const document: BackupDocument = { format: FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: now, imageBinariesIncluded: false, payload: validateData(data) };
@@ -24,5 +25,7 @@ export function prepareImport(current: WorkbenchData, incoming: WorkbenchData, m
     experiments: [...current.experiments, ...validated.experiments],
     images: [...current.images, ...validated.images],
     settings: { ...validated.settings, ...current.settings },
+    // Shuffle collections merge like other assets; ID collisions are rejected.
+    ...(current.shuffle || validated.shuffle ? { shuffle: mergeShuffle(current.shuffle, validated.shuffle) } : {}),
   });
 }

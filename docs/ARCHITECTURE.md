@@ -103,3 +103,8 @@ interface NovelAIAdapter {
 - `ui/useWorkbench.ts`: 画像writeを保存キューへstageし、metadata/slotと共にcommit。失敗時は未保存状態とBlobを維持しretry可能。Undoはmetadataのみを保持、明示purge時は履歴/backupを保護する。
 - `ui/Comparisons.tsx`: source選択→A/B固定→B案編集/preview/確定→手動copy→各PNG取込。セッションCRUD/設定diff/metadata照合と手入力/容量/欠落通知。workspaceやサイトを暗黙に更新しない。
 - `ui/ImageComparison.tsx`: BlobからのObject URLをeffect cleanupで解放。遅い非同期読込はcancelし、bitmapもclose。同期zoom/pan、横並び/ワイプ/サイズ条件付きpixel diff。Canvasは検証済みローカルPNGのみ。
+
+## Prompt Shuffle
+
+- 純粋エンジン `src/core/shuffle`、検証/移行 `src/data/shuffle.ts`、複数欄プロトコルと生成オブザーバ `src/platform/novelai`、UI `src/ui/Shuffle.tsx` と `src/ui/shuffle/`。詳細・依存関係・判断は `docs/shuffle/architecture.md`。
+- 実NovelAIの live adapter は引き続き読取り専用。キャラクター欄・生成検知・位置は能力falseを返し、パネルはコピーと手動記録に切り替える。

@@ -1,6 +1,6 @@
 # NovelAI Prompt Workbench (非公式)
 
-NovelAI画像生成向けのローカル保存型Chrome MV3拡張です。P0/P1、P2の範囲コメント・連携基盤に加え、**P3のプリセット・グループ切替と、P4の画像管理・手動A/B比較を実装済み**です。**実NovelAIへの書込みは未検証のため、引き続き無効です。** NovelAIとは提携していません。
+NovelAI画像生成向けのローカル保存型Chrome MV3拡張です。P0/P1、P2の範囲コメント・連携基盤に加え、**P3のプリセット・グループ切替、P4の画像管理・手動A/B比較、プロンプトシャッフル（役割・ポーズ・カメラ・順序）を実装済み**です。**実NovelAIへの書込みは未検証のため、引き続き無効です。** NovelAIとは提携していません。
 
 ## 実装済み
 
@@ -90,6 +90,24 @@ PNGは20MiB、各辺8192px、合計16,777,216画素まで。PNG署名・チャ�
 
 fixture上の書込みフローは対象タブ固定→read/prepare→変更前後確認→明示apply→CAS/readbackです。成功を実サイト対応の根拠にはしていません。権限は`sidePanel`のみで、tabs/activeTab/host_permissions/backgroundを追加していません。
 
+## プロンプトシャッフル
+
+同じプロンプトで構図が似通うのを避けるため、**キャラクターの外見（固定プロンプト）は変えずに**、役割・ポーズ・表情・カメラ・左右順だけを入れ替えます。「シャッフル」タブから使います。
+
+1. 「＋ プロファイル」を作成し、キャラクターを追加して固定プロンプト（例: `girl, blonde hair, blue eyes, white dress`）を入力します。可変プロンプトはカテゴリ別に入力し、シャッフルがそのカテゴリを決めたときだけ置き換わります。
+2. 役割テンプレート（例: Pointing — 行動する側 `standing, source#pointing at another` / 行動される側 `sitting, target#pointing`）やポーズセット・候補プール・カメラプリセットを登録します。「標準テンプレート・候補を追加」で汎用例を入れられます（明示操作時のみ）。
+3. 対象カテゴリ、方式（Pure Random / Shuffle Bag / Weighted Random）、直前・直近N件の回避、シャッフルSeed、モデルを選びます。
+4. 「Shuffle Now」で結果を確認します。役割は「A=行動する側、B=される側」と「B=行動する側、A=される側」のように**組で**入れ替わり、Shuffle Bagでは両方を使い切ってから次の巡回に入ります。「次のシャッフル結果のプレビュー」で次の差分も確認できます。
+5. 各欄（ベースPrompt・キャラクター別Prompt/UC）をコピーしてNovelAIに貼り付けます。サイト連携できる環境では「Apply（反映プレビュー）」→「確認してApply」、元に戻すときは「Restore」です。
+
+- 合成は毎回、ワークスペースの出力とキャラクター定義から計算し直すため、何度適用してもタグは増えません。ユーザーが書いたタグは削除せず、矛盾の可能性だけ警告します。NovelAIの `||a|b||` ランダマイザーは改変しません。
+- 同じ設定・同じシャッフルSeed・同じステップ数で同じ結果を再現します。NovelAIの生成Seedとは別で、生成Seedは読み書きしません。履歴（最大50件）から過去の結果を再適用できます。
+- 生成回数に応じた切替: 間隔（毎回/3/5/10/任意）を選び、「生成完了を手動で記録（+1）」で数えると、規定回数でシャッフルします。生成状態を確認できるサイト連携（現在はローカルfixtureのみ）では「自動シャッフルを開始」で、成功したジョブ数に応じて次回用プロンプトを書き換えます。生成ボタンは押さず、生成中は書き換えず、サイト側で編集されていれば上書きせず停止します。
+- **実NovelAIでは**: キャラクター欄・モデル表示・生成状態のDOMが未検証のため、反映・自動検知は無効です（接続すると「非対応」と理由を表示します）。コピーと手動記録を使ってください。Character Positionsの座標は変更しません。
+- 設定はIndexedDBに保存され、JSONバックアップに含まれます。シャッフル設定だけのエクスポート/インポート（履歴なし）もできます。読み込めないシャッフル設定は隔離し、ライブラリは通常どおり起動します。
+
+詳細: [docs/shuffle/architecture.md](docs/shuffle/architecture.md)、[データモデル](docs/shuffle/data-model.md)、[Site Adapter](docs/shuffle/site-adapter.md)、[テスト計画](docs/shuffle/test-plan.md)、[制約](docs/shuffle/limitations.md)。
+
 ## ローカル確認・テスト
 
 ```bash
@@ -108,6 +126,14 @@ corepack pnpm test:e2e
 LD_LIBRARY_PATH=/tmp/nai-chromium-deps/root/usr/lib/x86_64-linux-gnu \
 PLAYWRIGHT_BROWSERS_PATH=/tmp/nai-pw-browsers corepack pnpm test:e2e
 ```
+
+（root権限がない環境では `apt-get download libnspr4 libnss3 libasound2t64` と `dpkg -x` で共有ライブラリを展開し、`LD_LIBRARY_PATH` に指定します。）
+
+## 検証結果（2026-11-14、シャッフル追加後）
+
+- 単体・統合 **246件成功**（既存184 + シャッフル62）、strict型検査・production build成功。
+- Chromium E2E **46件成功**（既存37 + シャッフル9: 模擬サイト8、実content script 1）。
+- Mock E2Eの成功は実NovelAIでの動作確認ではありません。実サイトの書込み・キャラクター欄・生成検知は未検証で無効です。
 
 ## 検証結果（2026-11-03）
 

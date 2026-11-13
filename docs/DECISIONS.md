@@ -70,3 +70,20 @@ P0/P1検証日: 2026-11-03（ユーザーのAsia/Tokyo日付）。Linux上のブ
 | ADR-047 | Blobは削除時に即消去せず、明示purgeする | Undo/Redo/取込前backupの画像を保護。quota時は未保存Blobをメモリ保持しretry。容量はnavigator.storage.estimateの概算を表示。実ディスク満杯は未検証 |
 | ADR-048 | 共通物理倍率・位置で同期表示。pixel diffに上限 | 横並び/ワイプ。4MpxまでのsRGB RGBA絶対差。寸法違いは警告し、明示選択時だけBをAへCanvas高品質補間で変形する。原本は不変 |
 | ADR-049 | 画像とPromptはローカルのみ、生成はユーザー操作 | 追加通信・権限・entrypoint・依存なし。P2 live write能力falseを維持。fixture成功を実サイト検証とは扱わない |
+
+## Prompt Shuffle（2026-11-14）
+
+詳細は `docs/shuffle/`。
+
+| ID | 決定 | 理由・制限 |
+|---|---|---|
+| ADR-050 | 既存レイヤ（core/data/platform/ui）に配置し、`src/features/` は作らない | 既存設計との整合を優先。純粋ロジックは `src/core/shuffle`、DOMは `src/platform/novelai` のみ |
+| ADR-051 | Role Template と Pose Set を同一型 `SceneTemplate`（kind）で管理。役割IDとキャラクターIDを分離 | 割当の入替えを1つの仕組みで扱う。割当は二部マッチングで実現性を確認し、720通り以下だけ列挙・Bag、それ以上は段階的サンプリング（直積を作らない） |
+| ADR-052 | カテゴリ単位の置換と固定/可変の分離。ユーザー記述は削除せず警告のみ | 外見と構図の混在を防ぎ、二重適用でタグを増やさない。警告用のタグ抽出は単純なカンマ項目のみ（構文は解析しない） |
+| ADR-053 | cyrb128→sfc32 の自前PRNG、step別ストリーム、cursorを保存 | 依存追加なしで決定的。シャッフルSeedはNovelAIの生成Seedと独立し、生成Seedは扱わない |
+| ADR-054 | `WorkbenchData.shuffle`（独立 schemaVersion 1）。DB/JSON v3は維持 | IDB store追加・DB移行なしで同一transaction/revision/Undo/JSONに乗せる。読込時の不正shuffleは `shuffleRecovery` に隔離しライブラリを止めない（既存の「破損DBを自動初期化しない」に対し、元データを保持したまま分離する例外） |
+| ADR-055 | 複数欄書込みは単一ticket・書込み前の全欄CAS・自己書込みのみrollback・全欄readback | 部分成功と他者編集の上書きを防ぐ。既存の単一チャンネルprepare/applyは維持 |
+| ADR-056 | 実NovelAIのキャラクター欄・モデル・生成検知・位置座標は非対応（能力false） | DOM未調査。推測セレクタを入れない。fixture profileでのみ検証し、実サイトはコピーと手動記録で代替 |
+| ADR-057 | 生成回数は content script のオブザーバ（lease中のみ稼働）＋パネルのポーリングで数える | 成功ジョブをjob IDで1回だけ数え、再描画・失敗・再読込を数えない。複数パネルはleaseで排他。自動生成・Generateクリックはしない |
+| ADR-058 | 連続シャッフルは1つのUndo単位（coalesce） | 自動シャッフルで30件のUndo履歴を押し流さない。Undoはサイトを戻さない |
+| ADR-059 | 反映前原文・最後の書込み値はパネルのメモリのみ | 既存P2方針（サイト原文はDBに保存しない）に合わせる。パネルを閉じるとRestore不可 |

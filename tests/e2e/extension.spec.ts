@@ -136,3 +136,44 @@ test('real Content Script messaging isolates actual tabs and rejects reload/navi
     await expect(panel.getByRole('button', { name: 'Negativeをコピー', exact: true })).toBeEnabled();
   } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
 });
+
+test('real Content Script: shuffle reports unverified character fields, generation detection and writes as unsupported', async () => {
+  const extensionPath = resolve('.output/chrome-mv3');
+  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
+  const profile = await mkdtemp(join(tmpdir(), 'nai-shuffle-content-test-'));
+  const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  try {
+    // Synthetic page only; no live site, account or network. Contains look-alike
+    // character boxes that the production adapter must NOT treat as verified.
+    await context.route('https://novelai.net/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mock shuffle</title><div class="prompt-input-box-prompt" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>base text</p></div></div><div class="prompt-input-box-undesired-content" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>uc text</p></div></div><textarea class="character-prompt">character one</textarea><button>Generate untouched</button>' }));
+    const site = await context.newPage();
+    await site.goto('https://novelai.net/image');
+    const panel = await context.newPage();
+    panel.on('dialog', dialog => void dialog.accept());
+    await panel.goto(`chrome-extension://${id}/sidepanel.html`);
+    await expect(panel.getByText('保存済み · この端末のみ', { exact: true })).toBeVisible();
+    await panel.getByRole('tab', { name: 'シャッフル', exact: true }).click();
+    await panel.getByRole('button', { name: '＋ プロファイル', exact: true }).click();
+    await panel.getByRole('textbox', { name: '新しいキャラクター名', exact: true }).fill('Solo');
+    await panel.getByRole('button', { name: 'キャラクターを追加', exact: true }).click();
+    await panel.getByRole('button', { name: 'シャッフル用にNovelAIを接続', exact: true }).click();
+    const select = panel.getByRole('combobox', { name: 'シャッフルの対象タブ', exact: true });
+    const tabId = await select.getByRole('option', { name: /Mock shuffle/ }).getAttribute('value');
+    await select.selectOption(tabId!);
+    const support = panel.getByRole('list', { name: 'シャッフルの対象サイトの対応状況', exact: true });
+    await expect(support).toContainText('ベース Prompt: 読取りのみ');
+    await expect(support).toContainText('キャラクター欄: 0個（書込み不可）');
+    await expect(support).toContainText('Character Prompts欄のDOMは未検証');
+    await expect(support).toContainText('モデル表示: 不明');
+    await expect(support).toContainText('キャラクター位置: 変更しません');
+    await expect(support).toContainText('生成検知: 非対応');
+    await expect(panel.getByRole('button', { name: 'Apply（反映プレビュー）', exact: true })).toBeDisabled();
+    await panel.getByRole('combobox', { name: '自動シャッフルの間隔', exact: true }).selectOption('1');
+    await expect(panel.getByRole('button', { name: '自動シャッフルを開始', exact: true })).toBeDisabled();
+    await expect(panel.getByLabel('自動シャッフルの状態', { exact: true })).toContainText('このページでは生成を検知できません');
+    await expect(panel.getByRole('button', { name: '生成完了を手動で記録（+1）', exact: true })).toBeEnabled();
+    await expect(panel.getByRole('button', { name: 'ベース Promptをコピー', exact: true })).toBeEnabled();
+    await expect(site.locator('[contenteditable=true]').first()).toHaveText('base text');
+    await expect(site.locator('textarea.character-prompt')).toHaveValue('character one');
+  } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
+});

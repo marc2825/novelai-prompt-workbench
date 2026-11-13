@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { record, redo, startHistory, undo, type History } from '../core/history';
+import { record, redo, replacePresent, startHistory, undo, type History } from '../core/history';
 import type { WorkbenchData } from '../core/types';
 import { MigrationError, WorkbenchRepository } from '../data/repository';
 import { validateData } from '../data/validation';
@@ -20,6 +20,9 @@ export function useWorkbench() {
   const [storageError, setStorageError] = useState('');
   const [error, setError] = useState('');
   const [migrationRecovery, setMigrationRecovery] = useState<unknown>(null);
+  const [loadNotice, setLoadNotice] = useState('');
+  // Consecutive coalesced commits (shuffle steps) share one undo entry.
+  const coalescing = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +35,7 @@ export function useWorkbench() {
         const loaded = await opened.load();
         if (cancelled) return;
         revision.current = loaded.revision;
+        if (loaded.notice) setLoadNotice(loaded.notice);
         current.current = startHistory(loaded.data);
         setHistory(current.current);
       } catch (cause) {
@@ -71,18 +75,22 @@ export function useWorkbench() {
     void drain();
   };
 
-  const commit = (change: WorkbenchData | ((data: WorkbenchData) => WorkbenchData), backup = false): boolean => {
+  const commit = (change: WorkbenchData | ((data: WorkbenchData) => WorkbenchData), backup = false, options: { coalesce?: boolean } = {}): boolean => {
     if (!current.current) return false;
     try {
       const next = validateData(typeof change === 'function' ? change(current.current.present) : change);
-      apply(record(current.current, next), backup);
+      const merge = !!options.coalesce && coalescing.current && current.current.past.length > 0;
+      coalescing.current = !!options.coalesce;
+      apply(merge ? replacePresent(current.current, next) : record(current.current, next), backup);
       setError('');
       return true;
     } catch (cause) { setError(message(cause)); return false; }
   };
 
   return {
-    data: history?.present ?? null, saving, storageError, error, setError, commit, repository, migrationRecovery,
+    data: history?.present ?? null, saving, storageError, error, setError, commit, repository, migrationRecovery, loadNotice, setLoadNotice,
+    /** Latest committed state, readable synchronously from async callbacks. */
+    latest: () => current.current?.present ?? null,
     imageBlob: async (id: string, thumbnail = false) => {
       const pendingImage = imageWrites.current.get(id);
       const record = current.current?.present.images.find(image => image.id === id);
@@ -107,8 +115,8 @@ export function useWorkbench() {
       await repository.current?.purgeUnreferenced(states.flatMap(state => state.images.map(image => image.id)));
     },
     canUndo: !!history?.past.length, canRedo: !!history?.future.length,
-    undo: () => { if (current.current?.past.length) apply(undo(current.current), false); },
-    redo: () => { if (current.current?.future.length) apply(redo(current.current), false); },
+    undo: () => { coalescing.current = false; if (current.current?.past.length) apply(undo(current.current), false); },
+    redo: () => { coalescing.current = false; if (current.current?.future.length) apply(redo(current.current), false); },
     retry: () => { failed.current = false; setStorageError(''); void drain(); },
     recover: async (data: WorkbenchData) => {
       if (!repository.current) throw new Error('DBに接続できません。元データの退避後に再試行してください');

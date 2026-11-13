@@ -12,3 +12,8 @@ export function redo<T>(history: History<T>): History<T> {
   if (!history.future.length) return history;
   return { past: [...history.past, history.present], present: history.future[0]!, future: history.future.slice(1) };
 }
+/** Replace the present without a new undo entry (coalesces consecutive runtime steps). */
+export function replacePresent<T>(history: History<T>, next: T): History<T> {
+  if (next === history.present) return history;
+  return { ...history, present: next, future: [] };
+}
