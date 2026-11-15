@@ -1,5 +1,28 @@
 # 実装ステータス
 
+## タグ重みスライダー・画像比較UI（2026-11-16）
+
+- Workspace/B変更案の自由入力・候補原文で、選択したタグだけを0〜2のスライダー（0.05刻み）または数値入力で調整。数値重み全体の再選択、標準1への復帰、変更後preview、1回Undo/Redo。複雑構文・コメント構造・不正選択・古い原文は保護する。
+- Bの未反映プレビュー中は確定を無効化。A/元workspace/辞書は独立し、B確定時に旧画像の関連付けを解除する。PNG比較ビューを上部に移し、手動生成から比較までの手順を表示。
+- 狭いサイドパネルでグリッドの最小幅が広がる問題を修正。400px幅で重みコントロールが収まることをMock E2E・スクリーンショットで確認。
+- 永続化は従来のraw/snapshotのみ。DB/JSON v3、追加依存・権限・entrypointなし。README、PROMPT_SEMANTICS、AB_COMPARISON、DECISIONSを更新。
+
+検証（Node 24.21.0 / pnpm 10.34.5 / Playwright Chromium、ローカルfixtureのみ）:
+
+| コマンド | 結果 |
+|---|---|
+| `corepack pnpm install --frozen-lockfile --store-dir /tmp/nai-pnpm-store` | PASS（既存の書込み可能ストアを使用、lockfile変更なし） |
+| `corepack pnpm test` | **283件 PASS / 0件 FAIL、17ファイル**（既存246 + 重み37） |
+| `corepack pnpm typecheck` | PASS |
+| `corepack pnpm build` | PASS（権限は `sidePanel` のみ） |
+| `corepack pnpm test:e2e` | **49件 PASS / 0件 FAIL**（既存46 + 重み3、Mock E2E） |
+
+E2Eは既存の `/tmp/portfolio-ci-libs/root/usr/lib/x86_64-linux-gnu` を `LD_LIBRARY_PATH` に指定し、localhost待受・Chromium起動が可能な実行環境で検証。途中のテスト修正: ラベルの検索方法1件、400pxでの幅超過2件を検出して修正し、新規3件の再実行は全PASS。
+
+実サイトの手動検証は未実施。数値重みのモデル別解釈・生成効果、実NovelAIへの書込み、実NovelAI固有PNGメタデータは未検証。画像の自動生成は行わず、比較には手動保存PNGを使う。pushなし。
+
+---
+
 ## Prompt Shuffle（2026-11-14）
 
 | Phase | 状態 | 内容 |

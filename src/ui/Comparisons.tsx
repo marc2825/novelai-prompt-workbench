@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { captureVariant, compareSettings, createExperiment, duplicateExperiment, experimentDifferences, SETTING_LABELS, textDifference } from '../core/experiments';
 import { toggleMember, updateGroup } from '../core/commands';
 import { compileWorkspace } from '../core/compose';
@@ -26,21 +26,28 @@ function SettingsEditor({ value, onSave }: { value: GenerationSettings; onSave: 
 }
 function VariantDraft({ variant, onSave, onCancel }: { variant: ExperimentVariant; onSave: (workspace: PromptWorkspace) => void; onCancel: () => void }) {
   const [history, setHistory] = useState(() => startHistory(structuredClone(variant.workspaceSnapshot))); const draft = history.present;
+  const [pendingWeights, setPendingWeights] = useState<Set<string>>(() => new Set());
+  const weightDraftChanged = useCallback((label: string, pending: boolean) => setPendingWeights(previous => {
+    if (previous.has(label) === pending) return previous;
+    const next = new Set(previous); if (pending) next.add(label); else next.delete(label); return next;
+  }), []);
   const update = (next: PromptWorkspace) => setHistory(previous => record(previous, next));
   const compiled = compileWorkspace(draft);
   return <section className="panel stack" aria-label="Bスナップショット編集"><h3>Bの変更案（未保存）</h3><p>現在のワークスペースとAは変更しません。確定時にBのプロンプトを再固定し、旧画像の関連付けを外します。</p>
-    {(['positive', 'negative'] as const).map(channel => <PromptEditor key={channel} label={`B変更案 ${channel}`} value={channel === 'positive' ? draft.freeformPositive : draft.freeformNegative} spans={channel === 'positive' ? draft.freeformPositiveSpans : draft.freeformNegativeSpans} undo={() => setHistory(previous => undo(previous))} redo={() => setHistory(previous => redo(previous))} onChange={(raw, spans) => {
+    <p className="hint">重みを比べるには、下の原文からタグを選択して「重みを調整」を押します。候補の原文は「この候補のタグを編集」で開けます。</p>
+    {(['positive', 'negative'] as const).map(channel => <PromptEditor key={channel} onWeightDraftChange={weightDraftChanged} label={`B変更案 ${channel}`} value={channel === 'positive' ? draft.freeformPositive : draft.freeformNegative} spans={channel === 'positive' ? draft.freeformPositiveSpans : draft.freeformNegativeSpans} undo={() => setHistory(previous => undo(previous))} redo={() => setHistory(previous => redo(previous))} onChange={(raw, spans) => {
       const key = channel === 'positive' ? 'freeformPositive' : 'freeformNegative'; const spanKey = channel === 'positive' ? 'freeformPositiveSpans' : 'freeformNegativeSpans';
       const next = { ...draft, [key]: raw }; delete next[spanKey]; if (spans) next[spanKey] = spans; update(next);
     }} />)}
     {draft.groups.map(group => <fieldset key={group.id}><legend>{group.name} / {group.channel}</legend><label className="inline"><input type="checkbox" checked={group.enabled} onChange={event => update(updateGroup(draft, group.id, value => ({ ...value, enabled: event.target.checked })))} />グループ有効</label>
-      {group.members.map((member, index) => <div key={member.id}><label className="inline"><input type={group.mode === 'exclusive' ? 'radio' : 'checkbox'} name={`b-${group.id}`} disabled={!group.enabled} checked={group.mode === 'exclusive' ? group.selectedMemberId === member.id : member.enabled} onChange={() => update(updateGroup(draft, group.id, value => toggleMember(value, member.id)))} />{member.overrideRaw ?? member.rawSnapshot}</label><details><summary>この候補のタグを編集</summary><PromptEditor label={`B ${group.name} 候補${index + 1}`} value={member.overrideRaw ?? member.rawSnapshot} spans={member.overrideSpans} undo={() => setHistory(previous => undo(previous))} redo={() => setHistory(previous => redo(previous))} onChange={(raw, spans) => update(updateGroup(draft, group.id, value => ({ ...value, members: value.members.map(item => {
+      {group.members.map((member, index) => <div key={member.id}><label className="inline"><input type={group.mode === 'exclusive' ? 'radio' : 'checkbox'} name={`b-${group.id}`} disabled={!group.enabled} checked={group.mode === 'exclusive' ? group.selectedMemberId === member.id : member.enabled} onChange={() => update(updateGroup(draft, group.id, value => toggleMember(value, member.id)))} />{member.overrideRaw ?? member.rawSnapshot}</label><details><summary>この候補のタグを編集</summary><PromptEditor onWeightDraftChange={weightDraftChanged} label={`B ${group.name} 候補${index + 1}`} value={member.overrideRaw ?? member.rawSnapshot} spans={member.overrideSpans} undo={() => setHistory(previous => undo(previous))} redo={() => setHistory(previous => redo(previous))} onChange={(raw, spans) => update(updateGroup(draft, group.id, value => ({ ...value, members: value.members.map(item => {
         if (item.id !== member.id) return item; const { overrideSpans: _old, ...rest } = item; return { ...rest, overrideRaw: raw, ...(spans ? { overrideSpans: spans } : {}) };
       }) })))} /></details></div>)}
       {group.mode === 'exclusive' && <button type="button" onClick={() => update(updateGroup(draft, group.id, value => ({ ...value, selectedMemberId: null })))}>選択解除</button>}
     </fieldset>)}
     <label>B確定前 Positive<textarea readOnly value={compiled.positive} /></label><label>B確定前 Negative<textarea readOnly value={compiled.negative} /></label>
-    <div className="actions"><button type="button" disabled={!history.past.length} onClick={() => setHistory(previous => undo(previous))}>変更案をUndo</button><button type="button" disabled={!history.future.length} onClick={() => setHistory(previous => redo(previous))}>変更案をRedo</button><button type="button" onClick={() => onSave(draft)}>Bの変更を確定</button><button type="button" onClick={() => { if (confirm('Bの未保存変更案を破棄しますか？')) onCancel(); }}>変更案を破棄</button></div>
+    {!!pendingWeights.size && <p role="status">調整中の重みを「重みを反映」で確定するか、調整を閉じてからBを確定してください。</p>}
+    <div className="actions"><button type="button" disabled={!history.past.length} onClick={() => setHistory(previous => undo(previous))}>変更案をUndo</button><button type="button" disabled={!history.future.length} onClick={() => setHistory(previous => redo(previous))}>変更案をRedo</button><button type="button" disabled={!!pendingWeights.size} onClick={() => onSave(draft)}>Bの変更を確定</button><button type="button" onClick={() => { if (confirm('Bの未保存変更案を破棄しますか？')) onCancel(); }}>変更案を破棄</button></div>
   </section>;
 }
 function PromptDiff({ a, b, label }: { a: string; b: string; label: string }) { const diff = textDifference(a, b); return <div><h4>{label} の文字差分</h4><pre className="diff-text">{diff.prefix}<del>{diff.removed}</del><ins>{diff.added}</ins>{diff.suffix}</pre>{a === b && <p>変更なし</p>}</div>; }
@@ -72,6 +79,7 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
   const differences = experiment ? experimentDifferences(experiment) : null;
   return <div className="stack">
     <section className="panel stack"><h2>手動A/B比較</h2><p>スナップショットをコピー → NovelAIで手動生成 → 保存したPNGを取り込んで比較します。実サイトへの書込みは無効です。</p>
+      <ol className="comparison-steps"><li>Aを基準に、Bのタグ・重みを調整</li><li>同じSeed・生成設定でA/Bを手動生成</li><li>PNGを取り込み、横並び・重ね合わせで比較</li></ol>
       <label>比較元<select value={source} onChange={event => setSource(event.target.value)}><option value="current">現在のワークスペース</option>{data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
       <label>新しい比較名<input maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label>
       <button type="button" disabled={!sourceWorkspace || !name.trim() || editing} onClick={() => {
@@ -89,6 +97,7 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
         <button type="button" disabled={!sourceWorkspace || editing || busy} onClick={() => { if (sourceWorkspace && confirm('選択した比較元からBを再固定しますか？Bの旧画像の関連付けを外します。')) changeVariant('variantB', item => ({ ...captureVariant(item.id, 'B', sourceWorkspace, sourcePreset?.id ?? sourceWorkspace.appliedPresetId ?? null), settings: item.settings })); }}>比較元からBを再固定</button>
       </section>
       {editing && <VariantDraft key={experiment.id} variant={experiment.variantB} onCancel={() => setEditing(false)} onSave={workspace => { if (changeVariant('variantB', item => ({ ...captureVariant(item.id, 'B', workspace, null), settings: item.settings }))) setEditing(false); }} />}
+      <ImageComparison workbench={workbench} a={data.images.find(item => item.id === experiment.variantA.imageId)} b={data.images.find(item => item.id === experiment.variantB.imageId)} />
       {(['variantA', 'variantB'] as const).map(key => {
         const variant = experiment[key]; const image = data.images.find(item => item.id === variant.imageId);
         return <section className="panel stack" key={`${experiment.id}-${key}`} aria-label={`比較 ${variant.label}`}>
@@ -112,7 +121,6 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
         <strong>生成条件: {comparison?.status}{comparison?.status !== '記録した条件は一致' ? '（厳密比較不可）' : ''}</strong>{!!comparison?.unknown.length && <p>不明 / 未確認: {comparison.unknown.join('、')}</p>}
         <div className="table-scroll"><table><thead><tr><th>設定</th><th>A</th><th>B</th></tr></thead><tbody>{comparison?.rows.map(row => <tr key={row.label}><th>{row.label}</th><td>{row.a === null ? '不明' : String(row.a)}</td><td>{row.b === null ? '不明' : String(row.b)} {row.a !== null && row.b !== null && row.a !== row.b ? '（差あり）' : ''}</td></tr>)}</tbody></table></div><p>記録した条件が一致しても、モデルの版や未記録条件を含む厳密な再現性は保証しません。</p>
       </section>
-      <ImageComparison workbench={workbench} a={data.images.find(item => item.id === experiment.variantA.imageId)} b={data.images.find(item => item.id === experiment.variantB.imageId)} />
     </>}
     <section className="panel stack"><h3>画像ライブラリ ({data.images.length})</h3><p>原本とサムネイルを別々に保存します。JSONバックアップには画像バイナリを含みません。元PNGも別途保管してください。</p><p>登録画像の原本合計 {(data.images.reduce((sum, image) => sum + image.byteLength, 0) / 1048576).toFixed(2)} MiB / {capacity}</p>
       <button type="button" onClick={() => { if (!navigator.storage?.estimate) { setCapacity('この環境は容量取得に非対応です'); return; } void navigator.storage.estimate().then(value => setCapacity(`ブラウザ使用 ${(Number(value.usage ?? 0) / 1048576).toFixed(1)} MiB / 割当 ${value.quota === undefined ? '不明' : (value.quota / 1048576).toFixed(1) + ' MiB'}（概算）`)).catch(cause => workbench.setError(message(cause))); }}>ストレージ容量を確認</button>
