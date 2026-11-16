@@ -108,3 +108,10 @@ interface NovelAIAdapter {
 
 - 純粋エンジン `src/core/shuffle`、検証/移行 `src/data/shuffle.ts`、複数欄プロトコルと生成オブザーバ `src/platform/novelai`、UI `src/ui/Shuffle.tsx` と `src/ui/shuffle/`。詳細・依存関係・判断は `docs/shuffle/architecture.md`。
 - 実NovelAIの live adapter は引き続き読取り専用。キャラクター欄・生成検知・位置は能力falseを返し、パネルはコピーと手動記録に切り替える。
+
+## Experiment Lab
+
+- `core/lab/types.ts`は定義/軸/条件/手動進捗、`values.ts`は数値範囲・CSV・Seed、`prompt.ts`は最上位項目の範囲編集、`engine.ts`は直積・モデル制約・固定条件・テンプレート。時計/乱数/DOMは渡さない。
+- `data/lab.ts`は保存検証・複製。既存validationで再展開snapshotを照合し、metadata.extraへ保存。`lab-export.ts`はJSON/CSV/ZIP、`lab-grid.ts`はローカルCanvas出力。
+- `ui/lab/Setup.tsx` / `Lab.tsx` / `Results.tsx`は設定、手動進捗と取込、グリッド。実験の変更案は明示確定し、作成後の定義は固定。既存ImageComparison/useWorkbenchの保存キューを共用する。
+- SiteConnectionに成功した反映の通知callbackを追加。Labはその記録から対象タブ/document/channelの元原文を保持し、最後の反映値を確認してから既存SiteClientで復元preview/applyする。新しいsite selector・権限・content scriptは追加しない。

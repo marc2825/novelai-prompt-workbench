@@ -25,6 +25,7 @@ export function prepareImport(current: WorkbenchData, incoming: WorkbenchData, m
     experiments: [...current.experiments, ...validated.experiments],
     images: [...current.images, ...validated.images],
     settings: { ...validated.settings, ...current.settings },
+    ...(current.lab || validated.lab ? { lab: { ...validated.lab, ...current.lab, schemaVersion: 1, experiments: [...(current.lab?.experiments ?? []), ...(validated.lab?.experiments ?? [])] } } : {}),
     // Shuffle collections merge like other assets; ID collisions are rejected.
     ...(current.shuffle || validated.shuffle ? { shuffle: mergeShuffle(current.shuffle, validated.shuffle) } : {}),
   });

@@ -154,3 +154,15 @@ PLAYWRIGHT_BROWSERS_PATH=/tmp/nai-pw-browsers corepack pnpm test:e2e
 - 未検証: 実NovelAIの書込み・ログイン後UI・rich node・Character Prompts・言語切替、手動Side Panelドッキング、GitHub Actions実行、NovelAI固有PNGの解釈、実ディスク満杯、上限近辺での長期利用。
 
 受入対応と制限は[tasks/STATUS.md](tasks/STATUS.md)、データ仕様は[docs/DATA_MODEL.md](docs/DATA_MODEL.md)、判断は[docs/DECISIONS.md](docs/DECISIONS.md)、実DOMの観測範囲は[調査記録](docs/DOM_ADAPTER_CHECKLIST.md)を参照してください。
+
+## Experiment Lab（X/Y/Z Plot）
+
+「Experiment Lab」タブで、タグ重み・有無・置換・位置・Prompt S/R・タググループ・全文候補や、Seed/Steps/Guidance/Rescale/Sampler/Model/解像度/UC/Quality Tagsを軸に比較できます。Weight Sweep、2タグ相互作用、Seed Robustness、Prompt Matrixなど7種類のテンプレートを用意しています。
+
+1. ベースPrompt/UCと生成設定を入力し、X/Y/Zの候補を指定。予定枚数と全条件を確認して作成します（最大512条件）。
+2. Condition IDを選び、PromptをコピーしてNovelAIで同じSeed・設定に合わせ、手動生成します。PNGを該当条件へ登録します。
+3. X/YグリッドとZ/Seed/反復の切替、A/Bワイプ・差分で比較。評価・お気に入り・メモを保存し、JSON/CSV/画像付きZIP/グリッドPNGを出力できます。
+
+実NovelAIの生成設定の自動同期・画像捕捉・Controlled Batchは未対応です。実サイトのPrompt書込みprofileも未検証のためコピーを使います。JSONは画像metadataのみ、ZIPは元PNGを含みます。「広いタブでLabを開く」で比較画面を広げられます。
+
+詳しい操作、対応軸、上限、手動復元、実機未検証の範囲: [Experiment Lab](docs/lab/README.md) / [公式資料の調査](docs/lab/RESEARCH.md)。

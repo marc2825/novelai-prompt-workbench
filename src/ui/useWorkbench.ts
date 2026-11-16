@@ -98,14 +98,14 @@ export function useWorkbench() {
       if (pendingImage && pendingImage.record.hash === record.hash && pendingImage.record.width === record.width && pendingImage.record.height === record.height && pendingImage.record.byteLength === record.byteLength && pendingImage.record.thumbnailBytes === record.thumbnailBytes) return thumbnail ? pendingImage.thumbnail : pendingImage.original;
       return repository.current?.imageBlob(id, thumbnail, record);
     },
-    attachImage: (prepared: PreparedImage, experimentId: string, variant: 'variantA' | 'variantB') => {
+    attachImage: (prepared: PreparedImage, experimentId: string, variant: 'variantA' | 'variantB' | { conditionId: string }) => {
       const state = current.current?.present;
-      if (!state?.experiments.some(item => item.id === experimentId)) throw new Error('比較セッションが削除されています');
+      if (!state || (typeof variant === 'string' ? !state.experiments.some(item => item.id === experimentId) : !state.lab?.experiments.some(item => item.id === experimentId && item.conditions.some(c => c.id === variant.conditionId)))) throw new Error('比較セッションが削除されています');
       const existing = state.images.find(image => image.hash === prepared.record.hash);
       const id = existing?.id ?? prepared.id;
       const write = { id, original: prepared.original, thumbnail: prepared.thumbnail, record: prepared.record };
       imageWrites.current.set(id, write);
-      const ok = commit(data => ({ ...data, images: existing ? data.images.map(image => image.id === id ? { ...image, width: prepared.record.width, height: prepared.record.height, byteLength: prepared.record.byteLength, thumbnailBytes: prepared.record.thumbnailBytes } : image) : [...data.images, prepared.record], experiments: data.experiments.map(item => item.id === experimentId ? { ...item, updatedAt: prepared.record.createdAt, [variant]: { ...item[variant], imageId: id } } : item) }));
+      const ok = commit(data => ({ ...data, images: existing ? data.images.map(image => image.id === id ? { ...image, width: prepared.record.width, height: prepared.record.height, byteLength: prepared.record.byteLength, thumbnailBytes: prepared.record.thumbnailBytes } : image) : [...data.images, prepared.record], experiments: typeof variant === 'string' ? data.experiments.map(item => item.id === experimentId ? { ...item, updatedAt: prepared.record.createdAt, [variant]: { ...item[variant], imageId: id } } : item) : data.experiments, ...(typeof variant !== 'string' && data.lab ? { lab: { ...data.lab, experiments: data.lab.experiments.map(item => item.id === experimentId ? { ...item, updatedAt: prepared.record.createdAt, conditions: item.conditions.map(c => c.id === variant.conditionId ? { ...c, imageId: id, status: 'completed' as const, error: '' } : c) } : item) } } : {}) }));
       if (!ok) { imageWrites.current.delete(id); throw new Error('画像メタデータまたは比較の検証に失敗しました'); }
       return existing ? '同一ハッシュの画像を再利用しました。' : '画像を取り込みました。';
     },

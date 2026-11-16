@@ -166,3 +166,9 @@ interface Experiment {
 
 - `WorkbenchData.shuffle?: ShuffleData`（独自 `schemaVersion: 1`）と `shuffleRecovery?: ShuffleRecovery[]`。`metadata.extra` に保存され、同じtransaction・revision・JSONバックアップに含まれる。
 - 型・不変条件・移行・隔離・merge規則は `docs/shuffle/data-model.md`、正本は `src/core/shuffle/types.ts` と `src/data/shuffle.ts`。
+
+## Experiment Lab（DB/JSON v3内、Lab schemaVersion 1）
+
+`WorkbenchData.lab?: LabData` はmetadata.extraに保存する。正本: `src/core/lab/types.ts`。Definitionはベース両channel・settings・XYZ Axis・共通Seedリスト・反復数・任意の参考単価。LabExperimentはUUID、Definition snapshot、条件配列、状態、日時を保持する。Condition IDは実験UUIDと決定的な展開番号の組。座標・Seed index・反復・固定Prompt/UC・settings・factor provenance、手動進捗・imageId・評価・メモを持つ。
+
+保存前に定義から再展開して固定条件の一致を検証し、未知safe fieldは保持する。画像資産は既存images/Blob storesを共有、JSONにはmetadataのみ。旧資産形式やstore変更はなくmigrationは不要。詳細と上限は [Lab仕様](lab/README.md)。

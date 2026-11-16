@@ -1,3 +1,4 @@
+import type { LabData } from './lab/types';
 import type { ShuffleData, ShuffleRecovery } from './shuffle/types';
 
 export type Channel = 'positive' | 'negative';
@@ -42,6 +43,7 @@ export interface WorkbenchData {
   settings: Settings;
   /** Prompt Shuffle state (optional; absent = empty). Has its own schemaVersion. */
   shuffle?: ShuffleData;
+  lab?: LabData;
   /** Quarantined unreadable shuffle data found at load time, kept for manual recovery. */
   shuffleRecovery?: ShuffleRecovery[];
   // Forward-compatible, inert JSON fields survive backup/restore.

@@ -82,3 +82,7 @@ multi background [disabled] ✓city street
 - 前後の独立した単純数値重みは保持できる。複雑な入れ子、複数タグを囲む重み、braces/brackets、pipe、macro、エスケープ、改行、語/サロゲート途中は拒否する。モデルごとの構文解釈・効果を保証する機能ではない。
 - プレビュー中は原文を変更せず、明示反映を1回の履歴に記録する。原文変更で対象を無効にする。コメントspanがある欄は重み編集を無効にし、原文/spanの整合性を維持する。
 - 新しい永続化フィールドは追加せず、確定した文字列を既存のraw/snapshot/Undo/JSONに保存する。プリセットのdirty判定や実験の固定compiledにも既存経路で反映される。
+
+## Experiment Labのタグ操作
+
+Labでは明示的に指定された因子だけを操作するため、最上位項目の範囲を構造付きで検出する専用 `core/lab/prompt.ts` を用いる。単一タグ全体のbraces/brackets/numeric wrapperを対象にでき、負値・0重み・Offは別の操作。選択外は原文の範囲コピーで保持する。複数タグを囲む入れ子内部・曖昧な構文・同じ対象を複数軸で変更する操作は拒否する。従来のworkspace重みスライダー・compilerの意味は変更しない。詳細は [Lab原文保護](lab/README.md)。

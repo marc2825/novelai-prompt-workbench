@@ -1,3 +1,4 @@
+import { validateLab } from './lab';
 import type { BackupDocument, PromptSpan, WorkbenchData } from '../core/types';
 import { compileWorkspace } from '../core/compose';
 import { assertCommentSpans } from '../core/comments';
@@ -210,6 +211,7 @@ export function validateData(input: unknown): WorkbenchData {
       if (compiled.positive !== expected.positive || compiled.negative !== expected.negative) fail(key, '固定プロンプトとスナップショットが一致しません');
     }
   }
+  if (data.lab !== undefined) validateLab(data.lab, imageIds);
   const settings = object(data.settings ?? { activeWorkspaceId: null, librarySort: 'title' }, 'settings');
   oneOf(settings.librarySort, ['title', 'updatedAt'], 'settings.librarySort');
   if (settings.activeWorkspaceId !== null && !workspaceIds.has(settings.activeWorkspaceId)) fail('settings.activeWorkspaceId', 'ワークスペースが存在しません');

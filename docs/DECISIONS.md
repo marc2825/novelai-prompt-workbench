@@ -95,3 +95,13 @@ P0/P1検証日: 2026-11-03（ユーザーのAsia/Tokyo日付）。Linux上のブ
 | ADR-060 | 重み編集は明示選択した単純タグ/数値重み項目だけ | ユーザー指定範囲だけ置換し、選択外の原文・空白・重複タグを保持。全体をタグ配列へ変換しない。複雑構文・コメント構造は拒否し、0〜2の編集UIに限定 |
 | ADR-061 | 重みをプレビューして1操作で反映、永続化は既存rawのみ | 毎回選択時の原文から作り、ラッパーが累積しない。原文変更でプレビュー無効。既存Undo・preset・A/B snapshot・JSON経路を共用しDB版/依存/権限は追加しない |
 | ADR-062 | B確定前の重みプレビューを検出し、画像比較を上部へ移す | 未反映値の取りこぼしを防ぐ。Bの再確定は旧画像リンクを解除。画像は従来どおり手動生成PNGを取り込み、重みのモデル別効果は未検証 |
+
+## Experiment Lab（2026-11-16）
+
+| ID | 決定 | 理由・制限 |
+|---|---|---|
+| ADR-063 | Lab定義・軸展開・prompt操作・固定条件をpure coreに分離 | 最大512条件、共通Seed×反復、再現可能なID。安全な最上位タグ項目のみ編集し、曖昧な入れ子は拒否 |
+| ADR-064 | optional lab schemaVersion 1を既存metadata.extraへ保存 | DB v3のまま、全体backup/Undo/revision/画像storeを共用。importで全条件を再展開照合し、壊れた定義を自動採用しない |
+| ADR-065 | 手動生成と明示Condition IDへのPNG登録を実装 | 実機の設定DOMは未検証。コピー・既存SiteClientのCAS/readbackのみ利用。条件切替後の復元も最後の書込み値との比較が必須。Mode Bは無効 |
+| ADR-066 | 現行V5の既知Effort制約を各展開条件に検証 | Full Mediumの14 Steps/Euler Ancestral/UCなし/Rescaleなし。課金は公式UI確認値に基づく参考計算のみ |
+| ADR-067 | 8×8ページ表示、既存A/B画像ビューア、依存なしZIP32出力 | 無制限DOM/Canvas/Blobメモリを避ける。ZIP128MiB、JSONは画像本体なし。実NovelAI PNG固有解析はunknownのまま |

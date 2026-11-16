@@ -3,7 +3,7 @@ import type { Channel, CompiledPrompts } from '../core/types';
 import type { SiteClient } from '../platform/novelai/client';
 import type { SiteInspection, WriteMode, WritePreview } from '../platform/novelai/protocol';
 
-export function SiteConnection({ client, compiled, onImport }: { client?: SiteClient; compiled: CompiledPrompts; onImport: (channel: Channel, raw: string) => void }) {
+export function SiteConnection({ client, compiled, onImport, onApplied }: { client?: SiteClient; compiled: CompiledPrompts; onImport: (channel: Channel, raw: string) => void; onApplied?: (preview: WritePreview) => void }) {
   const [sites, setSites] = useState<SiteInspection[]>([]);
   const [selected, setSelected] = useState('');
   const [channel, setChannel] = useState<Channel>('positive');
@@ -71,6 +71,7 @@ export function SiteConnection({ client, compiled, onImport }: { client?: SiteCl
       const result = await client.apply(accepted);
       if (!result.ok) { setIssue(result.reason); return; }
       if (result.type !== 'apply') { setIssue('反映結果を確認できません'); return; }
+      onApplied?.(accepted);
       setNotice(`タブ${result.target.tabId}の${result.channel}を反映し、再読取りで一致を確認しました。生成操作は行っていません。`);
     })}>確認してサイトに反映</button><button type="button" disabled={busy} onClick={() => setPreview(null)}>反映をキャンセル</button></div></div>}
     {lastAttempt && <details><summary>直前のサイト操作の復旧用原文（タブ{lastAttempt.tabId} / {lastAttempt.channel}）</summary><div className="stack"><label>直前の反映前原文<textarea readOnly value={lastAttempt.before} /></label><p className="hint">画面を閉じるまで保持します。復旧が必要なら原文を選択してコピーしてください。Undoはサイト操作を戻しません。</p><button type="button" onClick={() => setLastAttempt(null)}>復旧用原文を閉じる</button></div></details>}
