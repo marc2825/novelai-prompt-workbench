@@ -12,6 +12,22 @@ export const MAX_DEPTH = 32;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ValidationError extends Error {}
+
+// Objects returned by validateData. The code base treats data as immutable, so an
+// object in this set is still valid and the save path need not validate it again.
+// Dev/E2E builds deep-freeze it, turning any accidental mutation into an error.
+const validated = new WeakSet<object>();
+const FREEZE_VALIDATED = typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+export function isValidated(value: unknown): value is WorkbenchData { return typeof value === 'object' && value !== null && validated.has(value); }
+function deepFreeze(root: object) {
+  const stack: object[] = [root];
+  while (stack.length) {
+    const value = stack.pop()!;
+    if (Object.isFrozen(value)) continue;
+    Object.freeze(value);
+    for (const child of Object.values(value)) if (child && typeof child === 'object') stack.push(child as object);
+  }
+}
 function fail(path: string, reason: string): never { throw new ValidationError(`${path}: ${reason}`); }
 function object(value: unknown, path: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(path, 'オブジェクトが必要です');
@@ -220,7 +236,10 @@ export function validateData(input: unknown): WorkbenchData {
   const shuffleRecovery = data.shuffleRecovery === undefined ? undefined : validateRecoveries(data.shuffleRecovery);
   const result = { ...data, categories, presets, experiments, images, settings, ...(shuffle ? { shuffle } : {}), ...(shuffleRecovery ? { shuffleRecovery } : {}) } as unknown as WorkbenchData;
   if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_BYTES) fail('payload', '10MiBを超えています');
-  return structuredClone(result);
+  const output = structuredClone(result);
+  if (FREEZE_VALIDATED) deepFreeze(output);
+  validated.add(output);
+  return output;
 }
 
 export function validateLegacyData(input: unknown): WorkbenchData {

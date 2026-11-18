@@ -9,15 +9,17 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
   const extensionPath = resolve('.output/chrome-mv3');
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8')) as {
     manifest_version: number; permissions: string[]; host_permissions?: string[];
-    side_panel: { default_path: string }; action: { default_popup: string };
-    content_scripts: { matches: string[] }[]; background?: unknown;
+    side_panel: { default_path: string }; action: { default_popup?: string; default_title: string };
+    content_scripts: { matches: string[] }[]; background?: { service_worker: string; type?: string };
   };
   expect(manifest.manifest_version).toBe(3);
   expect(manifest.permissions).toEqual(['sidePanel']);
   expect(manifest.host_permissions).toBeUndefined();
-  expect(manifest.background).toBeUndefined();
+  // The only background job is opening the side panel from the toolbar button (no popup).
+  expect(manifest.background).toEqual({ service_worker: 'background.js' });
   expect(manifest.side_panel.default_path).toBe('sidepanel.html');
-  expect(manifest.action.default_popup).toBe('sidepanel.html');
+  expect(manifest.action.default_popup).toBeUndefined();
+  expect(manifest.action.default_title).toBeTruthy();
   expect(manifest.content_scripts).toHaveLength(1);
   expect([...manifest.content_scripts[0]!.matches].sort()).toEqual(['https://novelai.net/image', 'https://novelai.net/image?*', 'https://novelai.net/image/*'].sort());
 
@@ -31,6 +33,8 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
   });
   let context = await launch();
   try {
+    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    await expect.poll(() => worker.evaluate(() => (globalThis as unknown as { chrome: { sidePanel: { getPanelBehavior(): Promise<{ openPanelOnActionClick?: boolean }> } } }).chrome.sidePanel.getPanelBehavior())).toEqual({ openPanelOnActionClick: true });
     let page = await context.newPage();
     await page.goto(`chrome-extension://${id}/sidepanel.html`);
     await expect(page.getByText('保存済み · この端末のみ', { exact: true })).toBeVisible();

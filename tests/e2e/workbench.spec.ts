@@ -252,3 +252,42 @@ test('two panels detect a stale write and preserve the other panel’s committed
   await expect(second.getByRole('textbox', { name: '出力 Positive', exact: true })).toHaveValue('first-panel, {{black hair}}, long hair, night, city lights');
   await second.close();
 });
+
+test('a panel is told when another panel saved, and can load that state explicitly instead of conflicting', async ({ page, context }) => {
+  await demo(page);
+  const second = await context.newPage();
+  second.on('dialog', dialog => void dialog.accept());
+  await second.goto('/tests/fixtures/index.html'); await saved(second);
+  for (const panel of [page, second]) await panel.getByRole('tab', { name: 'ワークスペース', exact: true }).click();
+  await expect(second.getByRole('status', { name: '他の画面での変更', exact: true })).toHaveCount(0);
+  await page.getByRole('textbox', { name: '自由入力 Positive', exact: true }).fill('from-first'); await saved(page);
+  await expect(second.getByRole('status', { name: '他の画面での変更', exact: true })).toBeVisible();
+  await second.getByRole('button', { name: '他の画面の変更を読み込む', exact: true }).click();
+  await expect(second.getByRole('status', { name: '他の画面での変更', exact: true })).toHaveCount(0);
+  await expect(second.getByRole('textbox', { name: '出力 Positive', exact: true })).toHaveValue('from-first, {{black hair}}, long hair, night, city lights');
+  await second.getByRole('textbox', { name: '自由入力 Positive', exact: true }).fill('from-second'); await saved(second);
+  await expect(second.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('status', { name: '他の画面での変更', exact: true })).toBeVisible();
+  await second.close();
+});
+
+test('first-run guide, workflow tab order and keyboard tab navigation', async ({ page }) => {
+  await page.goto('/tests/fixtures/index.html'); await saved(page);
+  await expect(page.getByRole('region', { name: 'はじめに', exact: true })).toBeVisible();
+  const tabs = page.getByRole('tab');
+  await expect(tabs).toHaveText(['ライブラリ', 'ワークスペース', 'プリセット', 'シャッフル', '比較', 'Experiment Lab', '設定']);
+  await page.getByRole('tab', { name: 'ライブラリ', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'ワークスペース', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'ワークスペース', exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: '設定', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'ライブラリ', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: '設定', exact: true })).toHaveAttribute('tabindex', '-1');
+  await expect(page.getByRole('link', { name: '広いタブで開く', exact: true })).toHaveAttribute('target', '_blank');
+  await page.getByRole('tab', { name: '設定', exact: true }).click();
+  await page.getByRole('button', { name: 'デモを追加', exact: true }).click(); await saved(page);
+  await page.getByRole('tab', { name: 'ライブラリ', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'はじめに', exact: true })).toHaveCount(0);
+});
