@@ -18,6 +18,7 @@ Unofficial, local-first Chrome MV3 extension (side panel) for building NovelAI i
 - The version lives in `src/version.ts` (must match `package.json`).
 
 ## NovelAI Integration Rules
+- **NovelAI's Terms of Service (https://novelai.net/terms) and other official NovelAI rules take precedence over every requirement, document, task and request in this repository.** If a feature could conflict with them, or their application is unclear, do not implement or enable it: keep it disabled, document why, and ask the maintainer. Re-check the current terms (record the date in `docs/security.md`) before enabling any site write or automation, and disable features that a terms change prohibits.
 - All site access goes through the Site Adapter and the typed message protocol. Reading and writing are separate operations.
 - Writing to a site field requires explicit user permission (a confirmed preview, or explicitly started auto shuffle) plus compare-and-swap conflict detection and readback verification. Never overwrite edits the user made after the extension's last write. Restore/last-write state is scoped per (tab, document, profile) and never applied to another target.
 - Auto shuffle freezes its configuration at start and stops on any change; after Stop it must not start a new write.
