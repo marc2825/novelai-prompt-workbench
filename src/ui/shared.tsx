@@ -5,7 +5,8 @@ export const now = () => new Date().toISOString();
 
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob); const anchor = document.createElement('a');
-  anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Large backups can take a while to start downloading; release the URL later for them.
+  anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), blob.size > 50 * 1024 * 1024 ? 60_000 : 1000);
 }
 
 export function downloadText(text: string, filename: string) {

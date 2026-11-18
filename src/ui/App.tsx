@@ -17,7 +17,8 @@ import { Comparisons } from './Comparisons';
 import { Shuffle } from './Shuffle';
 
 type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
-const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', '比較', '設定', 'シャッフル', 'Experiment Lab'];
+// Ordered by workflow: build prompts → save/vary them → compare results → settings & backup.
+const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', 'シャッフル', '比較', 'Experiment Lab', '設定'];
 
 export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const workbench = useWorkbench();
@@ -38,12 +39,26 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     const key = event.key.toLowerCase();
     if (key === 'z' || key === 'y') { event.preventDefault(); if (key === 'y' || event.shiftKey) workbench.redo(); else workbench.undo(); }
   }
+  function select(value: Tab) {
+    if (tab === value) return true;
+    if (comparisonDraft && !confirm('未保存の変更案を破棄して画面を切り替えますか？')) return false;
+    setTab(value); setNotice(''); return true;
+  }
+  // WAI-ARIA tabs: arrow keys / Home / End move between tabs (roving tabindex).
+  function tabKeys(event: KeyboardEvent) {
+    const index = TABS.indexOf(tab);
+    const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index - 1 + TABS.length) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    if (select(TABS[next]!)) document.getElementById(`tab-${TABS[next]}`)?.focus();
+  }
+  const firstRun = !!data && !data.libraryEntries.length && !data.workspaces.length;
   async function copy(channel: 'positive' | 'negative') {
     try { await navigator.clipboard.writeText(compiled[channel]); setNotice(`${channel}をコピーしました。`); }
     catch { workbench.setError('コピーできませんでした。出力欄を選択して手動でコピーしてください。'); }
   }
   return <main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
-    <header><small className="eyebrow">LOCAL PROMPT LIBRARY</small><h1>NovelAI Prompt Workbench</h1><p className="hint">原文を残して、構成を切り替える。</p></header>
+    <header><small className="eyebrow">LOCAL PROMPT LIBRARY</small><h1>NovelAI Prompt Workbench</h1><p className="hint">原文を残して、構成を切り替える。<a href={location.pathname} target="_blank" rel="noreferrer">広いタブで開く</a></p></header>
     <div className={`status ${workbench.storageError ? 'error' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>
     {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データをJSONで退避するか、DBの復旧用ファイルを保存してください。</p><div className="actions">
       {data && <button type="button" onClick={workbench.retry}>保存を再試行</button>}
@@ -53,10 +68,19 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         else void workbench.repository.current?.recoveryDump().then(dump => downloadText(recoveryJson(dump), 'nai-storage-recovery.json')).catch(error => workbench.setError(message(error)));
       }}>DB復旧用ファイルを保存</button>
     </div></section>}
+    {workbench.externalChange && !workbench.storageError && <section className="panel stack" role="status" aria-label="他の画面での変更">
+      <p>別の画面（サイドパネル・広いタブ）でデータが保存されました。この画面のまま編集すると保存時に競合します。</p>
+      <div className="actions"><button type="button" disabled={workbench.saving} onClick={() => void workbench.reloadFromStorage().then(() => setNotice('他の画面で保存された最新の内容を読み込みました（元に戻す履歴はリセットされました）。')).catch(error => workbench.setError(message(error)))}>他の画面の変更を読み込む</button></div>
+    </section>}
     {workbench.error && <div className="error" role="alert">{workbench.error}<button type="button" onClick={() => workbench.setError('')}>閉じる</button></div>}
     {!data && workbench.storageError && <Recovery workbench={workbench} />}
     {data && <>
-      <nav aria-label="メイン"><div className="tabs" role="tablist">{TABS.map(value => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} key={value} onClick={() => { if (tab !== value && comparisonDraft && !confirm('未保存の変更案を破棄して画面を切り替えますか？')) return; setTab(value); setNotice(''); }}>{value}</button>)}</div></nav>
+      <nav aria-label="メイン"><div className="tabs" role="tablist" aria-label="機能" onKeyDown={tabKeys}>{TABS.map(value => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} key={value} onClick={() => select(value)}>{value}</button>)}</div></nav>
+      {firstRun && tab === 'ライブラリ' && <section className="panel stack" aria-label="はじめに">
+        <h2>はじめに</h2>
+        <ol className="comparison-steps"><li>「ワークスペース」で構成（グループ）を作る</li><li>「ライブラリ」に部品（タグの原文）を登録し「構成に追加」</li><li>下の「出力プレビュー」をコピーしてNovelAIに貼り付け、NovelAI上で生成する</li></ol>
+        <p className="hint">サンプルは「設定」→「デモを追加」で入ります。データはこの端末だけに保存されます。定期的に「設定」→「完全バックアップ」を保存してください。</p>
+      </section>}
       <div className="actions history"><button type="button" disabled={!workbench.canUndo || comparisonDraft} onClick={workbench.undo}>元に戻す</button><button type="button" disabled={!workbench.canRedo || comparisonDraft} onClick={workbench.redo}>やり直す</button><small>Ctrl/Cmd+Z・Y（入力欄の外）</small></div>
       <PresetStatus workbench={workbench} />
       {notice && <p role="status">{notice}</p>}

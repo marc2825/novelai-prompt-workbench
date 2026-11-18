@@ -3,10 +3,12 @@
 ## レイヤ
 
 ```text
-Chrome Side Panel (React)
-  ├── Library UI / Workspace UI / Preset UI / AB comparison UI
-  ├── Application commands + undo / redo
-  ├── IndexedDB repository + migrations + import/export
+Toolbar button ──(background.js: sidePanel.setPanelBehavior のみ)──▶ Side Panel
+Chrome Side Panel / 広いタブ (React, 同じ sidepanel.html)
+  ├── Library / Workspace / Preset / Shuffle / Compare / Experiment Lab / Settings
+  ├── Application commands + undo / redo (useWorkbench)
+  ├── IndexedDB repository + migrations + JSON / 完全バックアップZIP
+  ├── BroadcastChannel（別パネル/タブの保存通知、ローカルのみ）
   ├── Pure compiler & validator (src/core)
   └── chrome.tabs messaging
           ↓
@@ -23,7 +25,7 @@ NovelAI image UI (unknown selectors until inspected)
 - Reactはサイドパネルだけに置く。DOM bridgeはUIに混ぜない。
 - `src/core` は全て純粋関数。OS依存、Chrome API、ネットワーク、DOM API無し。
 - IndexedDBはライブラリ/ワークスペース/サムネイル/実験を保持。設定のみ`chrome.storage.local`でも良い。sidepanel→contentで直接DB共有前提を置かず、必要なテキストだけメッセージ化する。
-- バックグラウンドservice workerは必要になるまで追加しない（イベントを永続プロセスとみなさない）。
+- バックグラウンドservice workerは「ツールバーボタンでサイドパネルを開く」ためだけに置く（`entrypoints/background.ts`、状態・通信・タブ参照なし）。永続プロセスとみなさない（2026-11-18、ADR-074）。
 
 ## 境界・アダプタ契約
 
@@ -115,3 +117,10 @@ interface NovelAIAdapter {
 - `data/lab.ts`は保存検証・複製。既存validationで再展開snapshotを照合し、metadata.extraへ保存。`lab-export.ts`はJSON/CSV/ZIP、`lab-grid.ts`はローカルCanvas出力。
 - `ui/lab/Setup.tsx` / `Lab.tsx` / `Results.tsx`は設定、手動進捗と取込、グリッド。実験の変更案は明示確定し、作成後の定義は固定。既存ImageComparison/useWorkbenchの保存キューを共用する。
 - SiteConnectionに成功した反映の通知callbackを追加。Labはその記録から対象タブ/document/channelの元原文を保持し、最後の反映値を確認してから既存SiteClientで復元preview/applyする。新しいsite selector・権限・content scriptは追加しない。
+
+## 2026-11-18の変更
+
+- 完全バックアップ: `src/data/zip.ts`（無圧縮ZIPの書込み・厳格な読取り）、`src/data/full-backup.ts`（書出し・検証・復元計画）、`src/ui/FullBackup.tsx`、`useWorkbench.restoreFull`（1トランザクションの直接保存、実行中は編集不可）。形式は [backup.md](backup.md)。
+- シャッフルのサイト状態: `src/core/shuffle/site-session.ts`（対象別セッション）、`src/ui/shuffle/auto-run.ts`（自動シャッフルの実行単位）。詳細は [shuffle/site-adapter.md](shuffle/site-adapter.md)。
+- 保存: 通常の保存はrevisionだけを読み、検証済みオブジェクトを再検証しない（ADR-077）。別パネル/タブの保存は `BroadcastChannel` で通知（ADR-076）。
+- 送信元URL照合の修正（`isPanelSender`、ADR-075）。

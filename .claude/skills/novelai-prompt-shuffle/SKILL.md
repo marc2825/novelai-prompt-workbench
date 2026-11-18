@@ -14,9 +14,9 @@ Read `AGENTS.md`, then `docs/shuffle/architecture.md` and `docs/shuffle/data-mod
 3. **Test determinism and constraints.** Add Vitest cases under `tests/unit/shuffle/` with fixed seeds: same seed → same sequence, bag cycles without duplicates, invalid weights, 0/1 candidates, 1/2/3+ characters, fixed prompts unchanged, no tag growth on repeated composition.
 4. **Update the Site Adapter only as far as needed** (`src/platform/novelai/`). Keep selectors there. Expose capabilities, fail safely (`UNSUPPORTED`/`CONFLICT`/`BUSY`), keep writes on the ticket + CAS + readback path, and keep the production adapter read-only unless a real-site profile has been verified and documented.
 5. **Integrate into the UI** (`src/ui/Shuffle.tsx`, `src/ui/shuffle/`). Use existing components/styles, keep it compact, and keep algorithms out of React. Schema changes need `SHUFFLE_SCHEMA_VERSION`, a migration, and validation.
-6. **Verify conflict, restore and stop paths.** User edits after the last write must never be overwritten silently. Restore must return the pre-apply text. Auto shuffle must stop on unsupported pages, navigation, a missing status element, or a lease held by another panel, and must never write while generating.
+6. **Verify conflict, restore and stop paths.** User edits after the last write must never be overwritten silently. Restore must return the pre-apply text of the *same* tab/document/profile session (`src/core/shuffle/site-session.ts`). Auto shuffle (`src/ui/shuffle/auto-run.ts`) freezes `shuffleConfigFingerprint` at start and must stop on any configuration or external cursor change, unsupported pages, navigation, a missing status element, storage errors, or a lease held by another panel; it must never write while generating and never start a write after Stop. Tests: `tests/unit/shuffle/auto-run.test.ts`, `site-session.test.ts`, `generation.test.ts`.
 7. **Run everything:** `corepack pnpm test`, `typecheck`, `build`, `test:e2e` (`tests/e2e/shuffle.spec.ts` + `extension.spec.ts`). Report exact counts.
-8. **Update docs:** `docs/shuffle/*`, `docs/DECISIONS.md`, `tasks/STATUS.md`, README.
+8. **Update docs:** `docs/shuffle/*`, `docs/DECISIONS.md`, `tasks/STATUS.md`, README (user-facing only).
 
 ## Never
 

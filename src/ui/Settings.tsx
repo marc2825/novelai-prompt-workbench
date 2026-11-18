@@ -6,6 +6,7 @@ import { MAX_BYTES, parseBackup, validateData } from '../data/validation';
 import { downloadText, newId, now } from './shared';
 import { message, type Workbench } from './useWorkbench';
 import { recoveryJson } from '../data/recovery';
+import { FullBackup } from './FullBackup';
 
 export function Settings({ workbench }: { workbench: Workbench }) {
   const data = workbench.data!;
@@ -19,7 +20,8 @@ export function Settings({ workbench }: { workbench: Workbench }) {
     try { prepareImport(data, document.payload, mode); } catch (error) { importError = message(error); }
   }
   return <div className="stack">
-    <section className="panel stack"><h2>JSONバックアップ</h2><p>ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・画像メタデータ・設定をローカルJSONに保存します。画像原本・サムネイルのバイナリは含みません。元PNGを別途保管してください。復元後の欠落は比較画面に表示します。</p>
+    <FullBackup workbench={workbench} />
+    <section className="panel stack"><h2>JSONバックアップ（テキストのみ）</h2><p>ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・Experiment Lab・シャッフル設定・画像メタデータ・設定をローカルJSONに保存します。<strong>画像原本・サムネイルは含みません</strong>（画像も残す場合は上の完全バックアップを使用してください）。復元後の画像欠落は比較画面に表示し、同じPNGの再取込で修復できます。</p>
       <button type="button" onClick={() => { try { downloadText(exportBackup(data, now()), 'nai-prompt-workbench.json'); } catch (error) { workbench.setError(message(error)); } }}>JSONをエクスポート</button>
       <p className="hint">保存失敗時も、上のボタンで画面上の作業データを退避できます。</p>
       <label>JSONをインポート<input type="file" accept=".json,application/json" disabled={busy} onChange={event => {
@@ -72,6 +74,6 @@ export function Settings({ workbench }: { workbench: Workbench }) {
       const demo = createDemo(newId, now());
       workbench.commit(previous => ({ ...previous, libraryEntries: [...previous.libraryEntries, ...demo.libraryEntries], categories: [...previous.categories, ...demo.categories], workspaces: [...previous.workspaces, ...demo.workspaces], settings: { ...previous.settings, activeWorkspaceId: demo.settings.activeWorkspaceId } }));
     }}>デモを追加</button></section>
-    <section className="panel stack"><h2>保存とプライバシー</h2><p>schemaVersion 3 / IndexedDB。旧データはバックアップ付きで移行します。データはこのChromeプロファイル内に保存されます。同期・外部送信はありません。</p><p>プリセットと範囲コメントを利用できます。実NovelAIの書込みは引き続き無効です。PNG画像・手動A/B比較を利用できます。NovelAI固有メタデータ解析は未検証です。</p></section>
+    <section className="panel stack"><h2>保存とプライバシー</h2><p>schemaVersion 3 / IndexedDB。データはこのChromeプロファイル内だけに保存され、同期・外部送信・解析送信はありません。拡張機能を削除するとデータも削除されるため、定期的に完全バックアップを保存してください。</p><p>実NovelAIへの書込みは未検証のため無効です（読取りとコピーのみ）。NovelAI固有のPNGメタデータ解析は未対応です。</p></section>
   </div>;
 }

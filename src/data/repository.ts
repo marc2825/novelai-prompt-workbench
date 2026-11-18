@@ -1,7 +1,7 @@
 import { emptyData } from '../core/commands';
 import { inspectPng } from '../core/png';
 import type { ImageRecord, WorkbenchData } from '../core/types';
-import { SCHEMA_VERSION, validateData, validateLegacyData, validatePreImageData } from './validation';
+import { isValidated, SCHEMA_VERSION, validateData, validateLegacyData, validatePreImageData } from './validation';
 import { quarantineShuffle } from './shuffle';
 
 const ASSETS = ['libraryEntries', 'categories', 'workspaces', 'presets', 'experiments', 'images'] as const;
@@ -57,6 +57,15 @@ async function readState(transaction: IDBTransaction, expectedVersion = SCHEMA_V
     return ids.map(id => byId.get(id as string)!);
   };
   return { data: { ...extra, libraryEntries: ordered(libraryEntries, 'libraryEntries'), categories: ordered(categories, 'categories'), workspaces: ordered(workspaces, 'workspaces'), ...(expectedVersion === 1 || legacy ? {} : { presets: ordered(presets!, 'presets') }), ...(expectedVersion < 3 ? {} : { experiments: ordered(experiments, 'experiments'), images: ordered(images, 'images') }), settings }, revision: revision as number };
+}
+
+/** Revision check for a save: two metadata reads instead of reading every store. */
+async function readRevision(transaction: IDBTransaction): Promise<number> {
+  const metadata = transaction.objectStore('metadata');
+  const [version, revision] = await Promise.all([request(metadata.get('schemaVersion')) as Promise<unknown>, request(metadata.get('revision')) as Promise<unknown>]);
+  if (version !== SCHEMA_VERSION) throw new Error('DBのschemaVersionが不正または未対応です。データは変更しません');
+  if (!Number.isSafeInteger(revision) || (revision as number) < 0) throw new Error('DBのrevisionが破損しています');
+  return revision as number;
 }
 
 async function rawDump(transaction: IDBTransaction, legacy = false) {
@@ -146,7 +155,8 @@ export class WorkbenchRepository {
   }
 
   async save(input: WorkbenchData, expectedRevision: number, backup = false, imageWrites: ImageWrite[] = []): Promise<number> {
-    const data = validateData(input);
+    // Data produced by validateData (every commit) is not validated a second time.
+    const data = isValidated(input) ? input : validateData(input);
     // Complete asynchronous hashing before opening the transaction, which must
     // remain active until all metadata and binary writes have been queued.
     for (const image of imageWrites) {
@@ -162,10 +172,12 @@ export class WorkbenchRepository {
     const done = completion(transaction);
     void done.catch(() => {});
     try {
-      const previous = await readState(transaction, SCHEMA_VERSION, false);
-      if (previous.revision !== expectedRevision) throw new StorageConflictError('別のパネルで更新されています。作業中データをエクスポートして再読込してください');
+      // Only a pre-import backup needs the full previous state; a normal save only checks the revision.
+      const previous = backup ? await readState(transaction, SCHEMA_VERSION, false) : null;
+      const revision = previous ? previous.revision : await readRevision(transaction);
+      if (revision !== expectedRevision) throw new StorageConflictError('別のパネルで更新されています。作業中データをエクスポートして再読込してください');
       const metadata = transaction.objectStore('metadata');
-      if (backup) metadata.put({ ...previous, savedAt: new Date().toISOString(), schemaVersion: SCHEMA_VERSION }, 'previousImport');
+      if (previous) metadata.put({ ...previous, savedAt: new Date().toISOString(), schemaVersion: SCHEMA_VERSION }, 'previousImport');
       for (const name of ASSETS) {
         const store = transaction.objectStore(name);
         store.clear();
@@ -208,6 +220,16 @@ export class WorkbenchRepository {
     if (record && (['hash', 'width', 'height', 'byteLength', 'thumbnailBytes'] as const).some(key => result[key] !== record[key])) return undefined;
     if (result.blob.size !== (thumbnail ? result.thumbnailBytes : result.byteLength)) return undefined;
     return result.blob;
+  }
+
+  /** Bindings of binaries already stored under these image IDs (also ones kept only for Undo / previous import). */
+  async binaryBindings(ids: readonly string[]): Promise<Map<string, { hash: string; byteLength: number; thumbnailBytes: number }>> {
+    const transaction = this.database.transaction('imageOriginals', 'readonly');
+    const store = transaction.objectStore('imageOriginals');
+    const [records] = await Promise.all([Promise.all(ids.map(id => request(store.get(id)) as Promise<{ hash?: unknown; byteLength?: unknown; thumbnailBytes?: unknown } | undefined>)), completion(transaction)]);
+    const result = new Map<string, { hash: string; byteLength: number; thumbnailBytes: number }>();
+    records.forEach((record, index) => { if (record) result.set(ids[index]!, { hash: String(record.hash), byteLength: Number(record.byteLength), thumbnailBytes: Number(record.thumbnailBytes) }); });
+    return result;
   }
 
   // Explicit cleanup is separate from deletion/Undo. Retained binaries allow Undo

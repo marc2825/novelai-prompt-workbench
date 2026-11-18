@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { record, redo, replacePresent, startHistory, undo, type History } from '../core/history';
 import type { WorkbenchData } from '../core/types';
-import { MigrationError, WorkbenchRepository } from '../data/repository';
+import { DATABASE_NAME, MigrationError, WorkbenchRepository } from '../data/repository';
 import { validateData } from '../data/validation';
 import type { ImageWrite, PreparedImage } from '../data/images';
 
@@ -23,6 +23,23 @@ export function useWorkbench() {
   const [loadNotice, setLoadNotice] = useState('');
   // Consecutive coalesced commits (shuffle steps) share one undo entry.
   const coalescing = useRef(false);
+  // A full restore owns the database until its single transaction settles; edits are refused meanwhile.
+  const restoring = useRef(false);
+  // Another panel/tab of this extension saved a newer revision (local BroadcastChannel; nothing leaves the browser).
+  const [externalChange, setExternalChange] = useState(false);
+  const channel = useRef<BroadcastChannel | null>(null);
+  const announce = () => { try { channel.current?.postMessage({ revision: revision.current }); } catch { /* Best effort only. */ } };
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const opened = new BroadcastChannel(`${DATABASE_NAME}:saved`);
+    channel.current = opened;
+    opened.onmessage = event => {
+      const incoming = (event.data as { revision?: unknown } | null)?.revision;
+      if (typeof incoming === 'number' && incoming > revision.current) setExternalChange(true);
+    };
+    return () => { opened.close(); channel.current = null; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +72,7 @@ export function useWorkbench() {
         pending.current = null;
         const writes = [...imageWrites.current.values()];
         revision.current = await repository.current.save(next.data, revision.current, next.backup, writes);
+        announce();
         for (const write of writes) if (next.data.images.some(image => image.id === write.id) && imageWrites.current.get(write.id) === write) imageWrites.current.delete(write.id);
       }
     } catch (cause) {
@@ -77,6 +95,7 @@ export function useWorkbench() {
 
   const commit = (change: WorkbenchData | ((data: WorkbenchData) => WorkbenchData), backup = false, options: { coalesce?: boolean } = {}): boolean => {
     if (!current.current) return false;
+    if (restoring.current) { setError('完全バックアップを復元中です。完了するまで編集できません'); return false; }
     try {
       const next = validateData(typeof change === 'function' ? change(current.current.present) : change);
       const merge = !!options.coalesce && coalescing.current && current.current.past.length > 0;
@@ -91,6 +110,8 @@ export function useWorkbench() {
     data: history?.present ?? null, saving, storageError, error, setError, commit, repository, migrationRecovery, loadNotice, setLoadNotice,
     /** Latest committed state, readable synchronously from async callbacks. */
     latest: () => current.current?.present ?? null,
+    /** Whether saving has failed and is waiting for a retry, readable synchronously. */
+    storageFailed: () => failed.current,
     imageBlob: async (id: string, thumbnail = false) => {
       const pendingImage = imageWrites.current.get(id);
       const record = current.current?.present.images.find(image => image.id === id);
@@ -114,14 +135,49 @@ export function useWorkbench() {
       const states = current.current ? [...current.current.past, current.current.present, ...current.current.future] : [];
       await repository.current?.purgeUnreferenced(states.flatMap(state => state.images.map(image => image.id)));
     },
+    /**
+     * Restore a complete backup in one IndexedDB transaction (data, previous-import
+     * backup and every image binary). Memory and history change only after the
+     * transaction commits; on any failure both the database and the screen keep
+     * the previous data. The restore itself is a single Undo step.
+     */
+    restoreFull: async (next: WorkbenchData, writes: ImageWrite[]): Promise<void> => {
+      if (!repository.current || !current.current) throw new Error('DBに接続できません');
+      if (running.current || pending.current || failed.current || restoring.current) throw new Error('保存が完了してから復元してください（保存エラー中は先に再試行してください）');
+      const validated = validateData(next);
+      restoring.current = true; running.current = true; setSaving(true);
+      try {
+        revision.current = await repository.current.save(validated, revision.current, true, writes);
+        announce();
+        coalescing.current = false;
+        current.current = record(current.current, validated);
+        setHistory(current.current);
+        setError('');
+      } finally { restoring.current = false; running.current = false; setSaving(false); }
+    },
+    externalChange,
+    /** Explicitly load what another panel/tab saved. Resets Undo history (it would revert the other panel's work). */
+    reloadFromStorage: async () => {
+      if (!repository.current) throw new Error('DBに接続できません');
+      if (running.current || pending.current || failed.current || restoring.current) throw new Error('この画面の保存が終わっていないため読み込めません。必要ならJSONで退避してから再読込してください');
+      const loaded = await repository.current.load();
+      if (running.current || pending.current || restoring.current) throw new Error('読込中に編集されたため中止しました。もう一度お試しください');
+      revision.current = loaded.revision;
+      coalescing.current = false;
+      current.current = startHistory(loaded.data);
+      setHistory(current.current);
+      setExternalChange(false);
+      if (loaded.notice) setLoadNotice(loaded.notice);
+    },
     canUndo: !!history?.past.length, canRedo: !!history?.future.length,
-    undo: () => { coalescing.current = false; if (current.current?.past.length) apply(undo(current.current), false); },
-    redo: () => { coalescing.current = false; if (current.current?.future.length) apply(redo(current.current), false); },
+    undo: () => { if (restoring.current) return; coalescing.current = false; if (current.current?.past.length) apply(undo(current.current), false); },
+    redo: () => { if (restoring.current) return; coalescing.current = false; if (current.current?.future.length) apply(redo(current.current), false); },
     retry: () => { failed.current = false; setStorageError(''); void drain(); },
     recover: async (data: WorkbenchData) => {
       if (!repository.current) throw new Error('DBに接続できません。元データの退避後に再試行してください');
       const recovered = await repository.current.recover(data);
       revision.current = recovered.revision;
+      announce();
       current.current = startHistory(recovered.data);
       pending.current = null;
       failed.current = false;
