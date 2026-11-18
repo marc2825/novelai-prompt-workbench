@@ -1,6 +1,7 @@
 import type { Channel } from '../../core/types';
-import type { NovelAIAdapter } from './adapter';
-import { visible } from './dom';
+import { parseFieldKey } from '../../core/shuffle/fields';
+import type { NovelAIAdapter, PromptFieldsAdapter } from './adapter';
+import { visible } from './dom-visibility';
 import { failure, MAX_PROMPT_LENGTH, type Capabilities, type FieldSnapshot, type Result } from './protocol';
 
 // Observed read-only on the public /image page, 2026-11-03. See DOM_ADAPTER_CHECKLIST.
@@ -10,9 +11,23 @@ const SELECTORS: Record<Channel, string> = {
   negative: '.prompt-input-box-undesired-content[data-prompt-input="true"] .ProseMirror[contenteditable="true"]',
 };
 const READ_ONLY = '実NovelAIのProseMirror書込み・内部状態保持は未検証です。コピーを使用してください';
+// Character Prompts / model selector / generation state were not observed (DOM_ADAPTER_CHECKLIST).
+const NO_CHARACTERS = '実NovelAIのCharacter Prompts欄のDOMは未検証のため、読取り・書込みとも行いません。キャラクター別にコピーしてください';
+const NO_MODEL = '実NovelAIのモデル表示のDOMは未検証のため、モデルは手動で選択してください';
 
 export class LiveReadOnlyAdapter implements NovelAIAdapter {
   private readonly tokens = new WeakMap<Element, string>();
+  readonly fields: PromptFieldsAdapter = {
+    describe: async () => {
+      const capabilities = await this.capabilities();
+      return { base: capabilities, characters: { slots: 0, canRead: false, canWrite: false, reason: NO_CHARACTERS }, model: { label: null, reason: NO_MODEL } };
+    },
+    readField: async field => {
+      const parsed = parseFieldKey(field);
+      return parsed.kind === 'base' ? this.read(parsed.channel) : failure('UNSUPPORTED', NO_CHARACTERS);
+    },
+    writeField: async () => failure('UNSUPPORTED', READ_ONLY),
+  };
   constructor(private readonly document: Document) {}
 
   async read(channel: Channel): Promise<Result<{ snapshot: FieldSnapshot }>> {

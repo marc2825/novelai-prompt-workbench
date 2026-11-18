@@ -1,5 +1,6 @@
 import type { Channel } from '../../core/types';
-import { failure, isSiteResponse, PROTOCOL, type Result, type SiteInspection, type SiteRequest, type SiteResponse, type Target, type WriteMode, type WritePreview } from './protocol';
+import type { FieldKey, FieldWrite } from '../../core/shuffle/fields';
+import { failure, isSiteResponse, PROTOCOL, type FieldsPreview, type Result, type SiteInspection, type SiteRequest, type SiteResponse, type Target, type WriteMode, type WritePreview } from './protocol';
 
 export interface TabTransport {
   listTabIds(): Promise<number[]>;
@@ -21,7 +22,7 @@ export class SiteClient {
       if (!isSiteResponse(response)) return failure('INVALID_MESSAGE', 'サイトからの応答を検証できません');
       if (!response.ok) return response;
       if (response.type !== request.type) return failure('INVALID_MESSAGE', '応答した操作の種類が一致しません');
-      const target = response.type === 'inspect' ? response.inspection : response.type === 'prepare' ? response.preview : response.target;
+      const target = response.type === 'inspect' || response.type === 'inspectFields' ? response.inspection : response.type === 'prepare' || response.type === 'prepareFields' ? response.preview : response.target;
       if (target.tabId !== request.tabId || (request.type !== 'inspect' && !sameTarget(target, request))) return failure('STALE_DOCUMENT', '応答したタブまたはページが選択先と一致しません');
       if (request.type === 'read' && response.type === 'read' && response.channel !== request.channel) return failure('INVALID_MESSAGE', '読取りチャンネルが一致しません');
       if (request.type === 'prepare' && response.type === 'prepare' && (response.preview.channel !== request.channel || response.preview.mode !== request.mode)) return failure('INVALID_MESSAGE', '反映プレビューのチャンネルまたは方法が一致しません');
@@ -48,6 +49,31 @@ export class SiteClient {
   }
   prepare(target: Target, channel: Channel, mode: WriteMode, text: string) {
     return this.send({ protocol: PROTOCOL, type: 'prepare', ...targetFields(target), channel, mode, text });
+  }
+  inspectFields(target: Target) {
+    return this.send({ protocol: PROTOCOL, type: 'inspectFields', ...targetFields(target) });
+  }
+  async readFields(target: Target, fields: FieldKey[]) {
+    const response = await this.send({ protocol: PROTOCOL, type: 'readFields', ...targetFields(target), fields });
+    if (response.ok && response.type === 'readFields' && response.values.map(value => value.field).join() !== fields.join()) return failure('INVALID_MESSAGE', '読取った欄が要求と一致しません');
+    return response;
+  }
+  async prepareFields(target: Target, characterSlots: number, writes: FieldWrite[]) {
+    const response = await this.send({ protocol: PROTOCOL, type: 'prepareFields', ...targetFields(target), characterSlots, writes });
+    if (response.ok && response.type === 'prepareFields' && (response.preview.writes.length !== writes.length || response.preview.writes.some((change, index) => change.field !== writes[index]!.field || change.after !== writes[index]!.text))) return failure('INVALID_MESSAGE', '反映プレビューの欄または内容が要求と一致しません');
+    return response;
+  }
+  async applyFields(preview: FieldsPreview) {
+    const { tabId, documentId, url, ticket } = preview;
+    const response = await this.send({ protocol: PROTOCOL, type: 'applyFields', tabId, documentId, url, ticket });
+    if (response.ok && response.type === 'applyFields' && (response.values.length !== preview.writes.length || response.values.some((value, index) => value.field !== preview.writes[index]!.field || value.raw !== preview.writes[index]!.after))) return failure('VERIFY_FAILED', '反映した欄または再読取り結果が確認内容と一致しません');
+    return response;
+  }
+  generationStatus(target: Target, session: string) {
+    return this.send({ protocol: PROTOCOL, type: 'generationStatus', ...targetFields(target), session });
+  }
+  releaseGeneration(target: Target, session: string) {
+    return this.send({ protocol: PROTOCOL, type: 'releaseGeneration', ...targetFields(target), session });
   }
   async apply(preview: WritePreview) {
     const { tabId, documentId, url, ticket } = preview;

@@ -1,6 +1,6 @@
 # NovelAI Prompt Workbench (非公式)
 
-NovelAI画像生成向けのローカル保存型Chrome MV3拡張です。P0/P1、P2の範囲コメント・連携基盤に加え、**P3のプリセット・グループ切替と、P4の画像管理・手動A/B比較を実装済み**です。**実NovelAIへの書込みは未検証のため、引き続き無効です。** NovelAIとは提携していません。
+NovelAI画像生成向けのローカル保存型Chrome MV3拡張です。P0/P1、P2の範囲コメント・連携基盤に加え、**P3のプリセット・グループ切替、P4の画像管理・手動A/B比較、プロンプトシャッフル（役割・ポーズ・カメラ・順序）を実装済み**です。**実NovelAIへの書込みは未検証のため、引き続き無効です。** NovelAIとは提携していません。
 
 ## 実装済み
 
@@ -76,6 +76,17 @@ JSONはUTF-8 10MiB、全snapshot/spanを含む合計10000レコード、深さ32
 4. 差分を確認し、A/BそれぞれのPromptをコピーします。NovelAIでユーザーが手動生成し、保存したPNGを該当スロットに取り込みます。自動生成・設定の自動操作はありません。
 5. 画像/Prompt/設定を比較します。PNGに生成情報が無い場合は画像情報を手入力できます。画像側の設定をスロットへ採用するには明示確認が必要です。
 
+### タグの重みをスライダーで比べる
+
+「Bのグループ・タグを編集」で原文のタグ1つを選択し、「重みを調整」を押します。自由入力のPositive/Negativeと、グループの「この候補のタグを編集」で使えます。ワークスペースの原文編集でも同じ操作が可能です。
+
+- スライダーは **0〜2、0.05刻み**。小数第2位までの数値入力、変更後プレビュー、標準の1に戻すボタンがあります。例: `blue eyes` → `1.4::blue eyes::`。0も数値重みとして残し、タグの削除やコメントOFFにはしません。
+- 「重みを反映」で編集欄に確定し、「Bの変更を確定」で比較用に保存します。調整中はBの確定を止め、未反映の重みを取りこぼさないようにします。Undo/Redoで戻せます。
+- 既存の数値重みは `1.4::blue eyes::` 全体を選んで再調整できます。同じタグが複数あっても選択した箇所だけを変え、前後の文字列・空白を保持します。
+- 複雑な入れ子・braces/brackets・pipe・macro・エスケープ・改行を含む欄、複数タグの一括重み、0〜2以外の既存重みは自動編集の対象外です。対象を独立した部品にするか本文で編集してください。コメント構造がある間は、構造を解除してから調整します。
+
+生成条件を合わせてA/Bを手動生成し、各PNGを取り込むと、比較画面上部の画像ビューで横並び・重ね合わせ・ピクセル差分を確認できます。Bを変更して確定すると旧B画像の関連付けを外します。数値重みのモデル別の効果や実NovelAIでの生成結果は未検証です。
+
 PNGは20MiB、各辺8192px、合計16,777,216画素まで。PNG署名・チャンク境界・CRC・終端とブラウザのデコードを検証します。APNG/JPEG/WebPは未対応です。標準`tEXt/zTXt/iTXt`のテキストは展開後も合計256KiBまで、128チャンクまで。HTMLとして描画しません。公式保存NovelAI PNGのフィールド対応は`codex/05`に従い実サンプル確認後に追加するparser interfaceとしています。テスト用の明示的なworkbench形式のみ構造化Prompt/Seed等の取得を検証しています。
 
 表示はA/B共通倍率・位置でパン/ズームできます。矢印キーでもパンできます。異なる寸法は警告し、ピクセル差分は同寸法のみ、またはユーザーが「BをAの幅・高さへ変形」を選んだ場合のみ計算します。Canvas高品質補間で縦横比が変わる場合があります。差分は各画像4,194,304画素まで、ブラウザがデコードしたsRGB RGBAの絶対差です。原本は変更しません。
@@ -89,6 +100,24 @@ PNGは20MiB、各辺8192px、合計16,777,216画素まで。PNG署名・チャ�
 **実NovelAIの挿入/置換は無効のままです。** P2時点で公開ページの空2欄をContent Script経由で自動読取りしましたが、ログイン後UIと書込み・内部状態保持は未検証です。プリセット適用・グループ切替はローカルだけで、サイトへ自動送信しません。コピーを使ってください。
 
 fixture上の書込みフローは対象タブ固定→read/prepare→変更前後確認→明示apply→CAS/readbackです。成功を実サイト対応の根拠にはしていません。権限は`sidePanel`のみで、tabs/activeTab/host_permissions/backgroundを追加していません。
+
+## プロンプトシャッフル
+
+同じプロンプトで構図が似通うのを避けるため、**キャラクターの外見（固定プロンプト）は変えずに**、役割・ポーズ・表情・カメラ・左右順だけを入れ替えます。「シャッフル」タブから使います。
+
+1. 「＋ プロファイル」を作成し、キャラクターを追加して固定プロンプト（例: `girl, blonde hair, blue eyes, white dress`）を入力します。可変プロンプトはカテゴリ別に入力し、シャッフルがそのカテゴリを決めたときだけ置き換わります。
+2. 役割テンプレート（例: Pointing — 行動する側 `standing, source#pointing at another` / 行動される側 `sitting, target#pointing`）やポーズセット・候補プール・カメラプリセットを登録します。「標準テンプレート・候補を追加」で汎用例を入れられます（明示操作時のみ）。
+3. 対象カテゴリ、方式（Pure Random / Shuffle Bag / Weighted Random）、直前・直近N件の回避、シャッフルSeed、モデルを選びます。
+4. 「Shuffle Now」で結果を確認します。役割は「A=行動する側、B=される側」と「B=行動する側、A=される側」のように**組で**入れ替わり、Shuffle Bagでは両方を使い切ってから次の巡回に入ります。「次のシャッフル結果のプレビュー」で次の差分も確認できます。
+5. 各欄（ベースPrompt・キャラクター別Prompt/UC）をコピーしてNovelAIに貼り付けます。サイト連携できる環境では「Apply（反映プレビュー）」→「確認してApply」、元に戻すときは「Restore」です。
+
+- 合成は毎回、ワークスペースの出力とキャラクター定義から計算し直すため、何度適用してもタグは増えません。ユーザーが書いたタグは削除せず、矛盾の可能性だけ警告します。NovelAIの `||a|b||` ランダマイザーは改変しません。
+- 同じ設定・同じシャッフルSeed・同じステップ数で同じ結果を再現します。NovelAIの生成Seedとは別で、生成Seedは読み書きしません。履歴（最大50件）から過去の結果を再適用できます。
+- 生成回数に応じた切替: 間隔（毎回/3/5/10/任意）を選び、「生成完了を手動で記録（+1）」で数えると、規定回数でシャッフルします。生成状態を確認できるサイト連携（現在はローカルfixtureのみ）では「自動シャッフルを開始」で、成功したジョブ数に応じて次回用プロンプトを書き換えます。生成ボタンは押さず、生成中は書き換えず、サイト側で編集されていれば上書きせず停止します。
+- **実NovelAIでは**: キャラクター欄・モデル表示・生成状態のDOMが未検証のため、反映・自動検知は無効です（接続すると「非対応」と理由を表示します）。コピーと手動記録を使ってください。Character Positionsの座標は変更しません。
+- 設定はIndexedDBに保存され、JSONバックアップに含まれます。シャッフル設定だけのエクスポート/インポート（履歴なし）もできます。読み込めないシャッフル設定は隔離し、ライブラリは通常どおり起動します。
+
+詳細: [docs/shuffle/architecture.md](docs/shuffle/architecture.md)、[データモデル](docs/shuffle/data-model.md)、[Site Adapter](docs/shuffle/site-adapter.md)、[テスト計画](docs/shuffle/test-plan.md)、[制約](docs/shuffle/limitations.md)。
 
 ## ローカル確認・テスト
 
@@ -109,6 +138,14 @@ LD_LIBRARY_PATH=/tmp/nai-chromium-deps/root/usr/lib/x86_64-linux-gnu \
 PLAYWRIGHT_BROWSERS_PATH=/tmp/nai-pw-browsers corepack pnpm test:e2e
 ```
 
+（root権限がない環境では `apt-get download libnspr4 libnss3 libasound2t64` と `dpkg -x` で共有ライブラリを展開し、`LD_LIBRARY_PATH` に指定します。）
+
+## 検証結果（2026-11-14、シャッフル追加後）
+
+- 単体・統合 **246件成功**（既存184 + シャッフル62）、strict型検査・production build成功。
+- Chromium E2E **46件成功**（既存37 + シャッフル9: 模擬サイト8、実content script 1）。
+- Mock E2Eの成功は実NovelAIでの動作確認ではありません。実サイトの書込み・キャラクター欄・生成検知は未検証で無効です。
+
 ## 検証結果（2026-11-03）
 
 - 単体 **184件成功**（既存129 + P4追加55）。
@@ -117,3 +154,15 @@ PLAYWRIGHT_BROWSERS_PATH=/tmp/nai-pw-browsers corepack pnpm test:e2e
 - 未検証: 実NovelAIの書込み・ログイン後UI・rich node・Character Prompts・言語切替、手動Side Panelドッキング、GitHub Actions実行、NovelAI固有PNGの解釈、実ディスク満杯、上限近辺での長期利用。
 
 受入対応と制限は[tasks/STATUS.md](tasks/STATUS.md)、データ仕様は[docs/DATA_MODEL.md](docs/DATA_MODEL.md)、判断は[docs/DECISIONS.md](docs/DECISIONS.md)、実DOMの観測範囲は[調査記録](docs/DOM_ADAPTER_CHECKLIST.md)を参照してください。
+
+## Experiment Lab（X/Y/Z Plot）
+
+「Experiment Lab」タブで、タグ重み・有無・置換・位置・Prompt S/R・タググループ・全文候補や、Seed/Steps/Guidance/Rescale/Sampler/Model/解像度/UC/Quality Tagsを軸に比較できます。Weight Sweep、2タグ相互作用、Seed Robustness、Prompt Matrixなど7種類のテンプレートを用意しています。
+
+1. ベースPrompt/UCと生成設定を入力し、X/Y/Zの候補を指定。予定枚数と全条件を確認して作成します（最大512条件）。
+2. Condition IDを選び、PromptをコピーしてNovelAIで同じSeed・設定に合わせ、手動生成します。PNGを該当条件へ登録します。
+3. X/YグリッドとZ/Seed/反復の切替、A/Bワイプ・差分で比較。評価・お気に入り・メモを保存し、JSON/CSV/画像付きZIP/グリッドPNGを出力できます。
+
+実NovelAIの生成設定の自動同期・画像捕捉・Controlled Batchは未対応です。実サイトのPrompt書込みprofileも未検証のためコピーを使います。JSONは画像metadataのみ、ZIPは元PNGを含みます。「広いタブでLabを開く」で比較画面を広げられます。
+
+詳しい操作、対応軸、上限、手動復元、実機未検証の範囲: [Experiment Lab](docs/lab/README.md) / [公式資料の調査](docs/lab/RESEARCH.md)。

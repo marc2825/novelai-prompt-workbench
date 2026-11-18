@@ -2,6 +2,7 @@ import { emptyData } from '../core/commands';
 import { inspectPng } from '../core/png';
 import type { ImageRecord, WorkbenchData } from '../core/types';
 import { SCHEMA_VERSION, validateData, validateLegacyData, validatePreImageData } from './validation';
+import { quarantineShuffle } from './shuffle';
 
 const ASSETS = ['libraryEntries', 'categories', 'workspaces', 'presets', 'experiments', 'images'] as const;
 const BINARY_STORES = ['imageOriginals', 'imageThumbnails'] as const;
@@ -14,7 +15,7 @@ export class StorageConflictError extends Error {}
 export class MigrationError extends Error {
   constructor(message: string, readonly snapshot: unknown) { super(message); }
 }
-export interface StoredState { data: WorkbenchData; revision: number }
+export interface StoredState { data: WorkbenchData; revision: number; notice?: string }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => { req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
@@ -139,7 +140,9 @@ export class WorkbenchRepository {
   async load(): Promise<StoredState> {
     const transaction = this.database.transaction(STORES, 'readonly');
     const [state] = await Promise.all([readState(transaction), completion(transaction)]);
-    return { data: validateData(state.data), revision: state.revision };
+    // Corrupt shuffle data is isolated (kept in shuffleRecovery) instead of blocking the library.
+    const isolated = quarantineShuffle(state.data, new Date().toISOString());
+    return { data: validateData(isolated.data), revision: state.revision, ...(isolated.notice ? { notice: isolated.notice } : {}) };
   }
 
   async save(input: WorkbenchData, expectedRevision: number, backup = false, imageWrites: ImageWrite[] = []): Promise<number> {

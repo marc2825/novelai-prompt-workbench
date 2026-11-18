@@ -89,3 +89,7 @@ C08/U05（プリセット）は下記P3で実装。U08（画像A/B）は未実�
 - 既存`extension.spec.ts`のChrome完全再起動ケースにpreset保存・binding・再読込を追加。実content scriptのwrite能力false、既存P1/P2の21 E2Eケースも維持。
 
 現在の単体テストは129件（既存102 + 追加27）、ブラウザテストは27件（既存21 + 追加6）。future-versionテストは現在版+1、未対応資産テストはpresetsから未実装experimentsへ対象を更新し、元の拒否検証を維持している。実サイトwrite・画像・A/Bは完了扱いにしない。
+
+## Prompt Shuffle
+
+網羅表は `docs/shuffle/test-plan.md`。単体・統合 `tests/unit/shuffle/`（62件）、Mock E2E `tests/e2e/shuffle.spec.ts`（8件）、実content scriptでの非対応表示 `tests/e2e/extension.spec.ts`（1件）。実NovelAIでの手動確認（M-S1〜M-S5）は未実施。

@@ -1,3 +1,4 @@
+import { Lab } from './lab/Lab';
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { compileWorkspace } from '../core/compose';
 import { snapshotMember } from '../core/commands';
@@ -13,13 +14,14 @@ import { SiteConnection } from './SiteConnection';
 import { Presets, PresetStatus } from './Presets';
 import { recoveryJson } from '../data/recovery';
 import { Comparisons } from './Comparisons';
+import { Shuffle } from './Shuffle';
 
-type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定';
-const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', '比較', '設定'];
+type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
+const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', '比較', '設定', 'シャッフル', 'Experiment Lab'];
 
 export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const workbench = useWorkbench();
-  const [tab, setTab] = useState<Tab>('ライブラリ');
+  const [tab, setTab] = useState<Tab>(location.hash === '#lab' ? 'Experiment Lab' : 'ライブラリ');
   const [notice, setNotice] = useState('');
   const [comparisonDraft, setComparisonDraft] = useState(false);
   const data = workbench.data;
@@ -40,7 +42,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     try { await navigator.clipboard.writeText(compiled[channel]); setNotice(`${channel}をコピーしました。`); }
     catch { workbench.setError('コピーできませんでした。出力欄を選択して手動でコピーしてください。'); }
   }
-  return <main onKeyDown={keyboard}>
+  return <main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
     <header><small className="eyebrow">LOCAL PROMPT LIBRARY</small><h1>NovelAI Prompt Workbench</h1><p className="hint">原文を残して、構成を切り替える。</p></header>
     <div className={`status ${workbench.storageError ? 'error' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>
     {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データをJSONで退避するか、DBの復旧用ファイルを保存してください。</p><div className="actions">
@@ -54,7 +56,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     {workbench.error && <div className="error" role="alert">{workbench.error}<button type="button" onClick={() => workbench.setError('')}>閉じる</button></div>}
     {!data && workbench.storageError && <Recovery workbench={workbench} />}
     {data && <>
-      <nav aria-label="メイン"><div className="tabs" role="tablist">{TABS.map(value => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} key={value} onClick={() => { if (tab !== value && comparisonDraft && !confirm('Bの未保存変更案を破棄して画面を切り替えますか？')) return; setTab(value); setNotice(''); }}>{value}</button>)}</div></nav>
+      <nav aria-label="メイン"><div className="tabs" role="tablist">{TABS.map(value => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} key={value} onClick={() => { if (tab !== value && comparisonDraft && !confirm('未保存の変更案を破棄して画面を切り替えますか？')) return; setTab(value); setNotice(''); }}>{value}</button>)}</div></nav>
       <div className="actions history"><button type="button" disabled={!workbench.canUndo || comparisonDraft} onClick={workbench.undo}>元に戻す</button><button type="button" disabled={!workbench.canRedo || comparisonDraft} onClick={workbench.redo}>やり直す</button><small>Ctrl/Cmd+Z・Y（入力欄の外）</small></div>
       <PresetStatus workbench={workbench} />
       {notice && <p role="status">{notice}</p>}
@@ -64,8 +66,10 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         {tab === '設定' && <Settings workbench={workbench} />}
         {tab === 'プリセット' && <Presets workbench={workbench} onEdit={() => setTab('ワークスペース')} />}
         {tab === '比較' && <Comparisons workbench={workbench} onDraftChange={setComparisonDraft} />}
+        {tab === 'Experiment Lab' && <Lab workbench={workbench} siteClient={siteClient} onDraftChange={setComparisonDraft} />}
+        {tab === 'シャッフル' && <Shuffle workbench={workbench} siteClient={siteClient} />}
       </div>
-      <section className="panel stack preview" aria-label="ライブプレビュー"><div className="group-head"><h2>出力プレビュー</h2><small>{workspace?.title ?? '構成なし'}</small></div>
+      {tab !== 'Experiment Lab' && <section className="panel stack preview" aria-label="ライブプレビュー"><div className="group-head"><h2>出力プレビュー</h2><small>{workspace?.title ?? '構成なし'}</small></div>
         {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}><label>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}<textarea readOnly rows={3} value={compiled[channel]} /></label><button type="button" onClick={() => void copy(channel)}>{channel === 'positive' ? 'Positiveをコピー' : 'Negativeをコピー'}</button></div>)}
         {compiled.warnings.map((warning, index) => <p role="alert" key={index}>{warning}</p>)}
         <SiteConnection client={siteClient} compiled={compiled} onImport={(channel, raw) => {
@@ -76,7 +80,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
             const { freeformNegativeSpans: _spans, ...rest } = item; return { ...rest, freeformNegative: raw, updatedAt: now() };
           }) }));
         }} />
-      </section>
+      </section>}
     </>}
     <footer>非公式・ローカル保存。画像生成はNovelAI上で手動で行います。</footer>
   </main>;

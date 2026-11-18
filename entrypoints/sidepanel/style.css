@@ -1,7 +1,7 @@
 :root { font-family: system-ui, 'Noto Sans JP', sans-serif; color-scheme: light dark; --accent: #4f7fbe; --line: #80808055; --muted: #80808020; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 300px; }
-main { max-width: 760px; margin: auto; padding: 16px; display: grid; gap: 14px; }
+main { max-width: 760px; margin: auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 header { border-left: 3px solid var(--accent); padding-left: 12px; }
 h1 { margin: 4px 0; font-size: 20px; letter-spacing: -.4px; }
 h2 { margin: 0; font-size: 15px; }
@@ -55,4 +55,19 @@ th, td { border: 1px solid var(--line); padding: 6px; text-align: left; vertical
 .table-scroll { overflow: auto; }
 td, th { padding: 6px; text-align: left; overflow-wrap: anywhere; }
 fieldset { min-width: 0; }
+.weight-control { padding: 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--muted); }
+.weight-control output { color: var(--accent); font: 700 20px ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.weight-target { font-family: ui-monospace, monospace; }
+.weight-scale { display: flex; justify-content: space-between; font-size: 11px; opacity: .8; }
+.weight-control input[type=range] { padding: 0; accent-color: var(--accent); }
+.comparison-steps { margin: 0; padding-left: 22px; font-size: 12px; line-height: 1.8; }
 .image-caption { position: absolute; bottom: 5px; left: 5px; color: #fff; background: #111c; padding: 2px 6px; pointer-events: none; }
+
+.lab-wide { max-width: 1400px; }
+.lab-grid { table-layout: auto; width: max-content; }
+.lab-grid th { max-width: 220px; min-width: 85px; }
+.lab-cell { display: grid; gap: 6px; min-height: 100px; padding: 4px; }
+.lab-cell .thumbnail { width: 100%; height: 120px; object-fit: contain; }
+.lab-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab-original { max-width: 100%; max-height: 500px; object-fit: contain; }
+progress { width: 100%; accent-color: var(--accent); }

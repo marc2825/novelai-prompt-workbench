@@ -1,5 +1,81 @@
 # 実装ステータス
 
+## Experiment Lab（2026-11-16）
+
+| Phase | 状態 | 実装・制約 |
+|---|---|---|
+| 1 条件生成 | 実装・自動検証済み | XYZ、タグ操作、数値/CSV/行候補、Seed群・反復、7テンプレート、全件preview、最大512条件 |
+| 2 手動連携 | 手動補助を実装・fixture検証済み | 既存SiteClientで読取り・確認付き反映・CAS/readback。条件ID付きPNG登録。条件切替後の原文復元もCAS。実NovelAIは読取り専用、設定同期は手動 |
+| 3 比較・保存 | 実装・自動検証済み | XYZグリッド、Seed/反復ページ、A/Bワイプ・差分、評価・メモ、履歴/複製/再開、JSON/CSV/ZIP/グリッドPNG |
+| 4 自動化・高度分析 | 未実装・Controlled Batch無効 | 正式な許諾・連携契約・実機profileが未確認。高度な統計分析は後続 |
+
+検証（Node 24.21.0 / pnpm 10.34.5 / Playwright 1.64.1 Chromium）:
+
+| コマンド | 結果 |
+|---|---|
+| `corepack pnpm install --frozen-lockfile --store-dir /tmp/nai-pnpm-store` | PASS、依存・lockfile変更なし |
+| `corepack pnpm test` | **333 PASS / 0 FAIL、18ファイル**（既存283 + Lab50） |
+| `corepack pnpm typecheck` | PASS |
+| `corepack pnpm build` | PASS、sidePanelのみ、entrypoint追加なし |
+| `corepack pnpm test:e2e` | **53 PASS / 0 FAIL**（既存49 + Lab4、Mock E2E） |
+
+5/25/75条件、CSV/range、正負の重み・完全ラッパー・出現番号、Matrix因子、Seed桁保持、Medium制約、不正snapshot/壊れたDBの保持、quota rollback、PNGのID紐付け・欠落修復、評価、出力、再起動、手動反映と競合/原文復元を検証。ZIPはPython標準zipfileでもCRC・JSON・CSV・原本PNG2枚を検証済み。400pxの画面もスクリーンショットで確認。
+
+再開後の環境でテスト用共有ライブラリが消えていたため、一度Lab E2E 4件がChromium起動前に失敗。libnspr4/libnss3/libasound2t64をapt-get downloadで `/tmp/nai-lab-libs` に取得・展開し、LD_LIBRARY_PATHを指定して全53件が成功。OSへのインストールはしていない。
+
+実サイトの有料生成・ログイン後DOMの手動検証は未実施。設定の自動取得/反映/復元、キャラクター別欄、PNG自動捕捉、公式固有metadata解析、ZIP取込、完全な全アプリ翻訳は未対応。[操作・制約](../docs/lab/README.md)、[公式資料の調査](../docs/lab/RESEARCH.md)。
+
+---
+
+## タグ重みスライダー・画像比較UI（2026-11-16）
+
+- Workspace/B変更案の自由入力・候補原文で、選択したタグだけを0〜2のスライダー（0.05刻み）または数値入力で調整。数値重み全体の再選択、標準1への復帰、変更後preview、1回Undo/Redo。複雑構文・コメント構造・不正選択・古い原文は保護する。
+- Bの未反映プレビュー中は確定を無効化。A/元workspace/辞書は独立し、B確定時に旧画像の関連付けを解除する。PNG比較ビューを上部に移し、手動生成から比較までの手順を表示。
+- 狭いサイドパネルでグリッドの最小幅が広がる問題を修正。400px幅で重みコントロールが収まることをMock E2E・スクリーンショットで確認。
+- 永続化は従来のraw/snapshotのみ。DB/JSON v3、追加依存・権限・entrypointなし。README、PROMPT_SEMANTICS、AB_COMPARISON、DECISIONSを更新。
+
+検証（Node 24.21.0 / pnpm 10.34.5 / Playwright Chromium、ローカルfixtureのみ）:
+
+| コマンド | 結果 |
+|---|---|
+| `corepack pnpm install --frozen-lockfile --store-dir /tmp/nai-pnpm-store` | PASS（既存の書込み可能ストアを使用、lockfile変更なし） |
+| `corepack pnpm test` | **283件 PASS / 0件 FAIL、17ファイル**（既存246 + 重み37） |
+| `corepack pnpm typecheck` | PASS |
+| `corepack pnpm build` | PASS（権限は `sidePanel` のみ） |
+| `corepack pnpm test:e2e` | **49件 PASS / 0件 FAIL**（既存46 + 重み3、Mock E2E） |
+
+E2Eは既存の `/tmp/portfolio-ci-libs/root/usr/lib/x86_64-linux-gnu` を `LD_LIBRARY_PATH` に指定し、localhost待受・Chromium起動が可能な実行環境で検証。途中のテスト修正: ラベルの検索方法1件、400pxでの幅超過2件を検出して修正し、新規3件の再実行は全PASS。
+
+実サイトの手動検証は未実施。数値重みのモデル別解釈・生成効果、実NovelAIへの書込み、実NovelAI固有PNGメタデータは未検証。画像の自動生成は行わず、比較には手動保存PNGを使う。pushなし。
+
+---
+
+## Prompt Shuffle（2026-11-14）
+
+| Phase | 状態 | 内容 |
+|---|---|---|
+| 0 Audit / ハーネス | 完了 | 調査結果と方針を `docs/shuffle/architecture.md` に記録。AGENTS.md統合、CLAUDE.md、Skill `novelai-prompt-shuffle` |
+| 1 Core Engine | 実装・単体PASS | 型、Seeded PRNG、Pure/Bag/Weighted、直前・直近N件回避、役割割当、制約、カテゴリ置換の合成、モデル制限、`|`構文、生成カウンタ |
+| 2 UI / 手動Apply | 実装・Mock E2E PASS | シャッフルタブ、キャラクター/テンプレート/プール/カメラ管理、現在・次回プレビュー、Shuffle Now、Apply/Restore、履歴、設定export/import |
+| 3 NovelAI連携 | **fixtureのみ検証／実サイト非対応** | 複数欄プロトコル、能力検出、欄数照合、CAS・rollback・readback。実adapterは読取り専用のまま、キャラクター欄・モデル・生成検知・位置は能力false |
+| 4 生成連動 | **fixtureのみ検証／実サイトは手動記録** | lease付きオブザーバ、job IDでの重複排除、再読込・再描画・失敗の除外、生成中は待機、編集検出で停止、手動+1の代替 |
+| 5 品質 | 完了 | 下記の全コマンドPASS、ドキュメント更新 |
+
+検証（Node 24.21.0 / pnpm 10.34.5 / Playwright 1.64.1 Chromium）:
+
+| コマンド | 結果 |
+|---|---|
+| `corepack pnpm test` | **246件 PASS / 16ファイル**（既存184 + シャッフル62） |
+| `corepack pnpm typecheck` | PASS |
+| `corepack pnpm build` | PASS（権限は `sidePanel` のみ、entrypoint追加なし） |
+| `corepack pnpm test:e2e` | **46件 PASS**（既存37 + シャッフル9） |
+
+E2E環境: Playwright 1.64.1用Chromiumを `playwright install` で取得し、root権限なしで不足共有ライブラリ（libnspr4/libnss3/libasound2）を `apt-get download` + `dpkg -x` で作業用ディレクトリに展開して `LD_LIBRARY_PATH` に指定した。依存・lockfileの変更なし。
+
+未検証・未実装: 実NovelAIでの書込み・キャラクター欄・生成検知・モデル検出・Character Positions（すべて無効/非対応として表示）。プリセットごとのプロファイル、バリエーション数推定、類似度ベースの構図回避。詳細は `docs/shuffle/limitations.md`。commit/push は行っていない。
+
+---
+
 更新: 2026-11-03（Asia/Tokyo）。ユーザー指定の**P4画像管理・手動A/B比較を実装**。既存資料のP3-Bに相当する。P0〜P3の機能・データを維持し、実NovelAIのwriteは無効のまま。
 
 | Phase | 状態 | 内容 |

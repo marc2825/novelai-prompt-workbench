@@ -25,7 +25,7 @@ export function Workspace({ workbench }: { workbench: Workbench }) {
     }}>＋ ワークスペース</button></div>
     <Presets workbench={workbench} />
     {!workspace ? <Empty>ワークスペースを作成して、グループにライブラリの部品を追加してください。</Empty> : <>
-      <section className="panel stack">
+      <section className="panel stack" key={workspace.id}>
         <Rename label="構成名" value={workspace.title} onSave={title => change(current => ({ ...current, title }))} />
         <button type="button" onClick={() => { if (confirm(`構成「${workspace.title}」を削除しますか？`)) workbench.commit(previous => { const workspaces = previous.workspaces.filter(item => item.id !== workspace.id); return { ...previous, workspaces, settings: { ...previous.settings, activeWorkspaceId: workspaces[0]?.id ?? null } }; }); }}>ワークスペースを削除</button>
         <PromptEditor label="自由入力 Positive" value={workspace.freeformPositive} spans={workspace.freeformPositiveSpans} undo={workbench.undo} redo={workbench.redo} onChange={(raw, spans) => change(current => {

@@ -2,7 +2,7 @@ import type { Channel, CompiledPrompts, PromptGroup, PromptWorkspace } from './t
 import { renderCommentSpans } from './comments';
 
 // Keep user authored raw text intact in persistence; only trim at output boundaries.
-function appendFragment(current: string, raw: string): string {
+export function appendFragment(current: string, raw: string): string {
   const piece = raw.trim();
   if (piece === '') return current;
   if (current === '') return piece;

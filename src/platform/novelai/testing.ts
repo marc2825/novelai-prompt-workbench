@@ -9,5 +9,17 @@ export function fixtureProfile(tabId: 101 | 202): VerifiedTextareaProfile {
       positive: `textarea[data-workbench-fixture="${tabId}-positive"]`,
       negative: `textarea[data-workbench-fixture="${tabId}-negative"]`,
     },
+    characters: {
+      max: 6,
+      selectors: {
+        positive: `textarea[data-workbench-fixture="${tabId}-character-{n}-positive"]`,
+        negative: `textarea[data-workbench-fixture="${tabId}-character-{n}-negative"]`,
+      },
+    },
+    model: { selector: `[data-workbench-fixture="${tabId}-model"]` },
+    generation: {
+      selector: `[data-workbench-fixture="${tabId}-generation"]`,
+      evidence: 'ローカルfixtureの生成状態要素（data-state / data-job-id）。実NovelAIの生成検知ではありません。',
+    },
   };
 }
