@@ -210,6 +210,16 @@ export class WorkbenchRepository {
     return result.blob;
   }
 
+  /** Bindings of binaries already stored under these image IDs (also ones kept only for Undo / previous import). */
+  async binaryBindings(ids: readonly string[]): Promise<Map<string, { hash: string; byteLength: number; thumbnailBytes: number }>> {
+    const transaction = this.database.transaction('imageOriginals', 'readonly');
+    const store = transaction.objectStore('imageOriginals');
+    const [records] = await Promise.all([Promise.all(ids.map(id => request(store.get(id)) as Promise<{ hash?: unknown; byteLength?: unknown; thumbnailBytes?: unknown } | undefined>)), completion(transaction)]);
+    const result = new Map<string, { hash: string; byteLength: number; thumbnailBytes: number }>();
+    records.forEach((record, index) => { if (record) result.set(ids[index]!, { hash: String(record.hash), byteLength: Number(record.byteLength), thumbnailBytes: Number(record.thumbnailBytes) }); });
+    return result;
+  }
+
   // Explicit cleanup is separate from deletion/Undo. Retained binaries allow Undo
   // and the previous-import backup to restore associations without losing pixels.
   async purgeUnreferenced(protectedIds: string[]): Promise<void> {

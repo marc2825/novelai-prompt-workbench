@@ -2,9 +2,19 @@ export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 export const MAX_IMAGE_PIXELS = 16_777_216;
 export const MAX_TEXT_BYTES = 262_144;
 export interface PngTextChunk { type: string; bytes: Uint8Array }
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index++) {
+    let crc = index;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    table[index] = crc >>> 0;
+  }
+  return table;
+})();
+/** CRC-32 (IEEE, as used by PNG and ZIP). Table-driven; same result as the bitwise definition. */
 export function crc32(bytes: Uint8Array): number {
   let crc = 0xffffffff;
-  for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0); }
+  for (let index = 0; index < bytes.length; index++) crc = CRC_TABLE[(crc ^ bytes[index]!) & 0xff]! ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
 export function inspectPng(bytes: Uint8Array) {

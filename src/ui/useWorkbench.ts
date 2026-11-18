@@ -23,6 +23,8 @@ export function useWorkbench() {
   const [loadNotice, setLoadNotice] = useState('');
   // Consecutive coalesced commits (shuffle steps) share one undo entry.
   const coalescing = useRef(false);
+  // A full restore owns the database until its single transaction settles; edits are refused meanwhile.
+  const restoring = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +79,7 @@ export function useWorkbench() {
 
   const commit = (change: WorkbenchData | ((data: WorkbenchData) => WorkbenchData), backup = false, options: { coalesce?: boolean } = {}): boolean => {
     if (!current.current) return false;
+    if (restoring.current) { setError('完全バックアップを復元中です。完了するまで編集できません'); return false; }
     try {
       const next = validateData(typeof change === 'function' ? change(current.current.present) : change);
       const merge = !!options.coalesce && coalescing.current && current.current.past.length > 0;
@@ -116,9 +119,28 @@ export function useWorkbench() {
       const states = current.current ? [...current.current.past, current.current.present, ...current.current.future] : [];
       await repository.current?.purgeUnreferenced(states.flatMap(state => state.images.map(image => image.id)));
     },
+    /**
+     * Restore a complete backup in one IndexedDB transaction (data, previous-import
+     * backup and every image binary). Memory and history change only after the
+     * transaction commits; on any failure both the database and the screen keep
+     * the previous data. The restore itself is a single Undo step.
+     */
+    restoreFull: async (next: WorkbenchData, writes: ImageWrite[]): Promise<void> => {
+      if (!repository.current || !current.current) throw new Error('DBに接続できません');
+      if (running.current || pending.current || failed.current || restoring.current) throw new Error('保存が完了してから復元してください（保存エラー中は先に再試行してください）');
+      const validated = validateData(next);
+      restoring.current = true; running.current = true; setSaving(true);
+      try {
+        revision.current = await repository.current.save(validated, revision.current, true, writes);
+        coalescing.current = false;
+        current.current = record(current.current, validated);
+        setHistory(current.current);
+        setError('');
+      } finally { restoring.current = false; running.current = false; setSaving(false); }
+    },
     canUndo: !!history?.past.length, canRedo: !!history?.future.length,
-    undo: () => { coalescing.current = false; if (current.current?.past.length) apply(undo(current.current), false); },
-    redo: () => { coalescing.current = false; if (current.current?.future.length) apply(redo(current.current), false); },
+    undo: () => { if (restoring.current) return; coalescing.current = false; if (current.current?.past.length) apply(undo(current.current), false); },
+    redo: () => { if (restoring.current) return; coalescing.current = false; if (current.current?.future.length) apply(redo(current.current), false); },
     retry: () => { failed.current = false; setStorageError(''); void drain(); },
     recover: async (data: WorkbenchData) => {
       if (!repository.current) throw new Error('DBに接続できません。元データの退避後に再試行してください');
