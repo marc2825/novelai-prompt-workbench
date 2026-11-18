@@ -93,3 +93,10 @@ C08/U05（プリセット）は下記P3で実装。U08（画像A/B）は未実�
 ## Prompt Shuffle
 
 網羅表は `docs/shuffle/test-plan.md`。単体・統合 `tests/unit/shuffle/`（62件）、Mock E2E `tests/e2e/shuffle.spec.ts`（8件）、実content scriptでの非対応表示 `tests/e2e/extension.spec.ts`（1件）。実NovelAIでの手動確認（M-S1〜M-S5）は未実施。
+
+## 2026-11-18 追加
+
+- 完全バックアップ: `tests/unit/full-backup.test.ts`（ZIP層、空データ・画像あり・同一画像の複数参照・Shuffle/Lab/比較の同時保存・別DBへの復元・画像欠落/破損・Lab ZIP・改変・不正パス・重複・ID衝突・quota中断・検証後のファイル変更）、`tests/e2e/backup.spec.ts`（別のブラウザコンテキスト＝別プロファイルへの復元、壊れたZIP、Undo/Redo、再読込後の保持）。生成したZIPはPython標準`zipfile`でもCRC・SHA-256を確認。
+- シャッフルの状態分離・自動停止・生成カウント: [shuffle/test-plan.md](shuffle/test-plan.md) の2026-11-18節。
+- 性能: `tests/unit/perf.test.ts`（100/500/2,000件、保存時に全ストアを読まない・再検証しないことを構造的に検証）。
+- UI: 別パネルの保存通知、タブのキーボード操作・タブ順・初回ガイド（`workbench.spec.ts`）、ツールバーでサイドパネルを開く設定（`extension.spec.ts`）。

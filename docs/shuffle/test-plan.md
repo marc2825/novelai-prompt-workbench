@@ -61,6 +61,18 @@ corepack pnpm test:e2e      # Chromium。共有ライブラリ不足の環境で
 | 追加 | 標準テンプレートでカテゴリ重複なし・設定export | 「standard templates: each category appears at most once…」 |
 | 追加 | 実content script（read-only adapter）で安全に停止 | extension.spec「real Content Script: shuffle reports unverified…as unsupported」 |
 
+## 2026-11-18 追加（状態の分離・自動の安全停止・生成カウント）
+
+| 観点 | テスト |
+|---|---|
+| 開始時に生成中のジョブ（ID有/無）を数えない、再描画・ID再出現・失敗・欠落の遷移表 | `generation.test.ts`（表形式15行＋境界） |
+| タブA→Bで反映前原文・編集検出を共有しない、再読込（documentId変化）・別プロファイルで使えない | `site-session.test.ts`、E2E「restore information is bound to the tab…」「a reloaded document and another profile…」 |
+| Apply途中失敗の分類（書込み前のコード／書込み開始後は状態不明） | `site-session.test.ts`、handlerのmid-write `CONFLICT`→`WRITE_FAILED` |
+| 停止後に新しい書込みを始めない（status・prepare・apply各待機中の停止）、送信済み書込みの記録 | `auto-run.test.ts` |
+| 設定変更（fingerprint）・外部カーソル変更・保存エラーで停止、自分のシャッフルでは停止しない | `auto-run.test.ts`、E2E「auto shuffle freezes its configuration…」 |
+| 自動開始時に生成中だったジョブを数えない（fixture） | E2E「a generation already running when auto shuffle starts…」 |
+| 広いタブ（`sidepanel.html#lab`）からの実content script読取り | `extension.spec.ts`、`site-session.test.ts`（送信元URL） |
+
 ## 実NovelAIでの手動確認（未実施）
 
 M-S1 キャラクター欄のDOM特定、M-S2 キャラクター欄への書込みとblur/再描画後の保持、M-S3 生成開始/完了の安定した表示要素、M-S4 モデル表示、M-S5 Character Positions。いずれも**未実施**。利用規約と認証情報の安全性のため、自動テストは実サイトに接続せず、有料生成も行わない。Mock E2Eの成功は実サイト対応を意味しない。

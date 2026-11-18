@@ -102,6 +102,8 @@ interface Experiment {
 
 ## JSONインポートの注意
 
+画像原本を含む完全バックアップZIPの形式と検証は [backup.md](backup.md) を参照。ZIP内の `data.json` はこの節のJSONバックアップと同一形式。
+
 - 画像はP1のテキストJSONには**含まない**。UIにその旨明示。
 - import前にサマリーを提示して`merge`/`replace`選択。初期は衝突IDへの安全なリネームもしくは明示エラーを優先。
 - サイズ上限（暫定10MB）、レコード件数上限（暫定10000件）、JSONの深さ制限を設定。入力のHTMLは実行しない。

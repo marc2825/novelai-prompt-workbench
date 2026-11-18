@@ -30,8 +30,9 @@ src/core/shuffle/          純粋TS（DOM/Chrome API/時計/乱数APIなし）
   tags.ts                  警告専用の読取りタグ抽出、カテゴリ語彙、固定タグロック
   fields.ts                論理フィールドキーと書込み計画（ベースUCは書かない）
   models.ts                公式記載に基づくモデル能力表（未記載はnull）
-  generation.ts            生成ジョブ追跡・自動シャッフルカウンタ（状態機械）
-  defaults.ts / state.ts   標準テンプレート（明示操作時のみ）／不変コマンド
+  generation.ts            生成ジョブ追跡・自動シャッフルカウンタ（状態機械。開始時のジョブは生成中でも基準）
+  site-session.ts          （タブ, ドキュメント, プロファイル）単位の反映前原文・最後の書込み・状態不明欄
+  defaults.ts / state.ts   標準テンプレート（明示操作時のみ）／不変コマンド、設定fingerprint
 src/data/shuffle.ts        検証・schemaVersion移行・読込時隔離・merge・単体export/import
 src/platform/novelai/      Site Adapter（セレクタはここだけ）
   protocol.ts              inspectFields/readFields/prepareFields/applyFields/generationStatus/releaseGeneration
@@ -41,7 +42,7 @@ src/platform/novelai/      Site Adapter（セレクタはここだけ）
   dom.ts / generation.ts   検証済みprofile用 textarea adapter / DOM生成状態オブザーバ
   live.ts                  実NovelAI: ベース2欄の読取りのみ。キャラクター欄・モデル・生成検知は非対応
 src/ui/Shuffle.tsx         シャッフルタブ（設定・結果・次回プレビュー・履歴）
-src/ui/shuffle/            LibraryEditors / ShuffleSite（Apply・Restore・自動）/ inputs
+src/ui/shuffle/            LibraryEditors / ShuffleSite（Apply・Restore・自動）/ auto-run（自動シャッフルの実行単位）/ inputs
 ```
 
 依存方向: `ui → core, data, platform(client)`、`platform → core(fields/generation型)`、`data → core`。`core` は何にも依存しない。UIはDOMを走査せず、アルゴリズムを持たない（合成・抽選は全て core 呼出し）。
