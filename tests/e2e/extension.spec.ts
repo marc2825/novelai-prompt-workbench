@@ -177,3 +177,27 @@ test('real Content Script: shuffle reports unverified character fields, generati
     await expect(site.locator('textarea.character-prompt')).toHaveValue('character one');
   } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
 });
+
+test('real Content Script: the wide Lab tab (sidepanel.html#lab) is accepted as the panel; read-only stays read-only', async () => {
+  const extensionPath = resolve('.output/chrome-mv3');
+  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
+  const profile = await mkdtemp(join(tmpdir(), 'nai-wide-tab-test-'));
+  const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  try {
+    await context.route('https://novelai.net/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mock wide</title><div class="prompt-input-box-prompt" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>wide positive</p></div></div><div class="prompt-input-box-undesired-content" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>wide negative</p></div></div>' }));
+    const site = await context.newPage();
+    await site.goto('https://novelai.net/image');
+    const panel = await context.newPage();
+    await panel.goto(`chrome-extension://${id}/sidepanel.html#lab`);
+    await expect(panel.getByText('保存済み · この端末のみ', { exact: true })).toBeVisible();
+    await panel.getByText('NovelAIからベースPromptを読む', { exact: true }).click();
+    await panel.getByRole('button', { name: 'NovelAIの接続を確認', exact: true }).click();
+    const select = panel.getByRole('combobox', { name: '対象タブ', exact: true });
+    await expect(select.getByRole('option')).toHaveCount(2);
+    await select.selectOption((await select.getByRole('option', { name: /Mock wide/ }).getAttribute('value'))!);
+    await panel.getByRole('button', { name: 'サイトの現在値を読む', exact: true }).click();
+    await expect(panel.getByRole('textbox', { name: 'サイトの現在値 (positive)', exact: true })).toHaveValue('wide positive');
+    await expect(panel.getByRole('button', { name: '反映プレビューを作成', exact: true })).toBeDisabled();
+    await expect(site.locator('[contenteditable=true]').first()).toHaveText('wide positive');
+  } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
+});

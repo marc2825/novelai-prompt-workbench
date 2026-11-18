@@ -23,6 +23,19 @@ export interface HandlerEnvironment {
 export const LEASE_MS = 15_000;
 const NO_FIELDS = 'このサイト連携は複数欄の操作に対応していません。コピーを使用してください';
 
+/**
+ * The sender must be the extension's own panel page. Its fragment/query may vary
+ * (the wide Lab tab opens `sidepanel.html#lab`), so only scheme, host and path are
+ * compared. `URL.origin` is opaque for non-special schemes, hence the explicit parts.
+ */
+export function isPanelSender(senderUrl: string | undefined, panelUrl: string): boolean {
+  if (typeof senderUrl !== 'string') return false;
+  try {
+    const url = new URL(senderUrl); const panel = new URL(panelUrl);
+    return url.protocol === panel.protocol && url.host === panel.host && url.pathname === panel.pathname && !url.username && !url.password;
+  } catch { return false; }
+}
+
 export function createSiteHandler(adapter: NovelAIAdapter, environment: HandlerEnvironment) {
   let prepared: { preview: WritePreview; snapshot: FieldSnapshot } | null = null;
   let preparedFields: { preview: FieldsPreview; snapshots: FieldSnapshot[] } | null = null;
@@ -35,7 +48,7 @@ export function createSiteHandler(adapter: NovelAIAdapter, environment: HandlerE
   const generating = () => !!adapter.generation?.running && adapter.generation.status().generating;
 
   return async (input: unknown, sender: MessageSender): Promise<SiteResponse> => {
-    if (sender.id !== environment.extensionId || sender.url !== environment.panelUrl || sender.tab !== undefined) return failure('UNAUTHORIZED', '拡張パネルからの操作だけを受け付けます');
+    if (sender.id !== environment.extensionId || !isPanelSender(sender.url, environment.panelUrl) || sender.tab !== undefined) return failure('UNAUTHORIZED', '拡張パネルからの操作だけを受け付けます');
     if (!isSiteRequest(input)) return failure('INVALID_MESSAGE', '操作メッセージが不正です');
     const request = input;
     const url = environment.url();
@@ -134,8 +147,11 @@ export function createSiteHandler(adapter: NovelAIAdapter, environment: HandlerE
           for (const [index, change] of pending.preview.writes.entries()) {
             const result = await fields.writeField(change.field, pending.snapshots[index]!, change.after);
             if (!result.ok || environment.url() !== url) {
+              if (result.ok) written.push({ field: change, snapshot: result.snapshot });
               await rollback();
-              return failure(result.ok ? 'STALE_DOCUMENT' : result.code, `${fieldLabel(change.field)}: ${result.ok ? '反映中にページが移動しました' : result.reason}。反映済みの欄は、他の編集がない場合だけ元に戻しました`);
+              // Always WRITE_FAILED once writing has started: the panel treats every
+              // other applyFields code as "nothing was written" (site-session NO_WRITE_CODES).
+              return failure('WRITE_FAILED', `${fieldLabel(change.field)}: ${result.ok ? '反映中にページが移動しました' : result.reason}。反映済みの欄は、他の編集がない場合だけ元に戻しました`);
             }
             written.push({ field: change, snapshot: result.snapshot });
           }

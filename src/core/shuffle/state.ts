@@ -112,3 +112,29 @@ export function reapplyHistory(shuffle: ShuffleData, entryId: string): ShuffleDa
 export function clearCurrent(shuffle: ShuffleData, profileId: string): ShuffleData {
   return updateProfile(shuffle, profileId, profile => ({ ...profile, current: null }));
 }
+
+/** JSON with object keys sorted, so equal content always yields an equal string. */
+export function stableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) => item && typeof item === 'object' && !Array.isArray(item)
+    ? Object.fromEntries(Object.keys(item).sort().map(key => [key, (item as Record<string, unknown>)[key]]))
+    : item);
+}
+
+/**
+ * Fingerprint of everything that decides what the next shuffle of `profileId`
+ * writes: the whole library (characters, templates, pools, camera presets), the
+ * profile's participants and every setting (seed, mode, targets, model, output
+ * format, interval, …) and the base prompt. It deliberately excludes what the
+ * shuffle itself updates — cursor, current selection and history — so that an
+ * auto-shuffle run can freeze its configuration without stopping itself.
+ * Returns null when the profile does not exist.
+ */
+export function shuffleConfigFingerprint(shuffle: ShuffleData, profileId: string, base: { positive: string; negative: string }): string | null {
+  const profile = shuffle.profiles.find(item => item.id === profileId);
+  if (!profile) return null;
+  return stableStringify({
+    characters: shuffle.characters, templates: shuffle.templates, pools: shuffle.pools, cameraPresets: shuffle.cameraPresets,
+    profile: { id: profile.id, characterIds: profile.characterIds, settings: profile.settings },
+    base: [base.positive, base.negative],
+  });
+}

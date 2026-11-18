@@ -289,3 +289,116 @@ test('standard templates: each category appears at most once per target across m
   expect(exported.shuffle.characters).toHaveLength(2);
   expect(exported.shuffle.history).toEqual([]);
 });
+
+const targetSelect = (page: Page) => page.getByRole('combobox', { name: 'シャッフルの対象タブ', exact: true });
+async function applyShuffle(page: Page) {
+  await button(page, 'Apply（反映プレビュー）').click();
+  await button(page, '確認してApply').click();
+  await appliedNotice(page);
+}
+
+test('restore information is bound to the tab it was recorded on and is never applied to another tab', async ({ page }) => {
+  await setup(page);
+  await button(page, 'Shuffle Now').click();
+  await connect(page, '101');
+  await applyShuffle(page);
+  const shuffled101 = await textbox(page, 'Mock Character 1 Positive 101').inputValue();
+  expect(shuffled101).not.toBe('site 101 character 1');
+  await expect(button(page, 'Restore（復元プレビュー）')).toBeEnabled();
+  // Tab 202: tab 101's restore text is not offered for Restore, only shown copy-only.
+  await targetSelect(page).selectOption('202');
+  await expect(page.getByRole('list', { name: 'シャッフルの対象サイトの対応状況' })).toBeVisible();
+  await expect(button(page, 'Restore（復元プレビュー）')).toBeDisabled();
+  await page.getByText(/^他の対象・再読込前のページの反映前原文/).click();
+  await expect(page.getByRole('textbox', { name: /^タブ101・プロファイル1・ページ.+: キャラクター1 Prompt（反映前）$/ })).toHaveValue('site 101 character 1');
+  // No false "edited" warning on 202 caused by 101's writes.
+  await button(page, 'Apply（反映プレビュー）').click();
+  await expect(page.getByLabel('シャッフルの反映前の確認', { exact: true }).getByRole('alert')).toHaveCount(0);
+  await button(page, '確認してApply').click();
+  await appliedNotice(page);
+  await button(page, 'Restore（復元プレビュー）').click();
+  await expect(textbox(page, 'キャラクター1 Prompt（復元後）')).toHaveValue('site 202 character 1');
+  await expect(textbox(page, 'ベース Prompt（復元後）')).toHaveValue('site 202 positive');
+  await button(page, '確認してRestore').click();
+  await expect(textbox(page, 'Mock Character 1 Positive 202')).toHaveValue('site 202 character 1');
+  await expect(textbox(page, 'Mock Positive 202')).toHaveValue('site 202 positive');
+  // Tab 101 keeps its shuffled text and its own restore information.
+  await expect(textbox(page, 'Mock Character 1 Positive 101')).toHaveValue(shuffled101);
+  await targetSelect(page).selectOption('101');
+  await expect(page.getByRole('list', { name: 'シャッフルの対象サイトの対応状況' })).toBeVisible();
+  await button(page, 'Restore（復元プレビュー）').click();
+  await expect(textbox(page, 'キャラクター1 Prompt（復元後）')).toHaveValue('site 101 character 1');
+  await button(page, '確認してRestore').click();
+  await expect(textbox(page, 'Mock Character 1 Positive 101')).toHaveValue('site 101 character 1');
+});
+
+test('a reloaded document and another profile cannot use earlier restore information', async ({ page }) => {
+  await setup(page);
+  await button(page, 'Shuffle Now').click();
+  await connect(page, '101');
+  await applyShuffle(page);
+  // Another profile on the same tab: no restore information, no edit history.
+  await textbox(page, '新しいプロファイル名').fill('Second');
+  await button(page, '＋ プロファイル').click();
+  await expect(page.getByRole('combobox', { name: 'シャッフルプロファイル', exact: true })).toHaveValue(/.+/);
+  await expect(button(page, 'Restore（復元プレビュー）')).toBeDisabled();
+  await page.getByRole('combobox', { name: 'シャッフルプロファイル', exact: true }).selectOption({ label: 'プロファイル1' });
+  await expect(button(page, 'Restore（復元プレビュー）')).toBeEnabled();
+  // Reloading the NovelAI document invalidates the old target and its restore information.
+  await button(page, 'Reload document 101').click();
+  await button(page, 'Restore（復元プレビュー）').click();
+  await expect(page.getByLabel('シャッフルのサイト反映', { exact: true }).getByRole('alert')).toContainText('ページが移動・再読込');
+  await expect(page.getByLabel('シャッフルの復元前の確認', { exact: true })).toHaveCount(0);
+  await connect(page, '101');
+  await expect(button(page, 'Restore（復元プレビュー）')).toBeDisabled();
+  await page.getByText(/^他の対象・再読込前のページの反映前原文/).click();
+  await expect(page.getByRole('textbox', { name: /^タブ101・プロファイル1・ページ.+: キャラクター1 Prompt（反映前）$/ })).toHaveValue('site 101 character 1');
+  // The text remains for manual copy only; the site keeps the shuffled text.
+  await expect(textbox(page, 'Mock Character 1 Positive 101')).not.toHaveValue('site 101 character 1');
+});
+
+test('auto shuffle freezes its configuration: a settings change stops it and no further write happens', async ({ page }) => {
+  await setup(page);
+  await connect(page);
+  await page.getByRole('combobox', { name: '自動シャッフルの間隔', exact: true }).selectOption('1');
+  await saved(page);
+  await button(page, '自動シャッフルを開始').click();
+  await expect(status(page)).toContainText('動作中');
+  await expect(button(page, 'Shuffle Now')).toBeDisabled();
+  await expect(page.getByLabel('自動シャッフル実行中の注意', { exact: true })).toBeVisible();
+  const generate = page.getByRole('button', { name: /^Generate 101 / });
+  await generate.click();
+  await appliedNotice(page);
+  const applied = await textbox(page, 'Mock Character 1 Positive 101').inputValue();
+  // The run's own shuffles do not stop it.
+  await expect(status(page)).toContainText('動作中');
+  await commitText(page, 'シャッフルSeed', 'edited-seed');
+  await expect(page.getByLabel('シャッフルのサイト反映', { exact: true }).getByRole('alert')).toContainText('変更されたため、自動シャッフルを停止しました');
+  await expect(status(page)).toContainText('停止中');
+  await expect(button(page, 'Shuffle Now')).toBeEnabled();
+  await generate.click();
+  await page.waitForTimeout(1500);
+  await expect(textbox(page, 'Mock Character 1 Positive 101')).toHaveValue(applied);
+});
+
+test('a generation already running when auto shuffle starts is not counted', async ({ page }) => {
+  await setup(page);
+  await connect(page);
+  await page.getByRole('combobox', { name: '自動シャッフルの間隔', exact: true }).selectOption('1');
+  await saved(page);
+  await page.getByRole('checkbox', { name: 'Hold generation 101', exact: true }).check();
+  const generate = page.getByRole('button', { name: /^Generate 101 / });
+  await generate.click();
+  await expect(page.getByLabel('Generation status 101', { exact: true })).toContainText('generating');
+  await button(page, '自動シャッフルを開始').click();
+  await expect(status(page)).toContainText('生成中のため待機');
+  await page.getByRole('checkbox', { name: 'Hold generation 101', exact: true }).uncheck();
+  await expect(page.getByLabel('Generation status 101', { exact: true })).toContainText('succeeded');
+  await page.waitForTimeout(2200);
+  await expect(status(page)).toContainText('（0/1ジョブ');
+  await expect(textbox(page, 'Mock Character 1 Positive 101')).toHaveValue('site 101 character 1');
+  // The next job started after monitoring began is counted.
+  await generate.click();
+  await appliedNotice(page);
+  await expect(textbox(page, 'Mock Character 1 Positive 101')).not.toHaveValue('site 101 character 1');
+});

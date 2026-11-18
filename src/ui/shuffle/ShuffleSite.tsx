@@ -1,141 +1,92 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComposeResult } from '../../core/shuffle/compose';
 import { fieldLabel, planFieldWrites, type FieldKey } from '../../core/shuffle/fields';
-import { observeStatus, recordManual, resetAfterShuffle, startCounter, type AutoCounter } from '../../core/shuffle/generation';
+import { recordManual, resetAfterShuffle, startCounter, type AutoCounter } from '../../core/shuffle/generation';
 import { detectModel, MODEL_PROFILES } from '../../core/shuffle/models';
+import {
+  afterApplyAttempt, afterRestore, editedFields, emptySessions, getSession, hasRestoreText, markUncertain, NO_WRITE_CODES,
+  observeExpected, otherRestoreSessions, restoreWrites, sameDocument, updateSession, withBaseline,
+  type SiteSession, type SiteSessions,
+} from '../../core/shuffle/site-session';
 import type { ShuffleProfile, ShuffleTrigger } from '../../core/shuffle/types';
 import type { SiteClient } from '../../platform/novelai/client';
 import type { FieldsInspection, FieldsPreview, SiteInspection, Target } from '../../platform/novelai/protocol';
 import { newId } from '../shared';
+import { AutoShuffleRun } from './auto-run';
 
-type Values = Partial<Record<FieldKey, string>>;
 const INTERVALS = [1, 3, 5, 10] as const;
 
+export interface AutoCheck { fingerprint: string; step: number; blocked: string | null }
 export interface ShuffleSiteProps {
   client?: SiteClient;
   profile: ShuffleProfile;
   composed: ComposeResult;
-  onShuffle: (trigger: ShuffleTrigger) => ComposeResult | null;
+  onShuffle: (trigger: ShuffleTrigger) => { composed: ComposeResult; step: number } | null;
   onAutoEveryChange: (value: number | null) => void;
+  /** Synchronous view of the latest committed configuration of a profile (not the last render). */
+  autoCheck: (profileId: string) => AutoCheck;
+  profileName: (profileId: string) => string;
+  onAutoChange?: (running: boolean) => void;
 }
+interface Preview { kind: 'apply' | 'restore'; data: FieldsPreview; profileId: string }
 
 /**
  * Site-facing shuffle controls. Nothing here writes to NovelAI unless the user
  * confirms a preview (Apply/Restore) or explicitly starts auto shuffle, and every
  * write goes through the adapter's ticketed compare-and-swap path.
+ *
+ * Restore text, the extension's last writes and uncertain fields are kept per
+ * (tab, document, profile) session, so they can never be applied to another tab,
+ * a reloaded document or another profile.
  */
-export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryChange }: ShuffleSiteProps) {
+export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryChange, autoCheck, profileName, onAutoChange }: ShuffleSiteProps) {
   const [sites, setSites] = useState<SiteInspection[]>([]);
   const [selected, setSelected] = useState('');
   const [inspection, setInspection] = useState<FieldsInspection | null>(null);
-  const [preview, setPreview] = useState<{ kind: 'apply' | 'restore'; data: FieldsPreview } | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
   const [overwrite, setOverwrite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [issue, setIssue] = useState('');
   const [notice, setNotice] = useState('');
   const [custom, setCustom] = useState(String(profile.settings.autoEvery ?? 2));
-  const [baseline, setBaseline] = useState<Values>({});
   const [manual, setManual] = useState<AutoCounter | null>(null);
   const [auto, setAuto] = useState<{ armed: boolean; count: number; every: number; generating: boolean }>({ armed: false, count: 0, every: 0, generating: false });
-  // Refs are read by the polling loop, which must never act on a stale closure.
-  const lastWritten = useRef<Values>({});
-  // Fields whose state is unknown after a failed/unverified write. They always need explicit overwrite consent.
-  const uncertain = useRef(new Set<FieldKey>());
-  const baselineRef = useRef<Values>({});
-  const armed = useRef(false);
-  const counter = useRef<AutoCounter | null>(null);
-  const pending = useRef<ComposeResult | null>(null);
-  const session = useRef('');
-  const ticking = useRef(false);
-  const targetRef = useRef<Target | null>(null);
-  const shuffleRef = useRef(onShuffle);
-  shuffleRef.current = onShuffle;
+  // Sessions are read synchronously by the auto-shuffle run; the state counter only re-renders.
+  const sessions = useRef<SiteSessions>(emptySessions());
+  const [, setSessionVersion] = useState(0);
+  const run = useRef<AutoShuffleRun | null>(null);
+  const latest = useRef({ onShuffle, autoCheck, onAutoChange });
+  latest.current = { onShuffle, autoCheck, onAutoChange };
   const site = sites.find(item => String(item.tabId) === selected);
   const target: Target | null = site ? { tabId: site.tabId, documentId: site.documentId, url: site.url } : null;
   const every = profile.settings.autoEvery;
   const fieldsMode = profile.settings.outputMode === 'fields';
-  const writable = !!inspection && inspection.base.positive.canWrite && (composed.characters.length === 0 || inspection.characters.canWrite);
+  const writable = !!inspection && !!target && sameDocument(inspection, target) && inspection.base.positive.canWrite && (composed.characters.length === 0 || inspection.characters.canWrite);
+  const session = target ? getSession(sessions.current, target, profile.id) : null;
+  const others = otherRestoreSessions(sessions.current, session?.key ?? null);
 
-  const updateBaseline = (next: Values) => { baselineRef.current = next; setBaseline(next); };
-  const stopAuto = (reason: string, isError = true) => {
-    if (armed.current && targetRef.current && client) void client.releaseGeneration(targetRef.current, session.current).catch(() => undefined);
-    armed.current = false; pending.current = null; counter.current = null;
-    setAuto(current => ({ ...current, armed: false, generating: false }));
-    if (isError) setIssue(reason); else setNotice(reason);
-  };
-  // Leaving the tab, switching profile/target or changing the interval always stops auto mode.
-  useEffect(() => () => { if (armed.current && targetRef.current && client) void client.releaseGeneration(targetRef.current, session.current).catch(() => undefined); armed.current = false; }, [client]);
-  useEffect(() => { if (armed.current) stopAuto('設定・対象が変わったため自動シャッフルを停止しました'); setPreview(null); setManual(null); }, [profile.id, profile.settings.enabled, every, selected, profile.settings.outputMode]);
+  const setSessions = (change: (store: SiteSessions) => SiteSessions) => { sessions.current = change(sessions.current); setSessionVersion(version => version + 1); };
+  const stopAuto = (reason: string, isError = true) => run.current?.stop(reason, isError);
+  // Leaving the tab releases the lease without touching UI state.
+  useEffect(() => () => { const current = run.current; run.current = null; current?.stop('パネルを閉じたため自動シャッフルを停止しました'); latest.current.onAutoChange?.(false); }, []);
+  // Switching profile/target or changing the interval/output always stops auto mode and drops previews.
+  useEffect(() => { stopAuto('設定・対象が変わったため自動シャッフルを停止しました'); setPreview(null); setManual(null); }, [profile.id, profile.settings.enabled, every, selected, profile.settings.outputMode]);
   useEffect(() => { setPreview(null); }, [composed]);
   useEffect(() => {
     if (!preview) return;
     const timer = setTimeout(() => { setPreview(null); setIssue('プレビューの有効期限が切れました。作成し直してください'); }, Math.max(0, preview.data.expiresAt - Date.now()));
     return () => clearTimeout(timer);
   }, [preview]);
+  useEffect(() => {
+    if (!auto.armed) return;
+    const timer = setInterval(() => void run.current?.tick(), 1000);
+    return () => clearInterval(timer);
+  }, [auto.armed]);
 
   const perform = async (action: () => Promise<void>) => {
     setBusy(true); setIssue(''); setNotice('');
     try { await action(); } catch { setIssue('サイトとの通信に失敗しました。コピーを使用してください'); } finally { setBusy(false); }
   };
-  const record = (values: { field: FieldKey; raw: string }[]) => {
-    lastWritten.current = { ...lastWritten.current, ...Object.fromEntries(values.map(value => [value.field, value.raw])) };
-    for (const value of values) uncertain.current.delete(value.field);
-  };
-  const keepBaseline = (preview: FieldsPreview) => {
-    const next = { ...baselineRef.current };
-    for (const change of preview.writes) if (next[change.field] === undefined) next[change.field] = change.before;
-    updateBaseline(next);
-  };
-  const isEdited = (change: { field: FieldKey; before: string }) => uncertain.current.has(change.field) || (lastWritten.current[change.field] !== undefined && lastWritten.current[change.field] !== change.before);
-
-  const autoApply = async (site: Target, next: ComposeResult) => {
-    if (!client) return;
-    const prepared = await client.prepareFields(site, next.characters.length, planFieldWrites(next));
-    if (!armed.current) return;
-    if (!prepared.ok) { if (prepared.code !== 'BUSY') stopAuto(`自動シャッフルを停止しました: ${prepared.reason}`); return; }
-    if (prepared.type !== 'prepareFields') { stopAuto('自動シャッフルを停止しました: 予期しない応答です'); return; }
-    const edited = prepared.preview.writes.filter(change => uncertain.current.has(change.field) || lastWritten.current[change.field] !== change.before);
-    if (edited.length) { stopAuto(`拡張の最後の書込み後にNovelAI側で編集された欄（${edited.map(change => fieldLabel(change.field)).join('、')}）があるため、上書きせず自動シャッフルを停止しました。Applyで差分を確認してください`); return; }
-    const applied = await client.applyFields(prepared.preview);
-    if (!applied.ok && applied.code !== 'BUSY') for (const change of prepared.preview.writes) uncertain.current.add(change.field);
-    if (!armed.current) return;
-    if (!applied.ok) { if (applied.code !== 'BUSY') stopAuto(`自動シャッフルを停止しました: ${applied.reason}`); return; }
-    if (applied.type !== 'applyFields') { stopAuto('自動シャッフルを停止しました: 予期しない応答です'); return; }
-    record(applied.values);
-    pending.current = null;
-    if (counter.current) counter.current = resetAfterShuffle(counter.current);
-    setAuto(current => ({ ...current, count: 0 }));
-    setNotice(`自動シャッフル: ${applied.values.length}欄に次のプロンプトを反映しました。生成操作は行っていません。`);
-  };
-  const tick = async () => {
-    if (!armed.current || ticking.current || !client || !targetRef.current) return;
-    ticking.current = true;
-    try {
-      const site = targetRef.current;
-      const result = await client.generationStatus(site, session.current);
-      if (!armed.current) return;
-      if (!result.ok || result.type !== 'generationStatus') { stopAuto(`自動シャッフルを停止しました: ${result.ok ? '予期しない応答です' : result.reason}`); return; }
-      if (!result.status.supported) { stopAuto(`自動シャッフルを停止しました: ${result.status.reason}`); return; }
-      const update = observeStatus(counter.current!, result.status);
-      counter.current = update.counter;
-      setAuto(current => ({ ...current, count: update.counter.count, generating: result.status.generating }));
-      if ((!update.due && !pending.current) || result.status.generating) return; // Never write while generating.
-      if (!pending.current) {
-        const next = shuffleRef.current('auto');
-        if (!next) { stopAuto('シャッフルできないため自動シャッフルを停止しました'); return; }
-        if (next.errors.length) { stopAuto(`自動シャッフルを停止しました: ${next.errors[0]}`); return; }
-        pending.current = next;
-      }
-      await autoApply(site, pending.current);
-    } catch {
-      if (armed.current) stopAuto('サイトとの通信に失敗したため自動シャッフルを停止しました');
-    } finally { ticking.current = false; }
-  };
-  useEffect(() => {
-    if (!auto.armed) return;
-    const timer = setInterval(() => void tick(), 1000);
-    return () => clearInterval(timer);
-  }, [auto.armed]);
 
   if (!client) return <section className="panel stack" aria-label="シャッフルのサイト反映">
     <h2>NovelAIへの反映</h2>
@@ -144,8 +95,65 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
     {notice && <p role="status">{notice}</p>}
   </section>;
 
-  const edited = preview ? preview.data.writes.filter(isEdited) : [];
+  // A preview is checked against the session it was created for, never the one currently selected.
+  const previewSession = preview ? getSession(sessions.current, preview.data, preview.profileId) : null;
+  const edited = preview && previewSession ? editedFields(previewSession, preview.data.writes) : [];
   const detected = inspection ? detectModel(inspection.model.label) : 'unknown';
+  const startAuto = async () => {
+    if (!target || !every) return;
+    const fields = planFieldWrites(composed).map(write => write.field);
+    if (!confirm(`自動シャッフルを開始しますか？\nタブ${target.tabId}で成功した生成ジョブを${every}回数えるごとに次の構図を計算し、${fields.length}欄を書き換えます。\n・生成ボタンは押しません\n・生成中は書き換えません\n・拡張の書込み後にサイト側で編集された場合は上書きせず停止します\n・実行中にシャッフル設定やベースプロンプトを変更すると停止します`)) return;
+    const read = await client.readFields(target, fields);
+    if (!read.ok) { setIssue(read.reason); return; }
+    if (read.type !== 'readFields') return;
+    const observed = read.values.map(value => ({ field: value.field, before: value.raw }));
+    const changed = editedFields(getSession(sessions.current, target, profile.id), observed);
+    if (changed.length) { setIssue(`最後の反映後にサイト側で編集された欄（${changed.map(value => fieldLabel(value.field)).join('、')}）があります。Applyで確認してから開始してください`); return; }
+    const check = latest.current.autoCheck(profile.id);
+    if (check.blocked) { setIssue(`自動シャッフルを開始できません: ${check.blocked}`); return; }
+    setSessions(store => updateSession(store, target, profile.id, current => observeExpected(withBaseline(current, observed), read.values)));
+    const profileId = profile.id;
+    let created: AutoShuffleRun | null = null;
+    const owns = () => created !== null && run.current === created;
+    created = new AutoShuffleRun({
+      client, target, profileId, every, session: newId(), fingerprint: check.fingerprint, step: check.step,
+      current: () => latest.current.autoCheck(profileId),
+      shuffle: () => latest.current.onShuffle('auto'),
+      getSession: () => getSession(sessions.current, target, profileId),
+      setSession: change => setSessions(store => updateSession(store, target, profileId, change)),
+      onProgress: progress => { if (owns()) setAuto(current => ({ ...current, ...progress })); },
+      onWritten: count => { if (owns()) setNotice(`自動シャッフル: ${count}欄に次のプロンプトを反映しました。生成操作は行っていません。`); },
+      onStop: (reason, isError) => {
+        if (!owns()) return;
+        run.current = null;
+        setAuto(current => ({ ...current, armed: false, generating: false }));
+        latest.current.onAutoChange?.(false);
+        if (isError) setIssue(reason); else setNotice(reason);
+      },
+    });
+    run.current = created;
+    setAuto({ armed: true, count: 0, every, generating: false });
+    latest.current.onAutoChange?.(true);
+    setNotice(`自動シャッフルを開始しました（${every}ジョブごと）。いつでも停止できます。`);
+    void created.tick();
+  };
+  const confirmPreview = async (accepted: Preview) => {
+    if (!confirm(`タブ${accepted.data.tabId}の${accepted.data.writes.length}欄を、表示した内容に変更しますか？生成操作は行いません。`)) return;
+    setPreview(null);
+    const result = await client.applyFields(accepted.data);
+    const ok = result.ok && result.type === 'applyFields';
+    setSessions(store => updateSession(store, accepted.data, accepted.profileId, current => {
+      if (accepted.kind === 'apply') return afterApplyAttempt(current, accepted.data.writes, ok ? { ok: true, values: result.values } : { ok: false, code: result.ok ? 'INVALID_MESSAGE' : result.code });
+      if (ok) return afterRestore(current, result.values);
+      return !result.ok && NO_WRITE_CODES.includes(result.code) ? current : markUncertain(current, accepted.data.writes.map(change => change.field));
+    }));
+    if (!result.ok) { setIssue(result.reason); return; }
+    if (result.type !== 'applyFields') { setIssue('反映結果を確認できません。サイトの現在値を確認してください'); return; }
+    setNotice(accepted.kind === 'apply'
+      ? `${result.values.length}欄に反映し、再読取りで一致を確認しました。生成操作は行っていません。`
+      : `${result.values.length}欄を反映前の原文に戻し、再読取りで一致を確認しました。`);
+  };
+
   return <section className="panel stack" aria-label="シャッフルのサイト反映">
     <h2>NovelAIへの反映</h2>
     <p className="hint">Shuffle Nowだけではサイトを変更しません。Applyで変更前後を確認してから反映します。キャラクター欄の追加・削除、座標、生成ボタンは操作しません。</p>
@@ -178,19 +186,22 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
     <div className="actions">
       <button type="button" disabled={busy || auto.armed || !target || !writable || !fieldsMode || !!composed.errors.length} onClick={() => void perform(async () => {
         if (!target) return;
+        const profileId = profile.id;
         const result = await client.prepareFields(target, composed.characters.length, planFieldWrites(composed));
         if (!result.ok) { setIssue(result.reason); return; }
-        if (result.type === 'prepareFields') { setPreview({ kind: 'apply', data: result.preview }); setOverwrite(false); }
+        if (result.type === 'prepareFields') { setPreview({ kind: 'apply', data: result.preview, profileId }); setOverwrite(false); }
       })}>Apply（反映プレビュー）</button>
-      <button type="button" disabled={busy || auto.armed || !target || !writable || !Object.keys(baseline).length} onClick={() => void perform(async () => {
+      <button type="button" disabled={busy || auto.armed || !target || !writable || !session || !hasRestoreText(session)} onClick={() => void perform(async () => {
         if (!target) return;
+        const profileId = profile.id;
+        const writes = restoreWrites(getSession(sessions.current, target, profileId));
+        if (!writes.length) return;
         const inspected = await client.inspectFields(target);
         if (!inspected.ok) { setIssue(inspected.reason); return; }
         if (inspected.type !== 'inspectFields') return;
-        const writes = (Object.entries(baselineRef.current) as [FieldKey, string][]).map(([field, text]) => ({ field, text }));
         const result = await client.prepareFields(target, inspected.inspection.characters.slots, writes);
         if (!result.ok) { setIssue(result.reason); return; }
-        if (result.type === 'prepareFields') { setPreview({ kind: 'restore', data: result.preview }); setOverwrite(false); }
+        if (result.type === 'prepareFields') { setPreview({ kind: 'restore', data: result.preview, profileId }); setOverwrite(false); }
       })}>Restore（復元プレビュー）</button>
     </div>
     {composed.errors.length > 0 && <p className="hint">エラーがあるため反映できません。</p>}
@@ -202,59 +213,36 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
       </div>)}
       {edited.length > 0 && <div role="alert" className="stack"><p>拡張が最後に書き込んだ後、NovelAI側で編集された（または前回の反映が完了しなかった）欄があります: {edited.map(change => fieldLabel(change.field)).join('、')}</p>
         <label className="inline"><input type="checkbox" checked={overwrite} onChange={event => setOverwrite(event.target.checked)} />サイト側の編集を上書きすることを確認しました</label></div>}
-      <div className="actions"><button type="button" disabled={busy || (edited.length > 0 && !overwrite)} onClick={() => void perform(async () => {
-        if (!confirm(`タブ${preview.data.tabId}の${preview.data.writes.length}欄を、表示した内容に変更しますか？生成操作は行いません。`)) return;
-        const accepted = preview; setPreview(null);
-        // Keep the pre-apply text for Restore even if the write fails part-way.
-        if (accepted.kind === 'apply') keepBaseline(accepted.data);
-        const result = await client.applyFields(accepted.data);
-        if (!result.ok) {
-          if (!['EXPIRED', 'CONFLICT', 'BUSY'].includes(result.code)) for (const change of accepted.data.writes) uncertain.current.add(change.field);
-          setIssue(result.reason); return;
-        }
-        if (result.type !== 'applyFields') return;
-        if (accepted.kind === 'apply') {
-          record(result.values);
-          setNotice(`${result.values.length}欄に反映し、再読取りで一致を確認しました。生成操作は行っていません。`);
-        } else {
-          lastWritten.current = Object.fromEntries(result.values.map(value => [value.field, value.raw]));
-          uncertain.current.clear();
-          updateBaseline({});
-          setNotice(`${result.values.length}欄を反映前の原文に戻し、再読取りで一致を確認しました。`);
-        }
-      })}>{preview.kind === 'apply' ? '確認してApply' : '確認してRestore'}</button><button type="button" disabled={busy} onClick={() => setPreview(null)}>プレビューを破棄</button></div>
+      <div className="actions"><button type="button" disabled={busy || (edited.length > 0 && !overwrite)} onClick={() => void perform(() => confirmPreview(preview))}>{preview.kind === 'apply' ? '確認してApply' : '確認してRestore'}</button><button type="button" disabled={busy} onClick={() => setPreview(null)}>プレビューを破棄</button></div>
     </div>}
-    {Object.keys(baseline).length > 0 && <details><summary>反映前の原文（Restore用、{Object.keys(baseline).length}欄）</summary><div className="stack">
-      {(Object.entries(baseline) as [FieldKey, string][]).map(([field, text]) => <label key={field}>{fieldLabel(field)}（反映前）<textarea readOnly rows={2} value={text} /></label>)}
-      <p className="hint">パネルを閉じるまで保持します（DBには保存しません）。Undoはサイトを戻しません。</p>
+    {session && hasRestoreText(session) && <RestoreText session={session} label="反映前の原文" summary={`反映前の原文（Restore用、タブ${session.target.tabId}、${Object.keys(session.baseline).length}欄）`} />}
+    {others.length > 0 && <details><summary>他の対象・再読込前のページの反映前原文（コピー専用、{others.length}件）</summary><div className="stack">
+      <p className="hint">別のタブ・再読込前のドキュメント・別プロファイルで記録した原文です。取り違えを防ぐため、この画面からは反映しません。必要なら選択してコピーしてください。</p>
+      {others.map(item => <div className="stack" key={item.key}>
+        <RestoreText session={item} label={`タブ${item.target.tabId}・${profileName(item.profileId)}・ページ${item.target.documentId.slice(0, 8)}`} open />
+        <button type="button" onClick={() => { if (confirm('この反映前原文の記録を破棄しますか？パネル上の記録だけを消し、サイトは変更しません。')) setSessions(store => ({ ...store, sessions: store.sessions.filter(entry => entry.key !== item.key) })); }}>タブ{item.target.tabId}・ページ{item.target.documentId.slice(0, 8)}の記録を破棄</button>
+      </div>)}
     </div></details>}
 
     <h3>生成回数に応じた自動シャッフル</h3>
     <ManualCount every={every} armed={auto.armed} manual={manual} setManual={setManual} onShuffle={onShuffle} setNotice={setNotice} custom={custom} setCustom={setCustom} onAutoEveryChange={onAutoEveryChange} />
-    <p className="hint">回数は成功した生成ジョブ数です。1回の生成で複数枚を出力しても1回と数えます。自動シャッフルは生成ボタンを押しません。</p>
+    <p className="hint">回数は成功した生成ジョブ数です。1回の生成で複数枚を出力しても1回と数えます。自動シャッフルは生成ボタンを押しません。開始時点で生成中・表示中のジョブは数えません。</p>
     <div className="actions">
-      <button type="button" disabled={busy || auto.armed || !every || !target || !inspection?.generation.supported || !writable || !fieldsMode || !!composed.errors.length || !profile.settings.enabled} onClick={() => void perform(async () => {
-        if (!target || !every) return;
-        const fields = planFieldWrites(composed).map(write => write.field);
-        if (!confirm(`自動シャッフルを開始しますか？\nタブ${target.tabId}で成功した生成ジョブを${every}回数えるごとに次の構図を計算し、${fields.length}欄を書き換えます。\n・生成ボタンは押しません\n・生成中は書き換えません\n・拡張の書込み後にサイト側で編集された場合は上書きせず停止します`)) return;
-        const read = await client.readFields(target, fields);
-        if (!read.ok) { setIssue(read.reason); return; }
-        if (read.type !== 'readFields') return;
-        const changed = read.values.filter(value => isEdited({ field: value.field, before: value.raw }));
-        if (changed.length) { setIssue(`最後の反映後にサイト側で編集された欄（${changed.map(value => fieldLabel(value.field)).join('、')}）があります。Applyで確認してから開始してください`); return; }
-        const next = { ...baselineRef.current };
-        for (const value of read.values) { if (lastWritten.current[value.field] === undefined) lastWritten.current[value.field] = value.raw; if (next[value.field] === undefined) next[value.field] = value.raw; }
-        updateBaseline(next);
-        session.current = newId(); counter.current = startCounter(every); pending.current = null; targetRef.current = target; armed.current = true;
-        setAuto({ armed: true, count: 0, every, generating: false });
-        setNotice(`自動シャッフルを開始しました（${every}ジョブごと）。いつでも停止できます。`);
-        void tick();
-      })}>自動シャッフルを開始</button>
+      <button type="button" disabled={busy || auto.armed || !every || !target || !inspection?.generation.supported || !writable || !fieldsMode || !!composed.errors.length || !profile.settings.enabled} onClick={() => void perform(startAuto)}>自動シャッフルを開始</button>
       <button type="button" disabled={!auto.armed} onClick={() => stopAuto('自動シャッフルを停止しました。', false)}>自動シャッフルを停止</button>
     </div>
     <p role="status" aria-label="自動シャッフルの状態">{auto.armed ? `自動シャッフル: 動作中（${auto.count}/${auto.every}ジョブ${auto.generating ? '・生成中のため待機' : ''}）` : `自動シャッフル: 停止中${inspection && !inspection.generation.supported ? '（このページでは生成を検知できません。手動記録を使用してください）' : ''}`}</p>
     {issue && <p role="alert">{issue}</p>}{notice && <p role="status">{notice}</p>}
   </section>;
+}
+
+function RestoreText({ session, label, summary, open }: { session: SiteSession; label: string; summary?: string; open?: boolean }) {
+  const fields = Object.entries(session.baseline) as [FieldKey, string][];
+  const body = <div className="stack">
+    {fields.map(([field, text]) => <label key={field}>{label}: {fieldLabel(field)}（反映前）<textarea readOnly rows={2} value={text} /></label>)}
+    {!open && <p className="hint">パネルを閉じるまで保持します（DBには保存しません）。この対象タブ・ページ・プロファイル専用です。Undoはサイトを戻しません。</p>}
+  </div>;
+  return open ? body : <details><summary>{summary}</summary>{body}</details>;
 }
 
 function ManualCount({ every, armed, manual, setManual, onShuffle, setNotice, custom, setCustom, onAutoEveryChange }: {

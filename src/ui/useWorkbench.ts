@@ -91,6 +91,8 @@ export function useWorkbench() {
     data: history?.present ?? null, saving, storageError, error, setError, commit, repository, migrationRecovery, loadNotice, setLoadNotice,
     /** Latest committed state, readable synchronously from async callbacks. */
     latest: () => current.current?.present ?? null,
+    /** Whether saving has failed and is waiting for a retry, readable synchronously. */
+    storageFailed: () => failed.current,
     imageBlob: async (id: string, thumbnail = false) => {
       const pendingImage = imageWrites.current.get(id);
       const record = current.current?.present.images.find(image => image.id === id);
