@@ -106,6 +106,6 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         }} />
       </section>}
     </>}
-    <footer>非公式・ローカル保存。画像生成はNovelAI上で手動で行います。</footer>
+    <footer>非公式・ローカル保存。画像生成はNovelAI上で手動で行います。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
   </main>;
 }

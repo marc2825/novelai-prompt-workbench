@@ -22,6 +22,7 @@
 - [x] 利用規約（Effective: December 8th, 2025）を確認。ブラウザ拡張については**言及なし**（許可も禁止もしていない）。関係しうる条項と対応は [security.md](security.md#novelai利用規約との関係2026-11-18確認)
 - [ ] Chrome Web Storeで一般公開する前に、NovelAIサポートへ拡張機能の公開について問い合わせる（推奨）
 - [ ] リリースごとに規約の改定を確認する
+- [x] 「NovelAIの利用規約が優先される」旨をREADME・PRIVACY・画面フッター・AGENTS.md・security.mdに明記（2026-11-19）
 
 ### 名前・説明・アイコン
 
