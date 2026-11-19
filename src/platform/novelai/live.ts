@@ -4,11 +4,26 @@ import type { NovelAIAdapter, PromptFieldsAdapter } from './adapter';
 import { visible } from './dom-visibility';
 import { failure, MAX_PROMPT_LENGTH, type Capabilities, type FieldSnapshot, type Result } from './protocol';
 
-// Observed read-only on the public /image page, 2026-11-03. See DOM_ADAPTER_CHECKLIST.
+// The editor wrapper is `[data-prompt-input="true"]` with the class
+// `prompt-input-box-<visible field label>`, so the class depends on the UI language.
+// Only labels observed on the real site are listed — never guessed translations;
+// an unlisted language fails safely with NOT_FOUND. See DOM_ADAPTER_CHECKLIST.
 // No hashed classes, positional selectors, private editor state, or write profile.
-const SELECTORS: Record<Channel, string> = {
-  positive: '.prompt-input-box-prompt[data-prompt-input="true"] .ProseMirror[contenteditable="true"]',
-  negative: '.prompt-input-box-undesired-content[data-prompt-input="true"] .ProseMirror[contenteditable="true"]',
+export const VERIFIED_FIELD_LABELS: Record<Channel, readonly string[]> = {
+  positive: [
+    'prompt', // English UI, public /image page, observed 2026-11-03
+    'ベースプロンプト', // Japanese UI, logged in, observed 2026-11-19 (issue #4)
+  ],
+  negative: [
+    'undesired-content', // English UI, public /image page, observed 2026-11-03
+    '除外したい要素', // Japanese UI, logged in, observed 2026-11-19 (issue #4)
+  ],
+};
+// Exact class tokens (`~=`), so character wrappers such as
+// `prompt-input-box-キャラクタープロンプト-1-除外したい要素` never match a base channel.
+export const SELECTORS: Record<Channel, string> = {
+  positive: VERIFIED_FIELD_LABELS.positive.map(label => `[data-prompt-input="true"][class~="prompt-input-box-${label}"] .ProseMirror[contenteditable="true"]`).join(', '),
+  negative: VERIFIED_FIELD_LABELS.negative.map(label => `[data-prompt-input="true"][class~="prompt-input-box-${label}"] .ProseMirror[contenteditable="true"]`).join(', '),
 };
 const READ_ONLY = '実NovelAIのProseMirror書込み・内部状態保持は未検証です。コピーを使用してください';
 // Character Prompts / model selector / generation state were not observed (DOM_ADAPTER_CHECKLIST).
@@ -32,7 +47,7 @@ export class LiveReadOnlyAdapter implements NovelAIAdapter {
 
   async read(channel: Channel): Promise<Result<{ snapshot: FieldSnapshot }>> {
     const matches = Array.from(this.document.querySelectorAll(SELECTORS[channel])).filter(visible);
-    if (!matches.length) return failure('NOT_FOUND', '確認済みの入力欄構造を検出できません。コピーを使用してください');
+    if (!matches.length) return failure('NOT_FOUND', '確認済みの入力欄構造を検出できません（読取りを確認済みのNovelAI表示言語は英語・日本語です）。コピーを使用してください');
     if (matches.length !== 1) return failure('AMBIGUOUS', '表示中の編集欄が複数あるため読み取りません');
     const element = matches[0]!;
     if (Array.from(this.document.querySelectorAll(SELECTORS[channel === 'positive' ? 'negative' : 'positive'])).includes(element)) return failure('AMBIGUOUS', 'チャンネルの編集欄が重複しているため読み取りません');

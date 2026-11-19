@@ -205,3 +205,40 @@ test('real Content Script: the wide Lab tab (sidepanel.html#lab) is accepted as 
     await expect(site.locator('[contenteditable=true]').first()).toHaveText('wide positive');
   } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
 });
+
+test('real Content Script: reads the Japanese UI structure (issue #4) without confusing character fields; unlisted languages fail safely', async () => {
+  const extensionPath = resolve('.output/chrome-mv3');
+  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
+  const profile = await mkdtemp(join(tmpdir(), 'nai-locale-test-'));
+  const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  // Synthetic copy of the wrapper structure reported in issue #4 (class = prompt-input-box-<visible label>).
+  const box = (label: string, text: string) => `<div class="prompt-input-box prompt-input-box-${label}" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>${text}</p></div></div>`;
+  const japanese = [box('ベースプロンプト', 'ja base'), box('除外したい要素', 'ja uc'), ...[1, 2].flatMap(n => [box(`キャラクタープロンプト-${n}`, `char ${n}`), box(`キャラクタープロンプト-${n}-除外したい要素`, `char uc ${n}`)])].join('');
+  const unknown = [box('Basis-Prompt', 'de base'), box('Unerwünschter-Inhalt', 'de uc')].join('');
+  try {
+    await context.route('https://novelai.net/**', route => {
+      const german = new URL(route.request().url()).searchParams.get('lang') === 'de';
+      return route.fulfill({ contentType: 'text/html', body: `<!doctype html><meta charset="utf-8"><title>${german ? 'Mock DE' : 'Mock JA'}</title>${german ? unknown : japanese}` });
+    });
+    const ja = await context.newPage(); await ja.goto('https://novelai.net/image');
+    const de = await context.newPage(); await de.goto('https://novelai.net/image?lang=de');
+    const panel = await context.newPage();
+    await panel.goto(`chrome-extension://${id}/sidepanel.html`);
+    await expect(panel.getByText('保存済み · この端末のみ', { exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: 'NovelAIの接続を確認', exact: true }).click();
+    const select = panel.getByRole('combobox', { name: '対象タブ', exact: true });
+    await select.selectOption((await select.getByRole('option', { name: /Mock JA/ }).getAttribute('value'))!);
+    await panel.getByRole('button', { name: 'サイトの現在値を読む', exact: true }).click();
+    await expect(panel.getByRole('textbox', { name: 'サイトの現在値 (positive)', exact: true })).toHaveValue('ja base');
+    await panel.getByRole('combobox', { name: '反映チャンネル', exact: true }).selectOption('negative');
+    await panel.getByRole('button', { name: 'サイトの現在値を読む', exact: true }).click();
+    await expect(panel.getByRole('textbox', { name: 'サイトの現在値 (negative)', exact: true })).toHaveValue('ja uc');
+    await expect(panel.getByRole('button', { name: '反映プレビューを作成', exact: true })).toBeDisabled();
+    // An unlisted language is detected at connection time: reading stays disabled and the reason is shown.
+    await select.selectOption((await select.getByRole('option', { name: /Mock DE/ }).getAttribute('value'))!);
+    await expect(panel.getByRole('button', { name: 'サイトの現在値を読む', exact: true })).toBeDisabled();
+    await expect(panel.getByLabel('NovelAIサイト連携', { exact: true })).toContainText('確認済みの入力欄構造を検出できません');
+    await expect(panel.getByRole('textbox', { name: 'サイトの現在値 (negative)', exact: true })).toHaveCount(0);
+    await expect(ja.locator('[contenteditable=true]').first()).toHaveText('ja base');
+  } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
+});

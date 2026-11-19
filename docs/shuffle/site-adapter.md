@@ -6,7 +6,7 @@ NovelAI依存はすべて `src/platform/novelai/` に閉じ込める。セレク
 
 | 能力 | 実NovelAI（`LiveReadOnlyAdapter`） | ローカルfixture（`TextareaAdapter` + `fixtureProfile`） |
 |---|---|---|
-| ベース Prompt / UC 読取り | 観測済みの単純ProseMirror構造のみ（P2の実測） | ○ |
+| ベース Prompt / UC 読取り | 観測済みの単純ProseMirror構造のみ。確認済みの表示言語は英語（公開ページ、2026-11-03）と日本語（ログイン後、2026-11-19・issue #4） | ○ |
 | ベース書込み | **×（未検証のため無効）** | ○（native setter + input/change + 80ms readback） |
 | キャラクター欄 読取り/書込み | **×（DOM未調査）** `slots: 0` | ○（最大6欄、`{n}`テンプレートのセレクタ） |
 | モデル検出 | **×** `label: null` → ユーザーがモデルを選択 | ○（表示ラベルを `detectModel` で解釈） |
