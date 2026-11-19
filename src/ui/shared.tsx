@@ -28,7 +28,7 @@ export function Rename({ value, label, onSave }: { value: string; label: string;
 }
 
 export function Reorder({ name, first, last, onMove }: { name: string; first: boolean; last: boolean; onMove: (direction: -1 | 1) => void }) {
-  return <span className="reorder"><button type="button" disabled={first} aria-label={`${name}を上へ`} onClick={() => onMove(-1)}>↑</button><button type="button" disabled={last} aria-label={`${name}を下へ`} onClick={() => onMove(1)}>↓</button></span>;
+  return <span className="reorder"><button type="button" className="icon" disabled={first} aria-label={`${name}を上へ`} title="上へ移動" onClick={() => onMove(-1)}>↑</button><button type="button" className="icon" disabled={last} aria-label={`${name}を下へ`} title="下へ移動" onClick={() => onMove(1)}>↓</button></span>;
 }
 
 export function Empty({ children }: { children: ReactNode }) { return <p className="empty">{children}</p>; }

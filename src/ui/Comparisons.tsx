@@ -10,6 +10,7 @@ import { ImageComparison, Thumbnail } from './ImageComparison';
 import { PromptEditor } from './PromptEditor';
 import { downloadBlob, newId, now, Rename } from './shared';
 import { message, type Workbench } from './useWorkbench';
+import { InfoTip } from './InfoTip';
 
 function SettingsEditor({ value, onSave }: { value: GenerationSettings; onSave: (value: GenerationSettings) => void }) {
   const [draft, setDraft] = useState(value); const [extra, setExtra] = useState(JSON.stringify(value.extra, null, 2)); const [error, setError] = useState('');
@@ -78,7 +79,7 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
   const comparison = experiment ? compareSettings(experiment.variantA.settings, experiment.variantB.settings) : null;
   const differences = experiment ? experimentDifferences(experiment) : null;
   return <div className="stack">
-    <section className="panel stack"><h2>手動A/B比較</h2><p>スナップショットをコピー → NovelAIで手動生成 → 保存したPNGを取り込んで比較します。実サイトへの書込みは無効です。</p>
+    <section className="panel stack"><div className="section-title"><h2>手動A/B比較</h2><InfoTip label="手動A/B比較">現在の構成やプリセットをA/Bのスナップショットとして固定し、Bだけを変えて比べます。プロンプトをコピーしてNovelAIで同じSeed・設定で手動生成し、保存したPNGを取り込んで横並び・重ね合わせ・差分で比較します。元の構成は変更せず、実サイトへの書込みは行いません。</InfoTip></div>
       <ol className="comparison-steps"><li>Aを基準に、Bのタグ・重みを調整</li><li>同じSeed・生成設定でA/Bを手動生成</li><li>PNGを取り込み、横並び・重ね合わせで比較</li></ol>
       <label>比較元<select value={source} onChange={event => setSource(event.target.value)}><option value="current">現在のワークスペース</option>{data.presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
       <label>新しい比較名<input maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label>
@@ -86,7 +87,7 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
         if (!sourceWorkspace) return;
         const created = createExperiment(newId(), newId(), newId(), name, sourceWorkspace, sourcePreset?.id ?? (sourceWorkspace.appliedPresetId ?? null), now());
         if (workbench.commit(previous => ({ ...previous, experiments: [...previous.experiments, created] }))) { setSelected(created.id); setNotice('A/Bのプロンプトを固定して保存しました。現在の構成は変更していません。'); }
-      }}>比較セッションを作成</button>
+      }} className="primary">比較セッションを作成</button>
       <label>保存済み比較<select disabled={editing || busy} value={experiment?.id ?? ''} onChange={event => { setSelected(event.target.value); setNotice(''); }}><option value="" disabled>比較を選択</option>{data.experiments.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       {notice && <p role="status">{notice}</p>}
     </section>
@@ -122,7 +123,7 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
         <div className="table-scroll"><table><thead><tr><th>設定</th><th>A</th><th>B</th></tr></thead><tbody>{comparison?.rows.map(row => <tr key={row.label}><th>{row.label}</th><td>{row.a === null ? '不明' : String(row.a)}</td><td>{row.b === null ? '不明' : String(row.b)} {row.a !== null && row.b !== null && row.a !== row.b ? '（差あり）' : ''}</td></tr>)}</tbody></table></div><p>記録した条件が一致しても、モデルの版や未記録条件を含む厳密な再現性は保証しません。</p>
       </section>
     </>}
-    <section className="panel stack"><h3>画像ライブラリ ({data.images.length})</h3><p>原本とサムネイルを別々に保存します。JSONバックアップには画像バイナリを含みません。元PNGも別途保管してください。</p><p>登録画像の原本合計 {(data.images.reduce((sum, image) => sum + image.byteLength, 0) / 1048576).toFixed(2)} MiB / {capacity}</p>
+    <section className="panel stack"><div className="section-title"><h3>画像ライブラリ ({data.images.length})</h3><InfoTip label="画像ライブラリ">取り込んだPNGの原本とサムネイルをこの端末に保存します。JSONバックアップには画像を含まないため、画像も残すには「設定」の完全バックアップを使用してください。削除した画像のデータは「元に戻す」のために残り、「参照されない画像バイナリを解放」で整理できます。</InfoTip></div><p className="hint">登録画像の原本合計 {(data.images.reduce((sum, image) => sum + image.byteLength, 0) / 1048576).toFixed(2)} MiB / {capacity}</p>
       <button type="button" onClick={() => { if (!navigator.storage?.estimate) { setCapacity('この環境は容量取得に非対応です'); return; } void navigator.storage.estimate().then(value => setCapacity(`ブラウザ使用 ${(Number(value.usage ?? 0) / 1048576).toFixed(1)} MiB / 割当 ${value.quota === undefined ? '不明' : (value.quota / 1048576).toFixed(1) + ' MiB'}（概算）`)).catch(cause => workbench.setError(message(cause))); }}>ストレージ容量を確認</button>
       {data.images.slice(0, 50).map(image => <article key={image.id} className="member"><Thumbnail workbench={workbench} image={image} /><p>{image.name}</p><button type="button" onClick={() => { void workbench.imageBlob(image.id).then(blob => { if (!blob) throw new Error('画像原本が欠落しています'); downloadBlob(blob, image.name); }).catch(cause => workbench.setError(message(cause))); }}>画像原本を保存</button><button type="button" onClick={() => { if (confirm('画像メタデータと全比較の関連付けを削除しますか？Undo用の原本は保持します。')) workbench.commit(previous => ({ ...previous, images: previous.images.filter(item => item.id !== image.id), ...(previous.lab ? { lab: { ...previous.lab, experiments: previous.lab.experiments.map(e => ({ ...e, conditions: e.conditions.map(c => c.imageId === image.id ? { ...c, imageId: null, status: 'pending' as const } : c) })) } } : {}), experiments: previous.experiments.map(item => ({ ...item, variantA: item.variantA.imageId === image.id ? { ...item.variantA, imageId: null } : item.variantA, variantB: item.variantB.imageId === image.id ? { ...item.variantB, imageId: null } : item.variantB })) })); }}>登録画像を削除</button></article>)}
       {data.images.length > 50 && <p>先頭50件を表示。全件はスロットの選択欄から選べます。</p>}

@@ -3,6 +3,7 @@ import { prepareImport } from '../data/backup';
 import { countsOf, exportFullBackup, fullBackupFilename, inspectFullBackup, planFullRestore, type BackupCounts, type InspectedBackup } from '../data/full-backup';
 import { downloadBlob, now } from './shared';
 import { message, type Workbench } from './useWorkbench';
+import { InfoTip } from './InfoTip';
 
 const COUNT_LABELS: Record<keyof BackupCounts, string> = {
   libraryEntries: 'ライブラリ', categories: 'カテゴリ', workspaces: 'ワークスペース', presets: 'プリセット', experiments: 'A/B比較',
@@ -32,10 +33,9 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
   const current = countsOf(data);
 
   return <section className="panel stack" aria-label="完全バックアップ">
-    <h2>完全バックアップ（画像原本込み・推奨）</h2>
-    <p>ライブラリ・ワークスペース・プリセット・比較・Experiment Lab・シャッフル設定・画像メタデータに加え、<strong>画像原本とサムネイル</strong>を1つのZIPに保存します。別のChromeプロファイルや別のPCでも同じ状態に戻せます。</p>
-    <p className="hint">Undo履歴・サイト連携の一時情報は含みません。ZIPは無圧縮・最大2GiBです。Experiment LabのZIP（実験の共有用）とは別の形式です。</p>
-    <button type="button" disabled={blocked} onClick={() => void run(async () => {
+    <div className="section-title"><h2>完全バックアップ（画像原本込み・推奨）</h2><InfoTip label="完全バックアップ">ライブラリ・ワークスペース・プリセット・比較・Experiment Lab・シャッフル設定・画像メタデータに加え、画像原本とサムネイルを1つのZIPに保存します。別のChromeプロファイルや別のPCでも同じ状態に戻せます。Undo履歴とサイト連携の一時情報は含みません。ZIPは無圧縮・最大2GiBで、Experiment LabのZIP（実験の共有用）とは別の形式です。</InfoTip></div>
+    <p className="hint">画像も含めてすべてを1つのZIPに保存し、別の環境でもそのまま復元できます。定期的な保存をおすすめします。</p>
+    <button type="button" className="primary" disabled={blocked} onClick={() => void run(async () => {
       const time = now();
       const result = await exportFullBackup(workbench.latest()!, { image: (id, thumbnail) => workbench.imageBlob(id, thumbnail) }, time, (done, total) => setProgress(`画像を確認中… ${done}/${total}`));
       downloadBlob(result.blob, fullBackupFilename(time));
@@ -68,9 +68,9 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
         <option value="replace">全置換（別プロファイルへの移行・完全復元。現在のデータは取込前バックアップに1世代保持）</option>
         <option value="merge">追加（現在のデータに足す。ID・画像の重複はエラー）</option>
       </select></label>
-      <p className="hint">復元は1回の保存処理で行い、途中で失敗した場合は何も変更しません。復元後も「元に戻す」で復元前の状態に戻せます。</p>
+      <p className="hint">途中で失敗した場合は何も変更しません。復元後も「元に戻す」で戻せます。</p>
       {planError && <p role="alert">{planError}</p>}
-      <div className="actions"><button type="button" disabled={blocked || !!planError} onClick={() => void run(async () => {
+      <div className="actions"><button type="button" className="primary" disabled={blocked || !!planError} onClick={() => void run(async () => {
         const backup = inspected.backup;
         if (!confirm(mode === 'replace'
           ? `現在のデータ（ライブラリ${current.libraryEntries}件・ワークスペース${current.workspaces}件・比較${current.experiments}件など）を、このバックアップの内容で全置換しますか？\n画像原本${backup.binaries.size}件も保存します。`

@@ -15,6 +15,7 @@ import { Presets, PresetStatus } from './Presets';
 import { recoveryJson } from '../data/recovery';
 import { Comparisons } from './Comparisons';
 import { Shuffle } from './Shuffle';
+import { InfoTip } from './InfoTip';
 
 type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
 // Ordered by workflow: build prompts → save/vary them → compare results → settings & backup.
@@ -57,11 +58,14 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     try { await navigator.clipboard.writeText(compiled[channel]); setNotice(`${channel}をコピーしました。`); }
     catch { workbench.setError('コピーできませんでした。出力欄を選択して手動でコピーしてください。'); }
   }
+  const statusPill = <div className={`status ${workbench.storageError ? 'error' : !data ? 'loading' : workbench.saving ? 'saving' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>;
   return <main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
-    <header><small className="eyebrow">LOCAL PROMPT LIBRARY</small><h1>NovelAI Prompt Workbench</h1><p className="hint">原文を残して、構成を切り替える。<a href={location.pathname} target="_blank" rel="noreferrer">広いタブで開く</a></p></header>
-    <div className={`status ${workbench.storageError ? 'error' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>
+    <header className="app-header">
+      <div className="app-title"><h1>NovelAI Prompt Workbench</h1><InfoTip label="このツール">原文を残したまま、プロンプトの部品を組み合わせて切り替えるための非公式ツールです。データはこの端末だけに保存され、外部には送信しません。画像の生成はNovelAI上で行います。</InfoTip></div>
+      <div className="header-links">{!data && statusPill}<a href={location.pathname} target="_blank" rel="noreferrer" title="サイドパネルより広い画面で、同じデータを開きます">広いタブで開く</a></div>
+    </header>
     {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データをJSONで退避するか、DBの復旧用ファイルを保存してください。</p><div className="actions">
-      {data && <button type="button" onClick={workbench.retry}>保存を再試行</button>}
+      {data && <button type="button" className="primary" onClick={workbench.retry}>保存を再試行</button>}
       <button type="button" onClick={() => { if (confirm('未保存の画面上の編集を破棄して、保存データを再読込しますか？')) location.reload(); }}>再読込</button>
       <button type="button" disabled={!workbench.repository.current && !workbench.migrationRecovery} onClick={() => {
         if (workbench.migrationRecovery) downloadText(recoveryJson(workbench.migrationRecovery), 'nai-migration-recovery.json');
@@ -70,19 +74,27 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     </div></section>}
     {workbench.externalChange && !workbench.storageError && <section className="panel stack" role="status" aria-label="他の画面での変更">
       <p>別の画面（サイドパネル・広いタブ）でデータが保存されました。この画面のまま編集すると保存時に競合します。</p>
-      <div className="actions"><button type="button" disabled={workbench.saving} onClick={() => void workbench.reloadFromStorage().then(() => setNotice('他の画面で保存された最新の内容を読み込みました（元に戻す履歴はリセットされました）。')).catch(error => workbench.setError(message(error)))}>他の画面の変更を読み込む</button></div>
+      <div className="actions"><button type="button" className="primary" disabled={workbench.saving} onClick={() => void workbench.reloadFromStorage().then(() => setNotice('他の画面で保存された最新の内容を読み込みました（元に戻す履歴はリセットされました）。')).catch(error => workbench.setError(message(error)))}>他の画面の変更を読み込む</button></div>
     </section>}
     {workbench.error && <div className="error" role="alert">{workbench.error}<button type="button" onClick={() => workbench.setError('')}>閉じる</button></div>}
     {!data && workbench.storageError && <Recovery workbench={workbench} />}
     {data && <>
-      <nav aria-label="メイン"><div className="tabs" role="tablist" aria-label="機能" onKeyDown={tabKeys}>{TABS.map(value => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} key={value} onClick={() => select(value)}>{value}</button>)}</div></nav>
-      {firstRun && tab === 'ライブラリ' && <section className="panel stack" aria-label="はじめに">
+      <nav className="app-nav" aria-label="メイン">
+        <div className="tabs" role="tablist" aria-label="機能" onKeyDown={tabKeys}>{TABS.map(value => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} key={value} onClick={() => select(value)}>{value}</button>)}</div>
+        <div className="toolbar history">
+          <button type="button" className="small" disabled={!workbench.canUndo || comparisonDraft} onClick={workbench.undo}><span aria-hidden="true">↶ </span>元に戻す</button>
+          <button type="button" className="small" disabled={!workbench.canRedo || comparisonDraft} onClick={workbench.redo}>やり直す<span aria-hidden="true"> ↷</span></button>
+          <InfoTip label="元に戻す・やり直す">入力欄の外で Ctrl/Cmd+Z（元に戻す）・Ctrl/Cmd+Y（やり直す）。直近30操作まで戻せます。パネルを閉じると履歴は消え、NovelAIのページへの操作は戻りません。</InfoTip>
+          <span className="spacer" />
+          {statusPill}
+        </div>
+        <PresetStatus workbench={workbench} />
+      </nav>
+      {firstRun && tab === 'ライブラリ' && <section className="panel stack first-run" aria-label="はじめに">
         <h2>はじめに</h2>
         <ol className="comparison-steps"><li>「ワークスペース」で構成（グループ）を作る</li><li>「ライブラリ」に部品（タグの原文）を登録し「構成に追加」</li><li>下の「出力プレビュー」をコピーしてNovelAIに貼り付け、NovelAI上で生成する</li></ol>
-        <p className="hint">サンプルは「設定」→「デモを追加」で入ります。データはこの端末だけに保存されます。定期的に「設定」→「完全バックアップ」を保存してください。</p>
+        <p className="hint">サンプルは「設定」→「デモを追加」で入ります。定期的に「設定」→「完全バックアップ」を保存してください。</p>
       </section>}
-      <div className="actions history"><button type="button" disabled={!workbench.canUndo || comparisonDraft} onClick={workbench.undo}>元に戻す</button><button type="button" disabled={!workbench.canRedo || comparisonDraft} onClick={workbench.redo}>やり直す</button><small>Ctrl/Cmd+Z・Y（入力欄の外）</small></div>
-      <PresetStatus workbench={workbench} />
       {notice && <p role="status">{notice}</p>}
       <div role="tabpanel" id="main-panel" aria-labelledby={`tab-${tab}`}>
         {tab === 'ライブラリ' && <Library workbench={workbench} addToGroup={addToGroup} />}
@@ -93,8 +105,11 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         {tab === 'Experiment Lab' && <Lab workbench={workbench} siteClient={siteClient} onDraftChange={setComparisonDraft} />}
         {tab === 'シャッフル' && <Shuffle workbench={workbench} siteClient={siteClient} />}
       </div>
-      {tab !== 'Experiment Lab' && <section className="panel stack preview" aria-label="ライブプレビュー"><div className="group-head"><h2>出力プレビュー</h2><small>{workspace?.title ?? '構成なし'}</small></div>
-        {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}><label>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}<textarea readOnly rows={3} value={compiled[channel]} /></label><button type="button" onClick={() => void copy(channel)}>{channel === 'positive' ? 'Positiveをコピー' : 'Negativeをコピー'}</button></div>)}
+      {tab !== 'Experiment Lab' && <section className="panel stack preview" aria-label="ライブプレビュー"><div className="group-head"><div className="title"><h2>出力プレビュー</h2><InfoTip label="出力プレビュー">現在のワークスペースから合成したプロンプトです。コピーしてNovelAIに貼り付け、NovelAI上で生成してください。OFFにした部品・範囲は出力しません。</InfoTip></div><small>{workspace?.title ?? '構成なし'}</small></div>
+        {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}>
+          <div className="field-head"><label htmlFor={`preview-${channel}`}>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}</label><button type="button" className="small primary" onClick={() => void copy(channel)}>{channel === 'positive' ? 'Positiveをコピー' : 'Negativeをコピー'}</button></div>
+          <textarea id={`preview-${channel}`} readOnly rows={2} value={compiled[channel]} />
+        </div>)}
         {compiled.warnings.map((warning, index) => <p role="alert" key={index}>{warning}</p>)}
         <SiteConnection client={siteClient} compiled={compiled} onImport={(channel, raw) => {
           if (!workspace) { workbench.setError('先にワークスペースを作成してください'); return; }
@@ -106,6 +121,6 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         }} />
       </section>}
     </>}
-    <footer>非公式・ローカル保存。画像生成はNovelAI上で手動で行います。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
+    <footer>非公式ツール・データはこの端末のみ・生成はNovelAI上で手動。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
   </main>;
 }

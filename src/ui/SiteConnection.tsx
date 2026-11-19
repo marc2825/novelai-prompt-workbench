@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Channel, CompiledPrompts } from '../core/types';
 import type { SiteClient } from '../platform/novelai/client';
 import type { SiteInspection, WriteMode, WritePreview } from '../platform/novelai/protocol';
+import { InfoTip } from './InfoTip';
 
 export function SiteConnection({ client, compiled, onImport, onApplied }: { client?: SiteClient; compiled: CompiledPrompts; onImport: (channel: Channel, raw: string) => void; onApplied?: (preview: WritePreview) => void }) {
   const [sites, setSites] = useState<SiteInspection[]>([]);
@@ -31,8 +32,8 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
   };
 
   return <section className="stack site-connection" aria-label="NovelAIサイト連携">
-    <h2>NovelAIサイト連携</h2><p className="hint">対象タブを選択してください。トグル変更だけではサイトを書き換えません。入力はチャンネルごとに確認して反映します。</p>
-    <button type="button" disabled={busy} onClick={() => void perform(async () => {
+    <div className="section-title"><h3>NovelAIサイト連携</h3><InfoTip label="NovelAIサイト連携">開いているNovelAIの画像生成ページから、プロンプト欄の現在値を読み取れます。接続を確認して対象タブを選んでください。トグルの変更だけではサイトを書き換えません。読取り専用・未検出・曖昧な入力欄には書き込まず、現在の実サイトへの書込みは無効です（コピーを使用してください）。</InfoTip></div>
+    <button type="button" className="small" disabled={busy} onClick={() => void perform(async () => {
       version.current++; setPreview(null); setRead(null);
       const result = await client.discover();
       if (!result.ok) { setSites([]); setIssue(result.reason); return; }
@@ -40,10 +41,10 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
       setSelected(''); // Never auto-select a tab, including when only one exists.
       setNotice(result.sites.length ? `${result.sites.length}個の画像ページを検出しました。対象を選択してください。` : 'NovelAI画像ページに接続できません。ページを開くか再読込してください。コピーは利用できます。');
     })}>NovelAIの接続を確認</button>
-    <label>対象タブ<select value={selected} disabled={busy} onChange={event => { version.current++; setSelected(event.target.value); setIssue(''); }}><option value="">対象を選択</option>{sites.map(item => <option key={item.tabId} value={item.tabId}>タブ {item.tabId}: {item.title} — {item.url}</option>)}</select></label>
-    <div className="columns"><label>反映チャンネル<select value={channel} disabled={busy} onChange={event => { version.current++; setChannel(event.target.value as Channel); }}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>反映方法<select value={mode} disabled={busy} onChange={event => { version.current++; setMode(event.target.value as WriteMode); }}><option value="insert">選択範囲へ原文どおり挿入</option><option value="replace">入力欄全体を置換</option></select></label></div>
-    {site && <p className="hint">{site.capabilities[channel].reason}</p>}
-    <div className="actions"><button type="button" disabled={busy || !site?.capabilities[channel].canRead} onClick={() => void perform(async () => {
+    {sites.length > 0 && <label>対象タブ<select value={selected} disabled={busy} onChange={event => { version.current++; setSelected(event.target.value); setIssue(''); }}><option value="">対象を選択</option>{sites.map(item => <option key={item.tabId} value={item.tabId}>タブ {item.tabId}: {item.title} — {item.url}</option>)}</select></label>}
+    {site && <><div className="columns"><label>反映チャンネル<select value={channel} disabled={busy} onChange={event => { version.current++; setChannel(event.target.value as Channel); }}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>反映方法<select value={mode} disabled={busy} onChange={event => { version.current++; setMode(event.target.value as WriteMode); }}><option value="insert">選択範囲へ原文どおり挿入</option><option value="replace">入力欄全体を置換</option></select></label></div>
+    <p className="hint">{site.capabilities[channel].reason}</p>
+    <div className="actions"><button type="button" className="small" disabled={busy || !site?.capabilities[channel].canRead} onClick={() => void perform(async () => {
       if (!site) return;
       setPreview(null); setRead(null); const generation = version.current;
       const result = await client.read(site, channel);
@@ -53,7 +54,7 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
       setRead({ channel, raw: result.raw, tabId: site.tabId, documentId: site.documentId });
       setNotice('現在の入力を読み取りました。サイトは変更していません。');
     })}>サイトの現在値を読む</button>
-    <button type="button" disabled={busy || !site?.capabilities[channel].canWrite || !!compiled.warnings.length} onClick={() => void perform(async () => {
+    <button type="button" className="small" disabled={busy || !site?.capabilities[channel].canWrite || !!compiled.warnings.length} onClick={() => void perform(async () => {
       if (!site) return;
       setPreview(null); setRead(null); const generation = version.current;
       const result = await client.prepare(site, channel, mode, compiled[channel]);
@@ -61,7 +62,7 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
       if (!result.ok) { setIssue(result.reason); return; }
       if (result.type !== 'prepare') { setIssue('予期しないプレビュー応答です'); return; }
       setPreview(result.preview);
-    })}>反映プレビューを作成</button></div>
+    })}>反映プレビューを作成</button></div></>}
     {read && read.tabId === site?.tabId && read.documentId === site.documentId && <div className="stack"><label>サイトの現在値 ({read.channel})<textarea readOnly rows={3} value={read.raw} /></label><button type="button" disabled={busy} onClick={() => {
       if (confirm(`${read.channel}の自由入力をサイトから読んだ内容に置換しますか？コメント範囲も解除します。Undoで戻せます。`)) onImport(read.channel, read.raw);
     }}>読取り結果を自由入力へ取り込む</button></div>}
@@ -76,6 +77,5 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
     })}>確認してサイトに反映</button><button type="button" disabled={busy} onClick={() => setPreview(null)}>反映をキャンセル</button></div></div>}
     {lastAttempt && <details><summary>直前のサイト操作の復旧用原文（タブ{lastAttempt.tabId} / {lastAttempt.channel}）</summary><div className="stack"><label>直前の反映前原文<textarea readOnly value={lastAttempt.before} /></label><p className="hint">画面を閉じるまで保持します。復旧が必要なら原文を選択してコピーしてください。Undoはサイト操作を戻しません。</p><button type="button" onClick={() => setLastAttempt(null)}>復旧用原文を閉じる</button></div></details>}
     {issue && <p role="alert">{issue}</p>}{notice && <p role="status">{notice}</p>}
-    <small>読取り専用・未検出・曖昧な入力欄には書き込みません。コピーは上のボタンから利用できます。</small>
   </section>;
 }

@@ -3,6 +3,7 @@ import { searchLibrary } from '../core/search';
 import type { Channel, LibraryEntry } from '../core/types';
 import type { Workbench } from './useWorkbench';
 import { Empty, newId, now, Rename } from './shared';
+import { InfoTip } from './InfoTip';
 
 const PAGE_SIZE = 50;
 
@@ -48,12 +49,12 @@ export function Library({ workbench, addToGroup }: { workbench: Workbench; addTo
   const tags = [...new Set(data.libraryEntries.flatMap(entry => entry.tags))].sort();
 
   return <div className="stack">
-    {editing !== undefined ? <EntryForm key={editing?.id ?? 'new'} entry={editing} workbench={workbench} onClose={() => setEditing(undefined)} /> : <button type="button" onClick={() => setEditing(null)}>＋ ライブラリを追加</button>}
+    {editing !== undefined ? <EntryForm key={editing?.id ?? 'new'} entry={editing} workbench={workbench} onClose={() => setEditing(undefined)} /> : <button type="button" className="primary" onClick={() => setEditing(null)}>＋ ライブラリを追加</button>}
     <section className="panel stack" aria-label="検索と絞り込み">
       <label>検索<input type="search" value={query} placeholder="日本語名・原文・説明・タグ・カテゴリ" onChange={event => { setQuery(event.target.value); setPage(0); }} /></label>
-      <div className="columns"><label>カテゴリで絞る<select value={categoryId} onChange={event => { setCategoryId(event.target.value); setPage(0); }}><option value="">すべて</option>{data.categories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
-      <label>タグで絞る<select value={tag} onChange={event => { setTag(event.target.value); setPage(0); }}><option value="">すべて</option>{tags.map(value => <option key={value}>{value}</option>)}</select></label></div>
-      <label>並び順<select value={data.settings.librarySort} onChange={event => workbench.commit(previous => ({ ...previous, settings: { ...previous.settings, librarySort: event.target.value as 'title' | 'updatedAt' } }))}><option value="title">名前順</option><option value="updatedAt">更新が新しい順</option></select></label>
+      <div className="columns three"><label>カテゴリで絞る<select value={categoryId} onChange={event => { setCategoryId(event.target.value); setPage(0); }}><option value="">すべて</option>{data.categories.map(category => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
+      <label>タグで絞る<select value={tag} onChange={event => { setTag(event.target.value); setPage(0); }}><option value="">すべて</option>{tags.map(value => <option key={value}>{value}</option>)}</select></label>
+      <label>並び順<select value={data.settings.librarySort} onChange={event => workbench.commit(previous => ({ ...previous, settings: { ...previous.settings, librarySort: event.target.value as 'title' | 'updatedAt' } }))}><option value="title">名前順</option><option value="updatedAt">更新が新しい順</option></select></label></div>
     </section>
     <details className="panel"><summary>カテゴリ管理</summary><div className="stack">
       <form className="actions" onSubmit={event => { event.preventDefault(); if (workbench.commit(previous => ({ ...previous, categories: [...previous.categories, { id: newId(), name: categoryName }] }))) setCategoryName(''); }}><label>新しいカテゴリ<input required maxLength={200} value={categoryName} onChange={event => setCategoryName(event.target.value)} /></label><button type="submit">カテゴリ追加</button></form>
@@ -62,16 +63,16 @@ export function Library({ workbench, addToGroup }: { workbench: Workbench; addTo
       }}>カテゴリ削除</button></div>)}
     </div></details>
     <section className="panel stack" aria-label="部品の追加先">
-      <p className="hint">現在のワークスペース: {workspace?.title ?? '未作成'}。原文をスナップショットとして追加します。</p>
+      <div className="field-head"><span>追加先: {workspace?.title ?? 'ワークスペース未作成'}</span><InfoTip label="構成への追加">「構成に追加」を押すと、現在のワークスペースの選んだグループに原文をスナップショット（その時点のコピー）として追加します。あとでライブラリを編集しても構成側は変わりません。</InfoTip></div>
       <label>追加先グループ<select value={groupId} onChange={event => setTargetGroup(event.target.value)}><option value="" disabled>ワークスペースでグループを作成</option>{workspace?.groups.map(group => <option key={group.id} value={group.id}>{group.name} ({group.channel})</option>)}</select></label>
     </section>
     <p role="status">{results.length}件 / 全{data.libraryEntries.length}件</p>
     {!results.length && <Empty>{data.libraryEntries.length ? '条件に一致する項目がありません。' : '最初のプロンプトを追加してください。デモは設定から明示的に追加できます。'}</Empty>}
     {results.slice(actualPage * PAGE_SIZE, (actualPage + 1) * PAGE_SIZE).map(entry => <article className="panel stack" key={entry.id} aria-label={entry.title}>
-      <div className="group-head"><h2>{entry.title}</h2><span className="badge">{entry.defaultChannel}</span></div>
-      <pre>{entry.raw}</pre>{entry.description && <p>{entry.description}</p>}
-      <small>{data.categories.find(category => category.id === entry.categoryId)?.name ?? '未分類'} · {entry.tags.join(' / ')}</small>
-      <div className="actions"><button type="button" disabled={!groupId} onClick={() => addToGroup(entry, groupId)}>構成に追加</button><button type="button" onClick={() => setEditing(entry)}>編集</button><button type="button" onClick={() => { const timestamp = now(); workbench.commit(previous => ({ ...previous, libraryEntries: [...previous.libraryEntries, { ...structuredClone(entry), id: newId(), title: `${entry.title.slice(0, 195)} のコピー`, createdAt: timestamp, updatedAt: timestamp }] })); }}>複製</button><button type="button" onClick={() => {
+      <div className="group-head"><h2>{entry.title}</h2><span className={`badge ${entry.defaultChannel}`}>{entry.defaultChannel}</span></div>
+      <pre>{entry.raw}</pre>
+      <p className="entry-meta">{data.categories.find(category => category.id === entry.categoryId)?.name ?? '未分類'}{entry.tags.length ? ` · ${entry.tags.join(' / ')}` : ''}{entry.description ? ` — ${entry.description}` : ''}</p>
+      <div className="actions"><button type="button" className="small primary" disabled={!groupId} onClick={() => addToGroup(entry, groupId)}>構成に追加</button><button type="button" className="small" onClick={() => setEditing(entry)}>編集</button><button type="button" className="small" onClick={() => { const timestamp = now(); workbench.commit(previous => ({ ...previous, libraryEntries: [...previous.libraryEntries, { ...structuredClone(entry), id: newId(), title: `${entry.title.slice(0, 195)} のコピー`, createdAt: timestamp, updatedAt: timestamp }] })); }}>複製</button><button type="button" className="small danger" onClick={() => {
         if (confirm(`「${entry.title}」を削除しますか？構成のスナップショットは残ります。`)) workbench.commit(previous => ({ ...previous, libraryEntries: previous.libraryEntries.filter(item => item.id !== entry.id) }));
       }}>削除</button></div>
     </article>)}
