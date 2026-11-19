@@ -13,6 +13,7 @@ import { exportShuffle, importShuffle, parseShuffleExport } from '../../data/shu
 import { downloadText, Empty, newId, now, Reorder } from '../shared';
 import { message } from '../useWorkbench';
 import { CharacterLimit, ListCommit, NumberCommit, TextCommit } from './inputs';
+import { Hint } from '../InfoTip';
 
 type Change = (update: (shuffle: ShuffleData) => ShuffleData) => boolean;
 const SIDE_LABEL = { '': '指定なし', left: '左', right: '右' } as const;
@@ -20,7 +21,7 @@ const OPTION_PAGE = 100;
 
 function Constraints<T extends Constrained>({ label, item, onChange }: { label: string; item: T; onChange: (item: T) => void }) {
   return <details><summary>{label}の制約タグ</summary><div className="stack">
-    <p className="hint">タグは内部ラベルで、NovelAIには出力しません。「必須」はすでに選ばれた候補のタグを要求し、「除外」は一致するタグがあると候補から外します。</p>
+    <Hint label={`${label}の制約タグ`} summary="制約タグはNovelAIに出力しない内部ラベルです">タグは内部ラベルで、NovelAIには出力しません。「必須」はすでに選ばれた候補のタグを要求し、「除外」は一致するタグがあると候補から外します。</Hint>
     <ListCommit label={`${label}のタグ`} values={item.tags} onCommit={tags => onChange({ ...item, tags })} />
     <ListCommit label={`${label}の必須タグ`} values={item.requires} onCommit={requires => onChange({ ...item, requires })} />
     <ListCommit label={`${label}の除外タグ`} values={item.excludes} onCommit={excludes => onChange({ ...item, excludes })} />
@@ -35,11 +36,11 @@ function CharacterEditor({ character, change }: { character: CharacterDefinition
   return <details><summary>「{label}」を編集</summary><div className="stack">
     <TextCommit label="キャラクター名" value={character.name} required maxLength={200} onCommit={name => save({ ...character, name })} />
     <TextCommit label={`${label}の固定プロンプト`} multiline value={character.fixedPrompt} onCommit={fixedPrompt => save({ ...character, fixedPrompt })} placeholder="girl, blonde hair, blue eyes, white dress" />
-    <p className="hint">固定プロンプトは外見・固有設定です。シャッフルで変更・削除しません。</p>
+    <Hint label={`${label}の固定プロンプト`} summary="外見などは固定（シャッフルで変えません）">固定プロンプトは外見・固有設定です。シャッフルで変更・削除しません。</Hint>
     <ListCommit label={`${label}の固定タグ`} values={character.lockedTags} onCommit={lockedTags => save({ ...character, lockedTags })} />
-    <p className="hint">固定タグは常に出力し、そのタグを候補に含むカテゴリ（例: sitting → ポーズ）をシャッフルしません。</p>
+    <Hint label={`${label}の固定タグ`} summary="固定タグは常に出力します">固定タグは常に出力し、そのタグを候補に含むカテゴリ（例: sitting → ポーズ）をシャッフルしません。</Hint>
     {CHARACTER_CATEGORIES.map(category => <TextCommit key={category} label={`${label}の可変プロンプト（${CATEGORY_LABELS[category]}）`} value={variable(category)} onCommit={prompt => setVariable(category, prompt)} />)}
-    <p className="hint">可変プロンプトはシャッフルがそのカテゴリを決めたときだけ置き換えます。</p>
+    <Hint label={`${label}の可変プロンプト`} summary="シャッフルが決めたカテゴリだけ置き換え">可変プロンプトはシャッフルがそのカテゴリを決めたときだけ置き換えます。</Hint>
     <fieldset className="actions"><legend>{label}: 変更を許可する項目</legend>{CHARACTER_CATEGORIES.map(category => <label className="inline" key={category}><input type="checkbox" checked={character.allowedCategories.includes(category)} onChange={event => save({ ...character, allowedCategories: event.target.checked ? [...character.allowedCategories, category] : character.allowedCategories.filter(item => item !== category) })} />{label}: {CATEGORY_LABELS[category]}</label>)}</fieldset>
     <label>{label}の立ち位置<select value={character.side ?? ''} onChange={event => save({ ...character, side: (event.target.value || null) as CharacterDefinition['side'] })}>{Object.entries(SIDE_LABEL).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></label>
     <label className="inline"><input type="checkbox" checked={character.negativePrompt !== null} onChange={event => save({ ...character, negativePrompt: event.target.checked ? '' : null })} />{label}のUndesired Contentを管理する</label>
@@ -99,7 +100,7 @@ function TemplateEditor({ template, characters, change }: { template: SceneTempl
       <TextCommit label="テンプレート名" value={template.name} required maxLength={200} onCommit={name => save({ ...template, name })} />
       <label>{template.name}の種類<select value={template.kind} onChange={event => save({ ...template, kind: event.target.value as TemplateKind })}><option value="role">役割テンプレート</option><option value="pose">ポーズセット</option></select></label>
       <TextCommit label={`${template.name}の行動タグ`} value={template.action} maxLength={200} placeholder="hug" onCommit={action => save({ ...template, action: action.trim() })} />
-      <p className="hint">行動タグを入れると、相互作用を設定した役割に source#行動 / target#行動 / mutual#行動 を付けます（公式記法。常に信頼できるとは限りません）。</p>
+      <Hint label={`${template.name}の行動タグ`} summary="source# / target# / mutual# を自動で付けます">行動タグを入れると、相互作用を設定した役割に source#行動 / target#行動 / mutual#行動 を付けます（公式記法。常に信頼できるとは限りません）。</Hint>
       <TextCommit label={`${template.name}のベースプロンプト追加`} value={template.basePrompt} onCommit={basePrompt => save({ ...template, basePrompt })} />
       <NumberCommit label={`${template.name}の重み`} value={template.weight} min={0} max={1000} step={0.1} onCommit={weight => save({ ...template, weight })} />
       <Constraints label={template.name} item={template} onChange={save} />
@@ -114,7 +115,7 @@ export function TemplateList({ shuffle, change }: { shuffle: ShuffleData; change
   const [name, setName] = useState('');
   const [kind, setKind] = useState<TemplateKind>('role');
   return <details className="panel"><summary>役割テンプレート・ポーズセット ({shuffle.templates.length})</summary><div className="stack">
-    <p className="hint">役割テンプレートとポーズセットは同じ構造です。役割IDとキャラクターIDは別で、シャッフルごとに役割の担当者だけを入れ替えます。</p>
+    <Hint label="役割テンプレート・ポーズセット" summary="役割の担当キャラクターだけを入れ替えます">役割テンプレートとポーズセットは同じ構造です。役割IDとキャラクターIDは別で、シャッフルごとに役割の担当者だけを入れ替えます。</Hint>
     <form className="actions" aria-label="テンプレート作成" onSubmit={event => {
       event.preventDefault();
       if (name.trim() && change(current => ({ ...current, templates: [...current.templates, createTemplate(kind, newId(), name.trim(), [newId(), newId()])] }))) setName('');
@@ -164,7 +165,7 @@ export function PoolList({ shuffle, change }: { shuffle: ShuffleData; change: Ch
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ShuffleCategory>('pose');
   return <details className="panel"><summary>候補プール（ポーズ・表情・カメラ） ({shuffle.pools.length})</summary><div className="stack">
-    <p className="hint">キャラクター系プールは、テンプレートがそのカテゴリを決めなかったキャラクターごとに1つ選びます。同じカテゴリはキャラクターごとに1つだけ適用されます。</p>
+    <Hint label="候補プール" summary="キャラクターごとに1つずつ選びます">キャラクター系プールは、テンプレートがそのカテゴリを決めなかったキャラクターごとに1つ選びます。同じカテゴリはキャラクターごとに1つだけ適用されます。</Hint>
     <form className="actions" aria-label="候補プール作成" onSubmit={event => {
       event.preventDefault();
       if (name.trim() && change(current => ({ ...current, pools: [...current.pools, createPool(newId(), name.trim(), category)] }))) setName('');
@@ -183,7 +184,7 @@ function CameraEditor({ preset, change }: { preset: CameraPreset; change: Change
     <details><summary>「{preset.name}」を編集</summary><div className="stack">
       <TextCommit label="カメラプリセット名" value={preset.name} required maxLength={200} onCommit={name => save({ ...preset, name })} />
       {[...CAMERA_CATEGORIES, 'gaze' as const].map(category => <TextCommit key={category} label={`${preset.name}の${CATEGORY_LABELS[category]}`} value={part(category)} onCommit={prompt => setPart(category, prompt)} />)}
-      <p className="hint">アングル・フレーミング・視点はベースプロンプト、視線は各キャラクターに出力します。空欄のカテゴリは個別プールから選びます。</p>
+      <Hint label={`${preset.name}の出力先`} summary="アングル等はベース、視線は各キャラクターへ">アングル・フレーミング・視点はベースプロンプト、視線は各キャラクターに出力します。空欄のカテゴリは個別プールから選びます。</Hint>
       <NumberCommit label={`${preset.name}の重み`} value={preset.weight} min={0} max={1000} step={0.1} onCommit={weight => save({ ...preset, weight })} />
       <Constraints label={preset.name} item={preset} onChange={save} />
       <button type="button" onClick={() => { if (confirm(`カメラプリセット「${preset.name}」を削除しますか？`)) change(shuffle => ({ ...shuffle, cameraPresets: removeById(shuffle.cameraPresets, preset.id) })); }}>カメラプリセット「{preset.name}」を削除</button>
@@ -194,7 +195,7 @@ function CameraEditor({ preset, change }: { preset: CameraPreset; change: Change
 export function CameraList({ shuffle, change }: { shuffle: ShuffleData; change: Change }) {
   const [name, setName] = useState('');
   return <details className="panel"><summary>カメラプリセット ({shuffle.cameraPresets.length})</summary><div className="stack">
-    <p className="hint">アングル・距離・視線などを連動して切り替える組合せです。カテゴリ単位で置き換え、同じカテゴリを二重に出力しません。</p>
+    <Hint label="カメラプリセット" summary="カメラ関連をまとめて切り替える組合せです">アングル・距離・視線などを連動して切り替える組合せです。カテゴリ単位で置き換え、同じカテゴリを二重に出力しません。</Hint>
     <form className="actions" aria-label="カメラプリセット作成" onSubmit={event => {
       event.preventDefault();
       if (name.trim() && change(current => ({ ...current, cameraPresets: [...current.cameraPresets, createCameraPreset(newId(), name.trim())] }))) setName('');
@@ -211,7 +212,7 @@ export function ShuffleTransfer({ shuffle, change, onError }: { shuffle: Shuffle
   if (incoming) { try { importShuffle(shuffle, incoming, mode); } catch (error) { problem = message(error); } }
   return <details className="panel"><summary>標準テンプレート・シャッフル設定の取込/書出し</summary><div className="stack">
     <button type="button" onClick={() => { if (change(current => addDefaultLibrary(current, newId))) setNotice('標準のテンプレート・候補プール・カメラプリセットを追加しました。'); }}>標準テンプレート・候補を追加</button>
-    <p className="hint">標準テンプレートは公式記法の例（source#hug など）に沿った汎用例です。モデルでの効果は未検証です。キャラクターは含みません。</p>
+    <Hint label="標準テンプレート" summary="汎用の例です（効果は未検証・キャラクターは含みません）">標準テンプレートは公式記法の例（source#hug など）に沿った汎用例です。モデルでの効果は未検証です。キャラクターは含みません。</Hint>
     <button type="button" onClick={() => { try { downloadText(exportShuffle(shuffle, now()), 'nai-shuffle-settings.json'); } catch (error) { onError(message(error)); } }}>シャッフル設定をエクスポート</button>
     <label>シャッフル設定をインポート<input type="file" accept=".json,application/json" onChange={event => {
       const file = event.target.files?.[0]; event.target.value = ''; setIncoming(null); setNotice('');

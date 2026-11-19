@@ -13,6 +13,7 @@ import type { SiteClient } from '../../platform/novelai/client';
 import type { FieldsInspection, FieldsPreview, SiteInspection, Target } from '../../platform/novelai/protocol';
 import { newId } from '../shared';
 import { AutoShuffleRun } from './auto-run';
+import { Hint } from '../InfoTip';
 
 const INTERVALS = [1, 3, 5, 10] as const;
 
@@ -156,8 +157,8 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
 
   return <section className="panel stack" aria-label="シャッフルのサイト反映">
     <h2>NovelAIへの反映</h2>
-    <p className="hint">Shuffle Nowだけではサイトを変更しません。Applyで変更前後を確認してから反映します。キャラクター欄の追加・削除、座標、生成ボタンは操作しません。</p>
-    <button type="button" disabled={busy || auto.armed} onClick={() => void perform(async () => {
+    <Hint label="シャッフルのサイト反映" summary="Applyで変更前後を確認してから反映します">Shuffle Nowだけではサイトを変更しません。Applyで変更前後を確認してから反映します。キャラクター欄の追加・削除、座標、生成ボタンは操作しません。</Hint>
+    <button type="button" className="small" disabled={busy || auto.armed} onClick={() => void perform(async () => {
       setPreview(null); setInspection(null);
       const result = await client.discover();
       if (!result.ok) { setSites([]); setIssue(result.reason); return; }
@@ -213,11 +214,11 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
       </div>)}
       {edited.length > 0 && <div role="alert" className="stack"><p>拡張が最後に書き込んだ後、NovelAI側で編集された（または前回の反映が完了しなかった）欄があります: {edited.map(change => fieldLabel(change.field)).join('、')}</p>
         <label className="inline"><input type="checkbox" checked={overwrite} onChange={event => setOverwrite(event.target.checked)} />サイト側の編集を上書きすることを確認しました</label></div>}
-      <div className="actions"><button type="button" disabled={busy || (edited.length > 0 && !overwrite)} onClick={() => void perform(() => confirmPreview(preview))}>{preview.kind === 'apply' ? '確認してApply' : '確認してRestore'}</button><button type="button" disabled={busy} onClick={() => setPreview(null)}>プレビューを破棄</button></div>
+      <div className="actions"><button type="button" className="primary" disabled={busy || (edited.length > 0 && !overwrite)} onClick={() => void perform(() => confirmPreview(preview))}>{preview.kind === 'apply' ? '確認してApply' : '確認してRestore'}</button><button type="button" disabled={busy} onClick={() => setPreview(null)}>プレビューを破棄</button></div>
     </div>}
     {session && hasRestoreText(session) && <RestoreText session={session} label="反映前の原文" summary={`反映前の原文（Restore用、タブ${session.target.tabId}、${Object.keys(session.baseline).length}欄）`} />}
     {others.length > 0 && <details><summary>他の対象・再読込前のページの反映前原文（コピー専用、{others.length}件）</summary><div className="stack">
-      <p className="hint">別のタブ・再読込前のドキュメント・別プロファイルで記録した原文です。取り違えを防ぐため、この画面からは反映しません。必要なら選択してコピーしてください。</p>
+      <Hint label="他の対象の反映前原文" summary="取り違えを防ぐため、ここからは反映しません（コピー専用）">別のタブ・再読込前のドキュメント・別プロファイルで記録した原文です。取り違えを防ぐため、この画面からは反映しません。必要なら選択してコピーしてください。</Hint>
       {others.map(item => <div className="stack" key={item.key}>
         <RestoreText session={item} label={`タブ${item.target.tabId}・${profileName(item.profileId)}・ページ${item.target.documentId.slice(0, 8)}`} open />
         <button type="button" onClick={() => { if (confirm('この反映前原文の記録を破棄しますか？パネル上の記録だけを消し、サイトは変更しません。')) setSessions(store => ({ ...store, sessions: store.sessions.filter(entry => entry.key !== item.key) })); }}>タブ{item.target.tabId}・ページ{item.target.documentId.slice(0, 8)}の記録を破棄</button>
@@ -226,7 +227,7 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
 
     <h3>生成回数に応じた自動シャッフル</h3>
     <ManualCount every={every} armed={auto.armed} manual={manual} setManual={setManual} onShuffle={onShuffle} setNotice={setNotice} custom={custom} setCustom={setCustom} onAutoEveryChange={onAutoEveryChange} />
-    <p className="hint">回数は成功した生成ジョブ数です。1回の生成で複数枚を出力しても1回と数えます。自動シャッフルは生成ボタンを押しません。開始時点で生成中・表示中のジョブは数えません。</p>
+    <Hint label="生成回数の数え方" summary="成功した生成ジョブの回数で切り替えます">回数は成功した生成ジョブ数です。1回の生成で複数枚を出力しても1回と数えます。自動シャッフルは生成ボタンを押しません。開始時点で生成中・表示中のジョブは数えません。実行中にシャッフル設定やベースプロンプトを変えると安全のため停止します。</Hint>
     <div className="actions">
       <button type="button" disabled={busy || auto.armed || !every || !target || !inspection?.generation.supported || !writable || !fieldsMode || !!composed.errors.length || !profile.settings.enabled} onClick={() => void perform(startAuto)}>自動シャッフルを開始</button>
       <button type="button" disabled={!auto.armed} onClick={() => stopAuto('自動シャッフルを停止しました。', false)}>自動シャッフルを停止</button>
@@ -240,7 +241,7 @@ function RestoreText({ session, label, summary, open }: { session: SiteSession; 
   const fields = Object.entries(session.baseline) as [FieldKey, string][];
   const body = <div className="stack">
     {fields.map(([field, text]) => <label key={field}>{label}: {fieldLabel(field)}（反映前）<textarea readOnly rows={2} value={text} /></label>)}
-    {!open && <p className="hint">パネルを閉じるまで保持します（DBには保存しません）。この対象タブ・ページ・プロファイル専用です。Undoはサイトを戻しません。</p>}
+    {!open && <Hint label="反映前の原文の保持" summary="パネルを閉じるまで保持します">パネルを閉じるまで保持します（DBには保存しません）。この対象タブ・ページ・プロファイル専用です。Undoはサイトを戻しません。</Hint>}
   </div>;
   return open ? body : <details><summary>{summary}</summary>{body}</details>;
 }

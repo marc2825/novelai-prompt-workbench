@@ -15,6 +15,7 @@ import { CameraList, CharacterList, PoolList, ShuffleTransfer, TemplateList } fr
 import { NumberCommit, TextCommit } from './shuffle/inputs';
 import { ShuffleSite, type AutoCheck } from './shuffle/ShuffleSite';
 import type { Workbench } from './useWorkbench';
+import { InfoTip } from './InfoTip';
 
 const TARGET_LABELS: Record<ShuffleTarget, string> = { role: '役割', pose: 'ポーズ', expression: '表情', camera: 'カメラ・視線', position: '位置・順序' };
 const MODE_LABELS = { random: 'Pure Random（完全ランダム）', bag: 'Shuffle Bag（使い切るまで重複なし）', weighted: 'Weighted Random（重み付き）' } as const;
@@ -97,17 +98,14 @@ export function Shuffle({ workbench, siteClient }: { workbench: Workbench; siteC
     </section>}
 
     <section className="panel stack" aria-label="シャッフル設定">
-      <h2>シャッフル</h2>
+      <div className="section-title"><h2>シャッフル</h2><InfoTip label="シャッフル">キャラクターの外見（固定プロンプト）は変えずに、役割・ポーズ・表情・カメラ・左右順だけを入れ替えます。Shuffle Nowで結果を確認し、各欄をコピーしてNovelAIに貼り付けます。プレビューとApplyまでNovelAIの入力欄は変更しません。</InfoTip></div>
       {autoRunning && <p role="status" aria-label="自動シャッフル実行中の注意" className="hint">⚠ 自動シャッフル実行中です。シャッフル設定・キャラクター・テンプレート・候補・ベースプロンプトを変更すると、安全のため自動で停止します。</p>}
-      <p className="hint">キャラクターの外見は固定したまま、役割・ポーズ・カメラ・順序だけを入れ替えます。プレビューとApplyまでNovelAIの入力欄は変更しません。</p>
-      <div className="actions">
-        <label>シャッフルプロファイル<select value={profile?.id ?? ''} disabled={autoRunning} onChange={event => change(current => ({ ...current, activeProfileId: event.target.value || null }))}><option value="" disabled>プロファイルを選択</option>{shuffle.profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <form className="actions" aria-label="シャッフルプロファイル作成" onSubmit={event => {
+      <label>シャッフルプロファイル<select value={profile?.id ?? ''} disabled={autoRunning} onChange={event => change(current => ({ ...current, activeProfileId: event.target.value || null }))}><option value="" disabled>プロファイルを選択</option>{shuffle.profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <form className="actions" aria-label="シャッフルプロファイル作成" onSubmit={event => {
           event.preventDefault();
           const created = createProfile(newId(), profileName.trim() || `プロファイル${shuffle.profiles.length + 1}`, newSeed());
           if (change(current => addProfile(current, { ...created, characterIds: current.characters.map(item => item.id).slice(0, 6) }))) setProfileName('');
         }}><label>新しいプロファイル名<input maxLength={200} value={profileName} onChange={event => setProfileName(event.target.value)} /></label><button type="submit">＋ プロファイル</button></form>
-      </div>
       {!profile ? <Empty>プロファイルを作成すると、シャッフル方式・Seed・対象キャラクターを設定できます。</Empty> : <>
         <Rename label="プロファイル名" value={profile.name} onSave={name => changeProfile(current => ({ ...current, name }))} />
         <label className="inline"><input type="checkbox" checked={profile.settings.enabled} onChange={event => setSettings({ enabled: event.target.checked })} />シャッフル有効</label>
@@ -131,7 +129,7 @@ export function Shuffle({ workbench, siteClient }: { workbench: Workbench; siteC
           <TextCommit label="左側キャラクターの補助テキスト" value={profile.settings.positionHints.left} maxLength={1000} onCommit={left => setSettings({ positionHints: { ...profile.settings.positionHints, left } })} />
           <TextCommit label="右側キャラクターの補助テキスト" value={profile.settings.positionHints.right} maxLength={1000} onCommit={right => setSettings({ positionHints: { ...profile.settings.positionHints, right } })} />
         </div>}
-        <button type="button" onClick={() => { if (confirm(`プロファイル「${profile.name}」と、その履歴を削除しますか？キャラクター・テンプレートは残ります。Undoで戻せます。`)) change(current => removeProfile(current, profile.id)); }}>プロファイルを削除</button>
+        <button type="button" className="small danger" onClick={() => { if (confirm(`プロファイル「${profile.name}」と、その履歴を削除しますか？キャラクター・テンプレートは残ります。Undoで戻せます。`)) change(current => removeProfile(current, profile.id)); }}>プロファイルを削除</button>
       </>}
     </section>
 
@@ -146,7 +144,7 @@ export function Shuffle({ workbench, siteClient }: { workbench: Workbench; siteC
       {base.warnings.length > 0 && <p className="hint">⚠ ワークスペースにコンパイル警告があります。ベースプロンプトを確認してください。</p>}
       <ul aria-label="現在のシャッフル内容">{describeSelection(shuffle, profile.current).map((line, index) => <li key={index}>{line}</li>)}</ul>
       <div className="actions">
-        <button type="button" disabled={!profile.settings.enabled || !!workbench.storageError || autoRunning} onClick={() => { if (shuffleNow('manual')) setNotice('シャッフルしました。NovelAIの入力欄はまだ変更していません。'); }}>Shuffle Now</button>
+        <button type="button" className="primary" disabled={!profile.settings.enabled || !!workbench.storageError || autoRunning} onClick={() => { if (shuffleNow('manual')) setNotice('シャッフルしました。NovelAIの入力欄はまだ変更していません。'); }}>Shuffle Now</button>
         <button type="button" disabled={!profile.current || autoRunning} onClick={() => change(current => clearCurrent(current, profile.id))}>シャッフルを解除（元の構成）</button>
       </div>
       {!profile.settings.enabled && <p className="hint">シャッフルは無効です。</p>}

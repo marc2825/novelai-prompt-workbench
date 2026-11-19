@@ -291,3 +291,30 @@ test('first-run guide, workflow tab order and keyboard tab navigation', async ({
   await page.getByRole('tab', { name: 'ライブラリ', exact: true }).click();
   await expect(page.getByRole('region', { name: 'はじめに', exact: true })).toHaveCount(0);
 });
+
+test('detail texts stay hidden until hover, focus or tap, and stay inside the narrow panel', async ({ page }) => {
+  await page.goto('/tests/fixtures/index.html'); await saved(page);
+  const help = page.getByRole('button', { name: '出力プレビューの説明', exact: true });
+  const tip = page.getByRole('tooltip').filter({ hasText: '現在のワークスペースから合成したプロンプト' });
+  await expect(tip).toBeHidden();
+  await help.hover();
+  await expect(tip).toBeVisible();
+  await expect(help).toHaveAttribute('aria-describedby', (await tip.getAttribute('id'))!);
+  const box = (await tip.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(400);
+  await page.keyboard.press('Escape');
+  await page.mouse.move(0, 0);
+  await expect(tip).toBeHidden();
+  // Keyboard: focus shows, Escape hides.
+  await help.focus();
+  await expect(tip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tip).toBeHidden();
+  // Touch-style tap pins it open until tapped again or clicked elsewhere.
+  await help.click();
+  await page.mouse.move(0, 0);
+  await expect(tip).toBeVisible();
+  await page.getByRole('heading', { name: 'NovelAI Prompt Workbench', exact: true }).click();
+  await expect(tip).toBeHidden();
+});

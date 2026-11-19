@@ -7,6 +7,7 @@ import { downloadText, newId, now } from './shared';
 import { message, type Workbench } from './useWorkbench';
 import { recoveryJson } from '../data/recovery';
 import { FullBackup } from './FullBackup';
+import { InfoTip } from './InfoTip';
 
 export function Settings({ workbench }: { workbench: Workbench }) {
   const data = workbench.data!;
@@ -21,9 +22,8 @@ export function Settings({ workbench }: { workbench: Workbench }) {
   }
   return <div className="stack">
     <FullBackup workbench={workbench} />
-    <section className="panel stack"><h2>JSONバックアップ（テキストのみ）</h2><p>ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・Experiment Lab・シャッフル設定・画像メタデータ・設定をローカルJSONに保存します。<strong>画像原本・サムネイルは含みません</strong>（画像も残す場合は上の完全バックアップを使用してください）。復元後の画像欠落は比較画面に表示し、同じPNGの再取込で修復できます。</p>
+    <section className="panel stack" aria-label="JSONバックアップ"><div className="section-title"><h2>JSONバックアップ（テキストのみ）</h2><InfoTip label="JSONバックアップ">ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・Experiment Lab・シャッフル設定・画像メタデータ・設定をJSONに保存します。画像原本・サムネイルは含みません（画像も残すなら完全バックアップを使用）。復元後に欠けた画像は比較画面に表示され、同じPNGを再取込すると修復できます。保存エラーのときも、この書出しで画面上の作業データを退避できます。</InfoTip></div><p className="hint">画像原本を含まない軽いバックアップです。</p>
       <button type="button" onClick={() => { try { downloadText(exportBackup(data, now()), 'nai-prompt-workbench.json'); } catch (error) { workbench.setError(message(error)); } }}>JSONをエクスポート</button>
-      <p className="hint">保存失敗時も、上のボタンで画面上の作業データを退避できます。</p>
       <label>JSONをインポート<input type="file" accept=".json,application/json" disabled={busy} onChange={event => {
         const file = event.target.files?.[0];
         event.target.value = '';
@@ -37,7 +37,7 @@ export function Settings({ workbench }: { workbench: Workbench }) {
         <p>取込候補: ライブラリ{document.payload.libraryEntries.length}件、カテゴリ{document.payload.categories.length}件、構成{document.payload.workspaces.length}件、プリセット{document.payload.presets.length}件、比較{document.payload.experiments.length}件、画像メタデータ{document.payload.images.length}件。書出日時: {document.exportedAt}</p>
         <ul>{document.payload.libraryEntries.slice(0, 5).map(entry => <li key={entry.id}>{entry.title} — {entry.raw.slice(0, 120)}</li>)}</ul>
         <label>取込方法<select value={mode} onChange={event => setMode(event.target.value as 'merge' | 'replace')}><option value="merge">追加（ID衝突はエラー）</option><option value="replace">全置換（現在のデータをバックアップ）</option></select></label>
-        <p className="hint">追加時は現在の設定を優先し、全置換時はファイルの設定を復元します。追加・置換とも直前データをDBに1世代保持します。</p>
+        <p className="hint">追加は現在の設定を優先、全置換はファイルの設定を復元します。どちらも直前のデータを1世代保持します。</p>
         {importError && <p role="alert">{importError}</p>}
         <div className="actions"><button type="button" disabled={busy || !!importError} onClick={() => {
           try {
@@ -47,7 +47,7 @@ export function Settings({ workbench }: { workbench: Workbench }) {
           } catch (error) { workbench.setError(`${message(error)}。元データは変更していません`); }
         }}>確認してインポート</button><button type="button" onClick={() => setDocument(null)}>取込キャンセル</button></div>
       </div>}
-      <button type="button" disabled={busy} onClick={() => {
+      <div className="actions"><button type="button" className="small" disabled={busy} onClick={() => {
         void workbench.repository.current?.previousImport().then(previous => {
           if (!previous) { setNotice('取込前バックアップはまだありません。'); return; }
           try {
@@ -60,20 +60,20 @@ export function Settings({ workbench }: { workbench: Workbench }) {
           }
         }).catch(error => workbench.setError(message(error)));
       }}>取込前バックアップを保存</button>
-      <button type="button" disabled={busy} onClick={() => {
+      <button type="button" className="small" disabled={busy} onClick={() => {
         void workbench.repository.current?.migrationBackup().then(backup => {
           if (!backup) { setNotice('移行前バックアップはありません。新規作成したDBには不要です。'); return; }
           const data = validateData((backup as { data?: unknown }).data);
           downloadText(exportBackup(data, now()), 'nai-before-migration.json');
           setNotice('移行前の資産をJSONで保存しました。現在の形式でインポートできます。');
         }).catch(error => workbench.setError(message(error)));
-      }}>移行前バックアップを保存</button>
+      }}>移行前バックアップを保存</button></div>
       {notice && <p role="status">{notice}</p>}
     </section>
-    <section className="panel stack"><h2>デモデータ</h2><p>起動時にはサンプルを挿入しません。このボタンを押したときだけ、新しいIDでサンプルを追加します。</p><button type="button" disabled={busy} onClick={() => {
+    <section className="panel stack" aria-label="デモデータ"><div className="section-title"><h2>デモデータ</h2><InfoTip label="デモデータ">起動時にはサンプルを入れません。このボタンを押したときだけ、新しいIDでサンプルのライブラリと構成を追加します（既存のデータは変更しません）。</InfoTip></div><button type="button" disabled={busy} onClick={() => {
       const demo = createDemo(newId, now());
       workbench.commit(previous => ({ ...previous, libraryEntries: [...previous.libraryEntries, ...demo.libraryEntries], categories: [...previous.categories, ...demo.categories], workspaces: [...previous.workspaces, ...demo.workspaces], settings: { ...previous.settings, activeWorkspaceId: demo.settings.activeWorkspaceId } }));
     }}>デモを追加</button></section>
-    <section className="panel stack"><h2>保存とプライバシー</h2><p>schemaVersion 3 / IndexedDB。データはこのChromeプロファイル内だけに保存され、同期・外部送信・解析送信はありません。拡張機能を削除するとデータも削除されるため、定期的に完全バックアップを保存してください。</p><p>実NovelAIへの書込みは未検証のため無効です（読取りとコピーのみ）。NovelAI固有のPNGメタデータ解析は未対応です。</p></section>
+    <section className="panel stack" aria-label="保存とプライバシー"><div className="section-title"><h2>保存とプライバシー</h2><InfoTip label="保存とプライバシー">データはIndexedDB（schemaVersion 3）に保存され、同期・外部送信・解析送信はありません。実NovelAIへの書込みは未検証のため無効（読取りとコピーのみ）、NovelAI固有のPNGメタデータ解析は未対応です。</InfoTip></div><p className="hint">データはこのChromeプロファイルだけに保存されます。拡張機能を削除すると消えるため、完全バックアップを保存してください。</p></section>
   </div>;
 }
