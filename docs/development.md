@@ -15,7 +15,7 @@ corepack pnpm typecheck   # tsc --noEmit（strict）
 corepack pnpm build       # WXT → .output/chrome-mv3
 corepack pnpm test:e2e    # Playwright（tests/e2e）。buildの成果物を読むため必ずbuild後に実行
 corepack pnpm zip         # 配布用ZIP → .output/novelai-prompt-workbench-<version>-chrome.zip
-corepack pnpm fixture     # ローカルfixtureサーバ http://127.0.0.1:4173
+corepack pnpm fixture     # 手動確認用のVite開発サーバ http://127.0.0.1:4173
 ```
 
 完了前に `test` → `typecheck` → `build` → `test:e2e` の4つを実行し、件数を報告します（CIも同じ順序）。
@@ -25,7 +25,9 @@ corepack pnpm fixture     # ローカルfixtureサーバ http://127.0.0.1:4173
 - `http://127.0.0.1:4173/tests/fixtures/index.html` — サイトなしのUI（コピー・手動記録の経路）
 - `http://127.0.0.1:4173/tests/fixtures/site.html` — React制御の模擬サイト2タブ（101/202）＋UI。`TextareaAdapter` と合成プロファイルで書込み・キャラクター欄・生成状態を再現します。**実NovelAIの検証ではありません。**
 
-fixtureはViteの開発ビルドで動くため、検証済みデータの深い凍結（誤って書き換えると例外）が有効です。製品ビルドでは無効です。
+E2Eは `node scripts/serve-fixture.mjs` でfixtureを一度ビルドし（`.output/e2e-fixture`）、静的ファイルとして配信します（Playwrightの `webServer`。corepack・pnpmは不要）。Vite開発サーバは1ページで数百のモジュールを配信するため、低リソース環境では再読込を含むテストが `ERR_INSUFFICIENT_RESOURCES` / EMFILE で失敗することがありました（issue #4）。ビルド配信は1ページ数ファイルです（E2Eは1ワーカーで順に実行）。
+
+fixtureはReactの開発ビルド（`NODE_ENV=development`）で作るため、StrictModeの検査と、検証済みデータの深い凍結（誤って書き換えると例外）が有効です。製品ビルドでは無効です。`corepack pnpm fixture`（開発サーバ）が4173番で動いている場合、E2Eはそれを再利用します。
 
 ### E2Eの種類
 

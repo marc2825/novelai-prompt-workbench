@@ -98,7 +98,7 @@ test('quota failure keeps original DB atomic, reports unsaved state and allows r
 
 test('Chromium upgrades v2 with preserved presets and backed-up records', async ({ page }) => {
   page.on('dialog', dialog => void dialog.accept()); let data = fixture(); data = savePreset(data, data.workspaces[0]!.id, 'aaaaaaaa-aaaa-4aaa-8aaa-000000000099', 'v2プリセット', timestamp);
-  await page.goto('/tests/fixtures/blank.html'); await page.evaluate(async data => { const path = '/tests/fixtures/legacy-db.ts'; const { seedV2Database } = await import(path); (await seedV2Database(indexedDB, 'nai-prompt-workbench', data)).close(); }, data);
+  await page.goto('/tests/fixtures/blank.html'); await page.evaluate(async data => { const path = '/tests/fixtures/legacy-db.js'; const { seedV2Database } = await import(path).catch(() => import(path.replace(/\.js$/, '.ts'))); (await seedV2Database(indexedDB, 'nai-prompt-workbench', data)).close(); }, data);
   await page.goto('/tests/fixtures/index.html'); await saved(page); await tab(page, '比較'); await page.getByRole('combobox', { name: '比較元', exact: true }).selectOption({ label: 'v2プリセット' }); await create(page); await expect(field(page, 'A positive')).toHaveValue(await field(page, '出力 Positive').inputValue());
   await tab(page, '設定'); const event = page.waitForEvent('download'); await button(page, '移行前バックアップを保存').click(); const path = await (await event).path(); const backup = JSON.parse(await readFile(path!, 'utf8')); expect(backup.payload).toEqual(data);
 });

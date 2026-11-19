@@ -173,7 +173,7 @@ test('Chromium migrates a real v1 IndexedDB preserving comments, order and migra
   const output = compileWorkspace(data.workspaces[0]!);
   await page.goto('/tests/fixtures/blank.html');
   await page.evaluate(async data => {
-    const path = '/tests/fixtures/legacy-db.ts'; const { seedLegacyDatabase } = await import(path);
+    const path = '/tests/fixtures/legacy-db.js'; const { seedLegacyDatabase } = await import(path).catch(() => import(path.replace(/\.js$/, '.ts')));
     const database = await seedLegacyDatabase(indexedDB, 'nai-prompt-workbench', data); database.close();
   }, data);
   await page.goto('/tests/fixtures/index.html'); await saved(page);
@@ -195,7 +195,7 @@ test('a corrupt legacy database remains v1 and can be downloaded without automat
   const data = fixture(); Object.assign(data.libraryEntries[0]!, { raw: 42 });
   await page.goto('/tests/fixtures/blank.html');
   await page.evaluate(async data => {
-    const path = '/tests/fixtures/legacy-db.ts'; const { seedLegacyDatabase } = await import(path);
+    const path = '/tests/fixtures/legacy-db.js'; const { seedLegacyDatabase } = await import(path).catch(() => import(path.replace(/\.js$/, '.ts')));
     const cyclic: Record<string, unknown> = {}; cyclic.self = cyclic; data.future = cyclic;
     const database = await seedLegacyDatabase(indexedDB, 'nai-prompt-workbench', data); database.close();
   }, data);
