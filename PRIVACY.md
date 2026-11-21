@@ -1,6 +1,6 @@
 # プライバシーポリシー
 
-対象: Chrome拡張機能「NovelAI Prompt Workbench (unofficial)」（このリポジトリのソースコードからビルドしたもの）
+対象: Chrome拡張機能「NovelAI Prompt Workbench (unofficial)」（GitHub Releasesで配布するZIPと、このリポジトリのソースコードからビルドしたもの）
 最終更新: 2026-11-21
 
 この拡張機能は、NovelAI（Anlatan Inc.）とは提携していない非公式のツールです。NovelAIのサービスの利用には、NovelAIの利用規約・プライバシーポリシーが適用されます。この方針や拡張機能の機能とNovelAIの利用規約が食い違う場合は、NovelAIの利用規約が優先されます。
