@@ -12,7 +12,8 @@ export default defineConfig({
     // The toolbar button opens the side panel via the minimal background worker
     // (sidePanel.setPanelBehavior). No popup: a popup closes when the page is clicked.
     // Data lives in IndexedDB, so no storage/host/tabs permissions are needed.
-    action: { default_title: 'Prompt Workbench を開く' },
+    // manifest.icons is discovered from public/icon/<size>.png (rendered by scripts/render-icons.mjs).
+    action: { default_title: 'Prompt Workbench を開く', default_icon: { 16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png' } },
   },
   hooks: {
     // Ship the project's own MIT license with the build; third-party notices come from public/.

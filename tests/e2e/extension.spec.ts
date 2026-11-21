@@ -24,8 +24,9 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
   // Only the extension itself plus its license notices are shipped: no source maps, tests or fixtures.
   const { readdir } = await import('node:fs/promises');
   const shipped = (await readdir(extensionPath, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(extensionPath.length + 1).replaceAll('\\', '/'));
-  for (const file of shipped) expect(file).toMatch(/^(manifest\.json|sidepanel\.html|background\.js|LICENSE\.txt|THIRD_PARTY_NOTICES\.txt|chunks\/[\w-]+\.js|content-scripts\/novelai\.js|assets\/[\w-]+\.css)$/);
-  expect(shipped).toEqual(expect.arrayContaining(['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt']));
+  for (const file of shipped) expect(file).toMatch(/^(manifest\.json|sidepanel\.html|background\.js|LICENSE\.txt|THIRD_PARTY_NOTICES\.txt|icon\/(16|32|48|128)\.png|chunks\/[\w-]+\.js|content-scripts\/novelai\.js|assets\/[\w-]+\.css)$/);
+  expect(shipped).toEqual(expect.arrayContaining(['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt', 'icon/16.png', 'icon/32.png', 'icon/48.png', 'icon/128.png']));
+  expect((manifest as unknown as { icons: Record<string, string> }).icons).toEqual({ 16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png' });
   expect([...manifest.content_scripts[0]!.matches].sort()).toEqual(['https://novelai.net/image', 'https://novelai.net/image?*', 'https://novelai.net/image/*'].sort());
 
   // Chromium derives an unpacked extension ID from its normalized absolute path.
