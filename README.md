@@ -10,7 +10,7 @@ NovelAIの画像生成プロンプトを、**原文を残したまま部品と�
 - **この拡張機能の機能・説明・ドキュメントとNovelAIの利用規約が食い違う場合は、常にNovelAIの利用規約が優先されます。** 規約に反するおそれのある使い方はしないでください。
 - NovelAIが規約の改定や告知でこの種のツールの利用を制限・禁止した場合は、それに従い、必要に応じて利用を中止してください。開発者もそれに合わせて機能を無効化・削除します。
 - 開発者はNovelAIの規約への適合を保証しません。利用は自己責任でお願いします（[MITライセンス](LICENSE)の無保証条項も参照）。
-- 2026-11-18時点の規約はブラウザ拡張機能について言及していません。この拡張機能はNovelAIへのリクエスト送信・生成の自動化・ログイン情報へのアクセスを行わない設計です（確認内容: [docs/security.md](docs/security.md#novelai利用規約との関係2026-11-18確認)）。
+- 2026-11-21に確認した規約（2025-12-08施行）は、ブラウザ拡張機能について言及していません（許可も禁止もしていません）。この拡張機能はNovelAIへのリクエスト送信・生成の自動化・ログイン情報へのアクセスを行わない設計です（確認内容: [docs/security.md](docs/security.md#novelai利用規約との関係)）。
 
 ## できること
 
@@ -29,14 +29,18 @@ NovelAIの画像生成プロンプトを、**原文を残したまま部品と�
 - 生成ボタンの操作、自動・連続生成、NovelAIのAPI呼出し、ログイン情報の取得は行いません。
 - シャッフルの「生成完了の自動検知」「キャラクター欄への自動反映」はNovelAI上では使えません（手動で「生成完了を記録（+1）」とコピーを使います）。
 - NovelAIが保存したPNG固有の生成情報（Prompt・Seed等）の自動解析は未対応です（標準テキストの表示と手入力に対応）。
-- NovelAIのページからの読取りは、表示言語が**英語・日本語**の場合に確認済みです。それ以外の言語や、装飾・マクロを含むプロンプトは読み取らず（推測しないため）、コピーを案内します。
+- NovelAIのページからの読取りに対応する表示言語は**英語・日本語**です（英語は未ログインの公開ページで確認。日本語はログイン後の実ページで観測された構造を模擬ページで再現して検証しており、修正後の実ページでの再確認は未実施）。それ以外の言語や、装飾・マクロを含むプロンプトは読み取らず（推測しないため）、コピーを案内します。
 - 対応ブラウザはデスクトップ版Chrome（Chromium系）です。PNG以外の画像形式は未対応です。
 
-## インストール（開発版）
+## インストール
 
-ストア公開前のため、ソースからビルドして読み込みます（Node.js 22.12以上が必要）。
+現在は Chrome Web Store・GitHub Releases では配布していません。ソースコードからビルドして、Chromeに読み込みます。
+
+必要なもの: [Git](https://git-scm.com/)、[Node.js](https://nodejs.org/) 22.12以上、pnpm 10（Node.js 24以前は付属の Corepack で使えます。Node.js 25以降は `npm install -g pnpm@10` でインストールし、以下の `corepack pnpm` を `pnpm` に読み替えてください）。
 
 ```bash
+git clone https://github.com/marc2825/novelai-prompt-workbench.git
+cd novelai-prompt-workbench
 corepack pnpm install --frozen-lockfile
 corepack pnpm build
 ```
@@ -45,7 +49,7 @@ corepack pnpm build
 2. 「パッケージ化されていない拡張機能を読み込む」で `.output/chrome-mv3` フォルダを選びます。
 3. ツールバーの拡張機能メニュー（パズルのアイコン）で **NovelAI Prompt Workbench (unofficial)** を押すと、サイドパネルが開きます。ピン留めしておくと次からボタン1つで開けます。
 
-更新したときは、`chrome://extensions` で再読み込みし、開いているNovelAIのページも再読み込みしてください。
+更新するときは `git pull` → `corepack pnpm install --frozen-lockfile` → `corepack pnpm build` の後、`chrome://extensions` で再読み込みし、開いているNovelAIのページも再読み込みしてください。データは拡張機能を削除しない限り残りますが、更新の前に完全バックアップを保存しておくと安心です。
 
 ## 基本の使い方
 
@@ -76,7 +80,7 @@ corepack pnpm build
 
 ## プライバシーと安全性
 
-- 外部への送信、解析、同期は一切ありません。権限は `sidePanel` のみで、NovelAIの画像生成ページ（`https://novelai.net/image`）にだけ読取り用のスクリプトを読み込みます。
+- 外部への送信、解析、同期は一切ありません（ソースコードに通信処理はありません）。権限は `sidePanel` のみで、NovelAIの画像生成ページ（`https://novelai.net/image`）にだけ読取り用のスクリプトを読み込みます。
 - Cookie・ログイン情報・閲覧履歴にはアクセスしません。
 - 取り込むファイル（JSON・ZIP・PNG）は上限と形式を検証し、不正なものは取り込みません。
 
@@ -94,7 +98,12 @@ corepack pnpm build
 
 - 開発環境・テスト・ビルド: [docs/development.md](docs/development.md)
 - 設計: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、データ形式: [docs/DATA_MODEL.md](docs/DATA_MODEL.md)、判断の記録: [docs/DECISIONS.md](docs/DECISIONS.md)
-- 現在の状態と今後の作業: [tasks/STATUS.md](tasks/STATUS.md)、公開前チェック: [docs/release-checklist.md](docs/release-checklist.md)
+- コントリビュート: [CONTRIBUTING.md](CONTRIBUTING.md)、変更履歴: [CHANGELOG.md](CHANGELOG.md)
+- 現在の状態と今後の作業: [tasks/STATUS.md](tasks/STATUS.md)、配布前のチェック: [docs/release-checklist.md](docs/release-checklist.md)
 - コーディングエージェント向けの規約: [AGENTS.md](AGENTS.md)
 
-ライセンス: [MIT](LICENSE)。NovelAIの名称は識別のためだけに使用しており、NovelAI（Anlatan）の承認・提携を意味しません。
+## ライセンス
+
+[MIT License](LICENSE)。配布物に同梱するサードパーティのライセンス表示は [public/THIRD_PARTY_NOTICES.txt](public/THIRD_PARTY_NOTICES.txt) にあります。
+
+NovelAIの名称は対応サービスを示すためだけに使用しており、NovelAI（Anlatan Inc.）による承認・提携・保証を意味しません。NovelAIのロゴや画像は使用していません。

@@ -10,9 +10,9 @@
 - **認証情報に触れない**: Cookie・トークン・セッション・認証情報を読取り・記録・保存しません。
 - **未検証のサイト構造に書き込まない**: 製品の `LiveReadOnlyAdapter` は読取り専用です。推測したセレクタを追加しません（[DOM_ADAPTER_CHECKLIST.md](DOM_ADAPTER_CHECKLIST.md)）。
 
-## NovelAI利用規約との関係（2026-11-18確認）
+## NovelAI利用規約との関係
 
-確認した文書: NovelAI Terms of Service（https://novelai.net/terms 、"Effective: December 8th, 2025"）。法的助言ではなく、条文の読み取りです。
+確認した文書: NovelAI Terms of Service（https://novelai.net/terms 、"Effective: December 8th, 2025"）。2026-11-18に確認し、2026-11-21に再確認（施行日・下記の条項番号とも変更なし、拡張機能への言及なし）。法的助言ではなく、条文の読み取りです。
 
 **結論: 規約はブラウザ拡張機能・ユーザースクリプト・非公式ツールを明示的に許可も禁止もしていません（言及なし）。** 公式に認められた拡張機能ではありません。関係しうる条項と、この拡張の対応は次のとおりです。
 
@@ -69,10 +69,15 @@ JSON・完全バックアップZIP・PNG・Lab JSONは**信頼できない入力
 - 保存は1トランザクションで全ストアを更新し、revisionで複数パネルの競合を検出します（競合時は書き込まず保存エラー表示）。別パネル/タブの保存はローカルの `BroadcastChannel` で通知し、明示操作で読み込めます。
 - 破損DBを自動初期化しません。移行（v1/v2→v3）は元データのバックアップ保存成功後に行う原子的なupgradeです。
 
-## 依存関係
+## 依存関係・配布物・CI
 
-- 実行時依存は React / React DOM のみ。lockfileを `--frozen-lockfile` でCI検証します。
-- `pnpm audit`（2026-11-18）: 実行時依存に既知の脆弱性なし。開発用ビルドツール（vite・wxt経由）の `picomatch` にReDoS（GHSA-fc5q-39xc-vjpf、修正版未公開）。開発者が書いたglobにだけ適用され、配布物には含まれないため、修正版の公開を待って更新します。
+- 実行時依存は React / React DOM（MIT、間接的に scheduler）のみ。lockfileを `--frozen-lockfile` でCI検証します。
+- `pnpm audit`（2026-11-21）: 実行時・開発時とも既知の脆弱性 0件。以前（2026-11-18）報告されていた開発用ツールの `picomatch`（GHSA-fc5q-39xc-vjpf、配布物外）は現在報告されていません。
+- インストール済みの全155パッケージのライセンスは MIT / BSD / ISC / Apache-2.0 / MPL-2.0（MPL-2.0はビルドツールのみで配布物に含まれない）。
+- 配布物（`.output/chrome-mv3` と `pnpm zip` のZIP）には、拡張機能のコードと `LICENSE.txt`、同梱したサードパーティのライセンス表示 `THIRD_PARTY_NOTICES.txt`（React・React DOM・scheduler・Viteのpreload helper・WXTの実行時コード）だけを含めます。source map・テスト・fixtureは含みません（`extension.spec.ts` がファイル一覧を検証、`tests/unit/release.test.ts` がライセンス表示の欠落を検出）。
+- バンドル内の `fetch` はViteのmodule preload helper（拡張機能自身のchunkの先読み）だけで、外部URLへの通信はありません。
+- GitHub Actions: ワークフローのトークンは `contents: read` のみ、checkoutは認証情報を保存しない（`persist-credentials: false`）、Actionはコミットのフルハッシュで固定し、Dependabotで更新します。シークレットは使いません。
+- 秘密情報の検査: Gitleaks 8.30.1 で全コミット・作業ツリーを検査し検出なし（2026-11-21）。
 
 ## 確認済み・未確認
 

@@ -3,7 +3,7 @@
 ## 必要なもの
 
 - Node.js 22.12以上（開発時の実測は24.21.0、CIはNode 22）
-- pnpm 10.34.5（`corepack pnpm` で固定版を使用）
+- pnpm 10.34.5（`corepack pnpm` で固定版を使用。Node.js 25以降はCorepackが同梱されないため `npm install -g pnpm@10.34.5` で入れ、`corepack pnpm` を `pnpm` に読み替え）
 - E2E: Playwright 1.64.1 の Chromium
 
 ## コマンド
@@ -65,6 +65,8 @@ src/
 tests/unit/           Vitest（perf/ は性能計測用データ）
 tests/e2e/            Playwright
 tests/fixtures/       fixtureページ・合成PNG・旧DB
+scripts/              E2E用fixtureのビルド・配信（serve-fixture.mjs）
+public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.txt）
 ```
 
 詳細な設計は [ARCHITECTURE.md](ARCHITECTURE.md)、データ形式は [DATA_MODEL.md](DATA_MODEL.md) と [backup.md](backup.md)、安全方針は [security.md](security.md)。
@@ -83,9 +85,21 @@ tests/fixtures/       fixtureページ・合成PNG・旧DB
 
 最適化前は1編集あたり検証が2回（コミット時と保存時）、保存時に全ストアの読込みがあり、2,000件で約74 ms（検証25 ms＋保存49 ms）でした。
 
+## テストの出力
+
+スクリーンショットやダウンロードを保存するE2Eは、Playwrightのテストごとの出力先（`test-results/`、git管理外）に書き込みます。OSの一時ディレクトリのパスを直接書かないでください（Windowsで動かないため）。
+
+## CI
+
+`.github/workflows/ci.yml` が push・pull request で4つのチェックを実行します。トークンは `contents: read`、Actionはコミットのフルハッシュで固定（コメントにタグ）し、`.github/dependabot.yml` が月1回まとめて更新PRを作ります。npm依存はセキュリティ更新のPRだけ（リポジトリ設定の Dependabot security updates が有効な場合）。
+
+## ライセンス表示
+
+配布物には `LICENSE.txt`（`wxt.config.ts` の `build:publicAssets` でルートの `LICENSE` をコピー）と `public/THIRD_PARTY_NOTICES.txt`（バンドルされる React・React DOM・scheduler・Viteのpreload helper・WXTの実行時コードのライセンス表示）を同梱します。実行時の依存を追加・更新したら `THIRD_PARTY_NOTICES.txt` を更新してください（`tests/unit/release.test.ts` が依存の一覧とライセンス本文・バージョンの不一致を検出します）。
+
 ## リリース
 
-1. `src/version.ts` と `package.json` の `version` を同時に更新（テストで一致を確認）。
+1. `src/version.ts` と `package.json` の `version` を同時に更新（テストで一致を確認）。`CHANGELOG.md` の Unreleased を版番号にする。
 2. 4つのチェック → `corepack pnpm zip`。
-3. ZIPの中身が `manifest.json`・`background.js`・`sidepanel.html`・`assets/`・`chunks/`・`content-scripts/` だけであることを確認（fixture・テスト・source mapを含まない）。
+3. ZIPの中身が `manifest.json`・`background.js`・`sidepanel.html`・`assets/`・`chunks/`・`content-scripts/`・`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt` だけであることを確認（fixture・テスト・source mapを含まない。`extension.spec.ts` も検証）。
 4. 手動確認項目は [release-checklist.md](release-checklist.md)。

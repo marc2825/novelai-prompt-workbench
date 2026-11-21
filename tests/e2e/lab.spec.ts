@@ -16,7 +16,7 @@ test('Phase 1: weight, interaction, seed XYZ, Medium validation, bilingual UI an
  await combo(page,'Z Type').selectOption('seed');await field(page,'Z Values').fill('1001,1002,1003');await expect(page.getByText(/予定生成枚数: 75 \/ 512/)).toBeVisible();
  await create(page);const plot=page.getByRole('region',{name:'X/Y/Z Plot',exact:true});await expect(plot.locator('.lab-cell')).toHaveCount(25);
  await expect(combo(page,'共通Seed')).toBeDisabled();await combo(page,'Z').selectOption('1');await expect(plot.locator('.lab-cell').first()).toContainText('1002');await expect(page.getByRole('button',{name:'Controlled Batch',exact:true})).toBeDisabled();
- await page.screenshot({path:'/tmp/nai-lab-xyz.png',fullPage:true});
+ await page.screenshot({path:test.info().outputPath('nai-lab-xyz.png'),fullPage:true});
  await button(page,'新しい実験').click();await combo(page,'Effort').selectOption('medium');await expect(page.getByRole('spinbutton',{name:'steps',exact:true})).toHaveValue('14');await expect(field(page,'Undesired Content')).toBeDisabled();
  await combo(page,'Language').selectOption('en');await expect(page.getByRole('textbox',{name:'Experiment name',exact:true})).toBeVisible();
  page.removeAllListeners('dialog');page.on('dialog',d=>void d.dismiss());await page.getByRole('tab',{name:'ライブラリ',exact:true}).click();await expect(page.getByRole('tab',{name:'Experiment Lab',exact:true})).toHaveAttribute('aria-selected','true');
@@ -30,7 +30,7 @@ test('Phases 2/3: manual progress, pinned PNG association, ratings, viewer, expo
  await combo(page,'比較条件 A').selectOption(ids[0]!);await combo(page,'比較条件 B').selectOption(ids[1]!);await combo(page,'表示モード').selectOption('wipe');await page.getByRole('slider',{name:'重ね合わせ位置',exact:true}).fill('35');await expect(page.getByRole('img',{name:'比較画像B',exact:true})).toBeVisible();await combo(page,'表示モード').selectOption('diff');await expect(page.getByRole('img',{name:'A/Bピクセル差分',exact:true})).toBeVisible();
  const json=JSON.parse(await readFile((await download(page,'JSON'))!,'utf8'));expect(json.payload.lab.experiments[0].conditions[0].rating).toBe(5);expect(json.payload.images).toHaveLength(2);
  const csv=await readFile((await download(page,'CSV'))!,'utf8');expect(csv).toContain('strong blush');expect(csv).toContain('factors_json');
- const zipEvent=page.waitForEvent('download');await button(page,'ZIP (PNG + JSON + CSV)').click();await (await zipEvent).saveAs('/tmp/nai-lab-export.zip');
+ const zipEvent=page.waitForEvent('download');await button(page,'ZIP (PNG + JSON + CSV)').click();await (await zipEvent).saveAs(test.info().outputPath('nai-lab-export.zip'));
  const grid=await readFile((await download(page,'このZ・Seed・反復のグリッドPNGを保存'))!);expect([...grid.subarray(0,8)]).toEqual([137,80,78,71,13,10,26,10]);
  await button(page,'一時停止').click();await expect(button(page,'次の未実行条件を選択')).toBeDisabled();await saved(page);await page.reload();await saved(page);await page.getByRole('tab',{name:'Experiment Lab',exact:true}).click();await expect(page.getByRole('region',{name:'Execution',exact:true})).toContainText('paused');await expect(page.getByRole('img',{name:'選択条件の画像',exact:true})).toBeVisible();await button(page,'再開').click();await button(page,'実験を複製').click();await saved(page);await expect(page.getByRole('region',{name:'Execution',exact:true})).toContainText('completed: 0');await button(page,'実験を削除').click();await saved(page);await button(page,'元に戻す').click();await saved(page);await expect(combo(page,'保存済み実験').locator('option')).toHaveCount(3);
 });

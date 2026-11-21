@@ -1,5 +1,33 @@
 # 実装ステータス
 
+## 監査・品質改善（2026-11-18）
+
+1. **シャッフルのサイト状態の分離**: 反映前原文・最後の書込み・状態不明の欄を（タブ, ドキュメント, プロファイル）単位に分離。タブAの原文がタブBのRestoreに使われ得た不具合を修正。
+2. **自動シャッフルの安全停止**: 開始時に設定全体を固定し、変更・外部のカーソル変更・保存エラーで停止。停止後に新しい書込みを始めない。送信済みの書込みは記録。
+3. **生成ジョブカウント**: 開始時に生成中だったジョブを数えていた不具合を修正。
+4. **handler**: 書込み開始後の失敗を常に `WRITE_FAILED` に。広いタブ（`sidepanel.html#lab`）からの読取りが拒否されていた不具合を修正。
+5. **完全バックアップ/復元**: ZIP（manifest・data.json・画像原本・サムネイル）、検証→プレビュー→1トランザクションで復元、Undo可能。
+6. **UX**: ツールバーボタンでサイドパネル（popup廃止、最小のbackground）、別画面の保存通知、タブ順の整理・キーボード操作、初回ガイド、「広いタブで開く」。
+7. **性能**: 保存時の全ストア読込みと二重検証をなくした（2,000件で1編集 約74ms→約33ms、fake-indexeddb上）。
+8. **文書**: READMEを利用者向けに再構成。development / security / backup / release-checklist / SECURITY / PRIVACY を追加（PRIVACYは2026-11-21に正式版へ更新）。codex・完了済みタスク・旧ログをアーカイブ。
+
+### 検証結果（2026-11-18）
+
+環境: Linux（WSL2）、Node 24.21.0、pnpm 10.34.5、Playwright 1.64.1 Chromium。E2Eは共有ライブラリ（libnspr4/libnss3/libasound2t64）を作業用ディレクトリに展開して実行（OSへのインストールなし）。
+
+| コマンド | 作業開始時 | 作業後 |
+|---|---|---|
+| `corepack pnpm install --frozen-lockfile` | PASS（lockfile変更なし） | PASS（lockfile・依存の変更なし） |
+| `corepack pnpm test` | 333 PASS / 0 FAIL（18ファイル） | 418 PASS / 0 FAIL（23ファイル） |
+| `corepack pnpm typecheck` | PASS | PASS |
+| `corepack pnpm build` | PASS | PASS（permissions は `sidePanel` のみ、background追加） |
+| `corepack pnpm test:e2e` | 53 PASS / 0 FAIL | 62 PASS / 0 FAIL |
+
+E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` を模擬HTMLに差し替えた実content script）。**実NovelAIでの確認は実施していない。**
+
+
+---
+
 ## Experiment Lab（2026-11-16）
 
 | Phase | 状態 | 実装・制約 |
@@ -13,7 +41,7 @@
 
 | コマンド | 結果 |
 |---|---|
-| `corepack pnpm install --frozen-lockfile --store-dir /tmp/nai-pnpm-store` | PASS、依存・lockfile変更なし |
+| `corepack pnpm install --frozen-lockfile --store-dir <scratch>` | PASS、依存・lockfile変更なし |
 | `corepack pnpm test` | **333 PASS / 0 FAIL、18ファイル**（既存283 + Lab50） |
 | `corepack pnpm typecheck` | PASS |
 | `corepack pnpm build` | PASS、sidePanelのみ、entrypoint追加なし |
@@ -21,9 +49,9 @@
 
 5/25/75条件、CSV/range、正負の重み・完全ラッパー・出現番号、Matrix因子、Seed桁保持、Medium制約、不正snapshot/壊れたDBの保持、quota rollback、PNGのID紐付け・欠落修復、評価、出力、再起動、手動反映と競合/原文復元を検証。ZIPはPython標準zipfileでもCRC・JSON・CSV・原本PNG2枚を検証済み。400pxの画面もスクリーンショットで確認。
 
-再開後の環境でテスト用共有ライブラリが消えていたため、一度Lab E2E 4件がChromium起動前に失敗。libnspr4/libnss3/libasound2t64をapt-get downloadで `/tmp/nai-lab-libs` に取得・展開し、LD_LIBRARY_PATHを指定して全53件が成功。OSへのインストールはしていない。
+再開後の環境でテスト用共有ライブラリが消えていたため、一度Lab E2E 4件がChromium起動前に失敗。libnspr4/libnss3/libasound2t64をapt-get downloadで `<scratch>` に取得・展開し、LD_LIBRARY_PATHを指定して全53件が成功。OSへのインストールはしていない。
 
-実サイトの有料生成・ログイン後DOMの手動検証は未実施。設定の自動取得/反映/復元、キャラクター別欄、PNG自動捕捉、公式固有metadata解析、ZIP取込、完全な全アプリ翻訳は未対応。[操作・制約](../docs/lab/README.md)、[公式資料の調査](../docs/lab/RESEARCH.md)。
+実サイトの有料生成・ログイン後DOMの手動検証は未実施。設定の自動取得/反映/復元、キャラクター別欄、PNG自動捕捉、公式固有metadata解析、ZIP取込、完全な全アプリ翻訳は未対応。[操作・制約](../lab/README.md)、[公式資料の調査](../lab/RESEARCH.md)。
 
 ---
 
@@ -38,13 +66,13 @@
 
 | コマンド | 結果 |
 |---|---|
-| `corepack pnpm install --frozen-lockfile --store-dir /tmp/nai-pnpm-store` | PASS（既存の書込み可能ストアを使用、lockfile変更なし） |
+| `corepack pnpm install --frozen-lockfile --store-dir <scratch>` | PASS（既存の書込み可能ストアを使用、lockfile変更なし） |
 | `corepack pnpm test` | **283件 PASS / 0件 FAIL、17ファイル**（既存246 + 重み37） |
 | `corepack pnpm typecheck` | PASS |
 | `corepack pnpm build` | PASS（権限は `sidePanel` のみ） |
 | `corepack pnpm test:e2e` | **49件 PASS / 0件 FAIL**（既存46 + 重み3、Mock E2E） |
 
-E2Eは既存の `/tmp/portfolio-ci-libs/root/usr/lib/x86_64-linux-gnu` を `LD_LIBRARY_PATH` に指定し、localhost待受・Chromium起動が可能な実行環境で検証。途中のテスト修正: ラベルの検索方法1件、400pxでの幅超過2件を検出して修正し、新規3件の再実行は全PASS。
+E2Eは既存の `<scratch>` を `LD_LIBRARY_PATH` に指定し、localhost待受・Chromium起動が可能な実行環境で検証。途中のテスト修正: ラベルの検索方法1件、400pxでの幅超過2件を検出して修正し、新規3件の再実行は全PASS。
 
 実サイトの手動検証は未実施。数値重みのモデル別解釈・生成効果、実NovelAIへの書込み、実NovelAI固有PNGメタデータは未検証。画像の自動生成は行わず、比較には手動保存PNGを使う。pushなし。
 
@@ -119,15 +147,15 @@ E2E環境: Playwright 1.64.1用Chromiumを `playwright install` で取得し、r
 
 | コマンド | 結果 |
 |---|---|
-| `corepack pnpm install --frozen-lockfile --offline --store-dir /tmp/nai-pnpm-store` | PASS |
+| `corepack pnpm install --frozen-lockfile --offline --store-dir <scratch>` | PASS |
 | `corepack pnpm test` | **184件 PASS / 12ファイル**（既存129 + P4追加55） |
 | `corepack pnpm typecheck` | PASS（strict） |
 | `corepack pnpm build` | PASS。`.output/chrome-mv3/` |
 | Chromium E2E | **37件 PASS**（既存27 + P4追加10）、38.8秒 |
 
 ```bash
-LD_LIBRARY_PATH=/tmp/nai-chromium-deps/root/usr/lib/x86_64-linux-gnu \
-PLAYWRIGHT_BROWSERS_PATH=/tmp/nai-pw-browsers corepack pnpm test:e2e
+LD_LIBRARY_PATH=<scratch> \
+PLAYWRIGHT_BROWSERS_PATH=<scratch> corepack pnpm test:e2e
 ```
 
 新規単体: experiments/images/image-storage。immutable snapshot、preset/source変更後の再現、特殊文字diff、不明/不一致、Seed精度、不正JSON、循環、固定文字列不整合、pixel計算、PNG破損/巨大/圧縮/悪意metadata、v1/v2 JSON、v2移行/rollback、Blob分離/再開/欠落/不整合、実験IDとのpreset再採番、未知設定の未確認判定、quota原子性、purge保護を検証。

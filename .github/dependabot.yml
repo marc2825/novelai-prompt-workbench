@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned GitHub Actions in .github/workflows up to date.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ['*']
+  # npm/pnpm: security updates only (no routine version-bump PRs).
+  # Takes effect when "Dependabot security updates" is enabled in the repository settings.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0

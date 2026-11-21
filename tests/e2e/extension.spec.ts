@@ -21,6 +21,11 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
   expect(manifest.action.default_popup).toBeUndefined();
   expect(manifest.action.default_title).toBeTruthy();
   expect(manifest.content_scripts).toHaveLength(1);
+  // Only the extension itself plus its license notices are shipped: no source maps, tests or fixtures.
+  const { readdir } = await import('node:fs/promises');
+  const shipped = (await readdir(extensionPath, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(extensionPath.length + 1).replaceAll('\\', '/'));
+  for (const file of shipped) expect(file).toMatch(/^(manifest\.json|sidepanel\.html|background\.js|LICENSE\.txt|THIRD_PARTY_NOTICES\.txt|chunks\/[\w-]+\.js|content-scripts\/novelai\.js|assets\/[\w-]+\.css)$/);
+  expect(shipped).toEqual(expect.arrayContaining(['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt']));
   expect([...manifest.content_scripts[0]!.matches].sort()).toEqual(['https://novelai.net/image', 'https://novelai.net/image?*', 'https://novelai.net/image/*'].sort());
 
   // Chromium derives an unpacked extension ID from its normalized absolute path.

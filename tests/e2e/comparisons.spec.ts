@@ -58,7 +58,7 @@ test('imports metadata/no-metadata PNG, deduplicates by SHA-256, supports drop, 
   await page.getByRole('checkbox', { name: 'BをAの幅・高さへ変形して比較', exact: false }).check(); await expect(page.getByRole('img', { name: 'A/Bピクセル差分', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: '表示モード', exact: true }).selectOption('wipe'); await page.getByLabel('重ね合わせ位置', { exact: true }).fill('35'); await page.getByLabel('同期ズーム', { exact: true }).fill('2'); await page.getByLabel('同期画像枠', { exact: true }).focus(); await page.keyboard.press('ArrowRight');
   const styles = await page.getByLabel('画像比較', { exact: true }).locator('img').evaluateAll(images => images.map(image => image.getAttribute('style'))); expect(styles[0]).toContain('20px'); expect(styles[1]).toContain('20px');
-  await page.getByLabel('画像比較', { exact: true }).screenshot({ path: '/tmp/nai-p4-comparison.png' });
+  await page.getByLabel('画像比較', { exact: true }).screenshot({ path: test.info().outputPath('nai-p4-comparison.png') });
   await page.reload(); await saved(page); await tab(page, '比較'); await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible(); await expect(page.getByRole('img', { name: '比較画像B', exact: true })).toBeVisible();
   await expect(page.getByLabel('比較 B', { exact: true })).toContainText('NovelAI固有メタデータは未検証');
 });

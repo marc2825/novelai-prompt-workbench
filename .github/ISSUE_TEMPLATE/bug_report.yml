@@ -1,0 +1,45 @@
+name: 不具合の報告 / Bug report
+description: 拡張機能の不具合を報告します
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **公開されます。** 個人的なプロンプト、生成画像、ログイン情報・Cookie・トークン、個人情報を貼らないでください。必要ならダミーの文字列に置き換えてください。
+        脆弱性は[非公開の報告](https://github.com/marc2825/novelai-prompt-workbench/security/advisories/new)を使ってください。
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きたか / What happened
+      description: 期待した動作と実際の動作
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順 / Steps to reproduce
+      placeholder: |
+        1. 「ワークスペース」タブで…
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 拡張機能のバージョン・コミット / Version or commit
+      placeholder: 0.1.0 / main の 2dc56c1 など
+  - type: input
+    id: browser
+    attributes:
+      label: ブラウザとOS / Browser and OS
+      placeholder: Chrome 1xx / Windows 11
+  - type: dropdown
+    id: area
+    attributes:
+      label: 関係する機能 / Area
+      options: [ライブラリ・ワークスペース, プリセット, シャッフル, A/B比較, Experiment Lab, バックアップ・復元, NovelAIページの読取り, その他]
+  - type: textarea
+    id: notes
+    attributes:
+      label: 補足（エラーメッセージ・スクリーンショット） / Notes
+      description: 画面に表示されたエラー文など。スクリーンショットは個人的な内容が写っていないことを確認してください。
