@@ -35,6 +35,15 @@
 
 E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` を模擬HTMLに差し替えた実content script）。**実NovelAIのログイン後の環境での確認は実施していない。** 変更の経緯は [CHANGELOG.md](../CHANGELOG.md)・[docs/DECISIONS.md](../docs/DECISIONS.md)、過去の検証ログは [docs/archive/status-history.md](../docs/archive/status-history.md)。
 
+## 既知の制限
+
+- 実NovelAIへの書込み・ログイン後UIのキャラクター欄・生成検知は未検証のため無効。読取りは英語（公開ページで確認）・日本語（実ページの構造報告を模擬ページで再現して検証、修正後の実ページでの再確認は未実施）のみ。
+- サイドパネルと広いタブを同時に開き、両方で編集すると、後から保存した側が保存エラーになる（データは失われず、通知から最新を読み込めるほか、JSONで退避できる）。
+- 元に戻す・やり直すは直近30操作まで。パネルを閉じると履歴は消え、NovelAIのページへの操作は戻らない。
+- 完全バックアップは最大2GiB。「追加」モードで同じ画像を共有するデータは統合できない（全置換を使う）。
+- 数千件規模のデータでは1回の編集ごとの保存に時間がかかり、元に戻す履歴が多くのメモリを使う（目安は [docs/development.md](../docs/development.md#性能の目安)）。
+- そのほかシャッフルの制約は [docs/shuffle/limitations.md](../docs/shuffle/limitations.md)。
+
 ## 今後の作業
 
 評価: 価値・コスト・リスクは 高/中/低。
@@ -43,24 +52,21 @@ E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` �
 
 | 作業 | 価値 | コスト | リスク | 備考 |
 |---|---|---|---|---|
-| GitHubの設定（下記） | 高 | 低 | 低 | メンテナーがSettingsで実施。公開継続中に早めに推奨 |
 | Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | Releases配布の前に。手順は [release-checklist](../docs/release-checklist.md) |
 | 拡張アイコン（16/32/48/128px）の作成 | 高 | 低 | 低 | Chrome Web Storeで必須。NovelAIの意匠を模倣しない |
 | NovelAIサポートへの問い合わせ | 高 | 低 | 低 | 規約は拡張機能に言及なし（[security.md](../docs/security.md)）。Chrome Web Store公開の前に推奨。質問案は release-checklist |
 | ストア用の連絡先・掲載文・スクリーンショット | 中 | 中 | 低 | 連絡先はメンテナーが決定（PRIVACY.mdはGitHub Issuesを窓口として記載） |
 
-### GitHubの設定（推奨、2026-11-21時点で未設定）
+### GitHubの設定（2026-11-21に設定済み）
 
-| 設定 | 推奨 | 理由 | 副作用 |
-|---|---|---|---|
-| Description | 「Unofficial Chrome extension (side panel) to organize, toggle and compare NovelAI image-generation prompts locally. No data leaves your browser.」 | リポジトリの目的と非公式であることが一覧で分かる | なし |
-| Topics | `chrome-extension`, `manifest-v3`, `novelai`, `prompt-engineering`, `prompt-manager`, `side-panel`, `react`, `typescript`, `wxt`, `local-first` | 検索性 | なし |
-| Dependabot alerts | ON | 依存の脆弱性を通知 | 通知が届く |
-| Dependabot security updates | ON | `.github/dependabot.yml` によりnpmはセキュリティ更新のPRだけ作成（通常の更新PRは作らない）。Actionsのハッシュ固定は月1回まとめて更新 | 対応が必要なときだけPRが届く |
-| Secret scanning・Push protection | ON | 誤ってトークン等をpushしたときに検出・ブロック | 検出時にpushが止まる（解除手順あり） |
-| `main` のルールセット | 必須: 削除の禁止・force push の禁止。任意: 「Require status checks to pass」に `check`（CI）。承認必須（レビュー人数）は付けない | 履歴の破壊・ブランチ削除を防ぐ。現在のPR経由のマージ運用なら、CI失敗のままのマージも防げる | 削除・force push禁止だけなら副作用なし。status checks を必須にすると `main` への直接pushはできなくなる（PR経由にするか、自分をbypassに追加） |
-| Actions の権限 | 現状のまま（既定トークンは読取りのみ、PRの承認不可、初回コントリビューターのPRは承認後に実行） | 既に最小権限 | なし |
-| Private vulnerability reporting | ON（2026-11-21に設定済み） | 非公開の報告窓口 | なし |
+| 設定 | 状態 |
+|---|---|
+| Description・Topics | 設定済み（`chrome-extension`, `manifest-v3`, `novelai`, `prompt-engineering`, `prompt-manager`, `side-panel`, `react`, `typescript`, `wxt`, `local-first`） |
+| Private vulnerability reporting | 有効 |
+| Dependabot alerts・security updates | 有効（npmはセキュリティ更新のみ、Actionsは月1回まとめて更新。初回の更新PR #8 は公式タグとの一致を確認してマージ済み） |
+| Secret scanning・Push protection | 有効 |
+| `main` のルールセット「Protect main」 | 有効: ブランチ削除と force push を禁止。CI成功の必須化は付けていない（付けると `main` への直接pushができなくなるため。PR経由の運用に限定するなら追加可） |
+| Actions の権限 | 既定トークンは読取りのみ、PRの承認不可、初回コントリビューターのPRは承認後に実行（変更なし） |
 
 ### P2（品質・使い勝手）
 
