@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
@@ -109,5 +109,11 @@ describe('release notes source', () => {
     const section = changelogSection(readFileSync('CHANGELOG.md', 'utf8'), APP_VERSION);
     expect(section).toContain('確認できていないこと');
     expect(section).toContain('書込み');
+  });
+  it('the release notes tell users not to use the source code archives GitHub attaches', () => {
+    const notes = execFileSync(process.execPath, ['scripts/release-notes.mjs', APP_VERSION], { encoding: 'utf8' });
+    expect(notes).toContain(`novelai-prompt-workbench-${APP_VERSION}-chrome.zip`);
+    expect(notes).toContain('「Source code (zip)」「Source code (tar.gz)」');
+    expect(notes).toContain('manifest.json');
   });
 });

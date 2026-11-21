@@ -5,10 +5,11 @@ Node.js などの開発ツールは不要です。Chrome Web Store 版ではな�
 ## インストール
 
 1. [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) を開き、最新版の Assets から `novelai-prompt-workbench-<バージョン>-chrome.zip` をダウンロードします。
+   - 同じ Assets にある「Source code (zip)」「Source code (tar.gz)」は、GitHubがすべてのリリースに自動で付けるソースコードです。`manifest.json` を含まず、そのままでは読み込めません（使う場合は [development.md](development.md) の手順でビルドが必要です）。
 2. 置き場所になるフォルダを1つ決めて作ります。**このフォルダは更新のたびに使い回します。** バージョン番号を含まない名前にしてください。
    - 例（Windows）: `C:\Users\<ユーザー名>\ChromeExtensions\novelai-prompt-workbench`
    - 例（macOS）: `~/ChromeExtensions/novelai-prompt-workbench`
-3. ZIPの中身をそのフォルダに展開します。フォルダの直下に `manifest.json` がある状態にします（展開ツールが `novelai-prompt-workbench-0.1.0-chrome` のようなフォルダを作った場合は、その**中身**を置き場所のフォルダへ移します）。
+3. ZIPの中身をそのフォルダに展開します。フォルダの直下に `manifest.json` がある状態にします。Windowsのエクスプローラーで拡張子が非表示の場合は `manifest`（種類: JSON ファイル）と表示されます（展開ツールが `novelai-prompt-workbench-0.1.0-chrome` のようなフォルダを作った場合は、その**中身**を置き場所のフォルダへ移します）。
 4. Chromeで `chrome://extensions` を開き、右上の「デベロッパーモード」をONにします。
 5. 「パッケージ化されていない拡張機能を読み込む」を押し、置き場所のフォルダを選びます。
 6. ツールバーの拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すと、サイドパネルが開きます。ピン留めしておくと便利です。
