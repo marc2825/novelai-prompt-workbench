@@ -1,22 +1,32 @@
 # Security Policy / セキュリティ報告
 
-## 報告方法
+## 報告方法（非公開）
 
-脆弱性は**公開Issueに書かず**、GitHubの非公開の脆弱性報告（Repository → Security → Report a vulnerability）から報告してください。
+脆弱性は **公開のIssue・Pull Request・Discussionに書かないでください。** GitHubの非公開の脆弱性報告を使ってください。
 
-> メンテナー向け: 公開前に GitHub の Settings → Code security → **Private vulnerability reporting** を有効にしてください（現在は未設定）。有効にできない場合は、このファイルに別の連絡窓口を記載してください。
+- [Report a vulnerability（新しい非公開の報告を作成）](https://github.com/marc2825/novelai-prompt-workbench/security/advisories/new)
+- 画面からは: リポジトリの **Security** タブ → **Report a vulnerability**
 
-報告には、再現手順・影響範囲・使用したバージョン（拡張機能の詳細画面のバージョン）を含めてください。認証情報・実際のプロンプト・生成画像など個人的なデータは送らないでください。
+報告に含めてほしいもの: 影響する機能、再現手順、想定される影響、確認したバージョンまたはコミット（`chrome://extensions` の詳細画面のバージョン、または `main` のコミット）。
+
+報告に含めないでください: 実際のパスワード・Cookie・トークンなどの認証情報、個人的なプロンプトや生成画像、他人の個人情報。再現にはダミーのデータを使ってください。
+
+報告を受け取ったら内容を確認し、非公開のまま修正方針をやり取りします。修正の公開後、必要に応じてGitHub Security Advisoryとして公開します（個人で保守しているため、対応時間は保証できません）。
 
 ## 対象
 
-- この拡張機能のコード（`src/`, `entrypoints/`）と配布用ZIP
-- 取込ファイル（JSON・完全バックアップZIP・PNG）の検証の不備、サイトとのメッセージ検証の不備、意図しない書込み・データ消失
+- このリポジトリのコード（`src/`, `entrypoints/`, `scripts/`, `.github/`）と、そこからビルドした拡張機能
+- 例: 取込ファイル（JSON・完全バックアップZIP・PNG）の検証の不備、NovelAIページとのメッセージ検証の不備、意図しないページ書込み・外部通信・データ消失、権限の過剰
 
-NovelAIのサービス自体の脆弱性はNovelAIに報告してください。
+NovelAIのサービス自体の脆弱性は、NovelAIに報告してください。
 
 ## サポートするバージョン
 
-最新のリリースのみ修正します（現在 0.x のベータ段階）。
+| バージョン | 対応 |
+|---|---|
+| `main` ブランチ（0.1.0、未リリース） | 修正対象 |
+| 過去のコミット | 対象外（`main` に更新してください） |
 
-設計上の安全方針は [docs/security.md](docs/security.md) を参照してください。
+GitHub Releases・Chrome Web Storeでの配布を始めた後は、最新のリリースを修正対象とします。
+
+安全性の設計（権限、メッセージ検証、取込データの扱い）は [docs/security.md](docs/security.md) を参照してください。

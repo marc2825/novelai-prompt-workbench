@@ -1,49 +1,54 @@
-# 公開前チェックリスト
+# 公開・配布チェックリスト
 
-2026-11-18時点の監査結果と、公開前に人が判断・確認すべき事項です。チェックの済んだ項目は理由とともに記録してください。
+GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで配布する前に確認する事項です。最終更新: 2026-11-21。チェックした項目は日付と根拠を残してください。
 
-## 自動確認済み（このリポジトリで再現可能）
+## 1. GitHub公開（Public・公開中）
 
-- [x] `permissions: ["sidePanel"]` のみ、host_permissionsなし、content scriptは `https://novelai.net/image*` のみ（`extension.spec.ts` が検証）
-- [x] ツールバーボタンでサイドパネルを開く設定（`getPanelBehavior().openPanelOnActionClick === true` を実Chromiumで確認）
-- [x] 配布ZIPにテスト・fixture・source mapを含まない（`corepack pnpm zip` の中身を確認）
-- [x] リポジトリ・Git履歴に秘密情報（APIキー・トークン・秘密鍵）なし（`git log -p` を検索）
-- [x] 実行時依存（React）に既知の脆弱性なし。開発用ツールの `picomatch` ReDoSは配布物外（[security.md](security.md)）
-- [x] CI（GitHub Actions）は main / PR で test・typecheck・build・E2E を実行し成功している
+### 確認済み
 
-## 公開前に決めること（未完了）
+- [x] 秘密情報なし: Gitleaks 8.30.1 で全ブランチ・全コミット（マージを除く11件）と作業ツリーを検査し検出なし。手動でも履歴中のバイナリ・`.env`・ローカルパス・内部IP・個人情報を確認（2026-11-21）。Issue・PR・コメントにも該当なし
+- [x] 履歴にバイナリ・画像・個人的なプロンプトなし（テスト用PNGはコードで合成。デモデータは汎用のサンプル）
+- [x] コミット作者のメールアドレスは、メンテナーが公開を許容済み（対応不要）
+- [x] ライセンス: MIT（`LICENSE`、`package.json`）。依存はすべて許容的なライセンス
+- [x] セキュリティ報告: Private vulnerability reporting を有効化（2026-11-21）、[SECURITY.md](../SECURITY.md)
+- [x] CI: `contents: read`、Actionをハッシュ固定、`persist-credentials: false`、Dependabot設定（`.github/dependabot.yml`）
+- [x] Issue/PRテンプレート、[CONTRIBUTING.md](../CONTRIBUTING.md)、[PRIVACY.md](../PRIVACY.md)
 
-### ライセンス（決定済み）
+### GitHubの設定（メンテナーの操作が必要）
 
-- [x] **MIT**（2026-11-18、メンテナー決定）。`LICENSE` と `package.json` の `license` を追加。依存（React・WXT等、MIT）と両立する。
+推奨値と理由は [tasks/STATUS.md](../tasks/STATUS.md) の「GitHubの設定」を参照。
 
-### NovelAI利用規約（確認済み・要フォロー）
+- [ ] Description・Topics の設定
+- [ ] Dependabot alerts / Dependabot security updates / Secret scanning・Push protection の有効化
+- [ ] `main` のルールセット（force push・削除の禁止。CIの成功を必須にするかは運用に合わせて選択。承認必須にはしない）
 
-- [x] 利用規約（Effective: December 8th, 2025）を確認。ブラウザ拡張については**言及なし**（許可も禁止もしていない）。関係しうる条項と対応は [security.md](security.md#novelai利用規約との関係2026-11-18確認)
-- [ ] Chrome Web Storeで一般公開する前に、NovelAIサポートへ拡張機能の公開について問い合わせる（推奨）
-- [ ] リリースごとに規約の改定を確認する
-- [x] 「NovelAIの利用規約が優先される」旨をREADME・PRIVACY・画面フッター・AGENTS.md・security.mdに明記（2026-11-19）
+## 2. GitHub Releases での配布（未実施）
 
-### 名前・説明・アイコン
+- [ ] `src/version.ts` と `package.json` のバージョンを決めて更新（テストで一致を確認）
+- [ ] `CHANGELOG.md` の Unreleased をバージョン番号に置き換える
+- [ ] 4つのチェック（test・typecheck・build・test:e2e）→ `corepack pnpm zip`
+- [ ] ZIPの中身が `manifest.json`・`background.js`・`sidepanel.html`・`assets/`・`chunks/`・`content-scripts/`・`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt` だけであることを確認（`extension.spec.ts` も検証）
+- [ ] 下の「手動確認」の主要項目を、配布するZIPで実施
+- [ ] リリースノートに「非公式」「書込みは無効」「実NovelAIで確認した範囲」を明記
 
-- [ ] 名称 `NovelAI Prompt Workbench (unofficial)` が第三者の商標の利用条件に抵触しないか確認（ストア掲載では「非公式」「提携なし」を明記）
-- [ ] **アイコンが無い**（manifestに `icons` なし）。Chrome Web Storeは128px等のアイコンが必須。NovelAIのロゴ・配色を模倣しない独自デザインを用意
-- [ ] 説明文（日本語/英語）、スクリーンショット
-- [ ] バージョン方針（0.x ベータ → 1.0）
+## 3. Chrome Web Store での一般公開（未実施）
 
-### Git履歴・GitHub設定（この作業では変更していない）
+- [ ] **アイコンがない**（manifestに `icons` なし。16/32/48/128px が必要）。NovelAIのロゴ・配色を模倣しない独自デザインにする
+- [ ] ストア掲載文（日本語/英語）・スクリーンショット。名称・説明に「非公式」「NovelAIとは提携していない」を明記
+- [ ] プライバシーポリシーの公開URL（[PRIVACY.md](../PRIVACY.md) のGitHub上のURLで可）と、ストアの「データの使用」申告（収集なし）、単一用途の説明
+- [ ] 権限の正当化: `sidePanel`（UI表示）、content script（NovelAI画像生成ページのプロンプト欄の読取り）
+- [ ] 開発者アカウントの連絡先（ストアで必須。メンテナーが用意）
+- [ ] NovelAIサポートへの確認（下記）
 
-- [x] 一部コミットの作者メールが個人アドレスである件: メンテナーが「問題なし」と判断（2026-11-18）。履歴は書き換えない
-- [ ] リポジトリは現在 **Private**。公開設定はメンテナーが判断
-- [ ] `main` に **branch protection / ruleset なし**。推奨: PR必須、CI（`check` ジョブ）成功必須、force push禁止
-- [ ] Private vulnerability reporting を有効化（[SECURITY.md](../SECURITY.md)）
-- [ ] GitHub Actions: `actions/checkout@v4` 等をタグ指定。公開時はコミットSHA固定と `permissions: contents: read` の明示を推奨
+### NovelAIへの確認事項（推奨）
 
-### プライバシー・ストア申請
+利用規約（2025-12-08施行、2026-11-21再確認）はブラウザ拡張機能に言及していません（[security.md](security.md#novelai利用規約との関係)）。一般公開の前に、次をNovelAIサポートに問い合わせることを推奨します。
 
-- [ ] [PRIVACY.md](../PRIVACY.md)（草案）に運営者名・連絡先・施行日を記入し、公開URLを用意
-- [ ] Chrome Web Storeの「データの使用」申告: 収集なし・送信なし。単一用途の説明（NovelAI画像生成用プロンプトのローカル管理）
-- [ ] 権限の正当化: `sidePanel`（UI表示）、content script（NovelAI画像ページのプロンプト欄の読取り）
+1. NovelAIのページ上でプロンプト欄を**読み取るだけ**の非公式拡張機能を公開・配布してよいか
+2. 利用者の明示的な操作でプロンプト欄に**書き込む**機能（現在は無効）を将来有効にすることに問題はないか
+3. 拡張機能の名称・説明にサービス名「NovelAI」を使う際の条件（ロゴは使用しない）
+
+回答を得るまで、書込み・自動化の実サイト対応は無効のままにします。
 
 ## 手動確認項目（実機・未実施）
 
@@ -51,19 +56,20 @@
 
 ### Windows / macOS の Chrome（最新安定版）
 
-- [ ] `chrome://extensions` → デベロッパーモード → `.output/chrome-mv3` を読み込み、エラーが出ない
-- [ ] ツールバーのボタンで**サイドパネル**が開く（ポップアップではない）。2回目以降・Chrome再起動後も同じ
-- [ ] サイドパネルの幅を最小〜最大に変えて、タブ・ボタン・表が操作できる（400px前後）
+- [ ] `chrome://extensions` で `.output/chrome-mv3` を読み込み、エラーが出ない
+- [ ] ツールバーのボタンで**サイドパネル**が開く（ポップアップではない）。Chrome再起動後も同じ
+- [ ] サイドパネルの幅を変えても、タブ・ボタン・「?」の説明・表が操作できる（400px前後）
 - [ ] 「広いタブで開く」で同じデータが表示される。片方で保存すると他方に「別の画面での変更」通知が出て、読み込める
 - [ ] データ入力 → Chrome完全終了 → 再起動で保持
-- [ ] 完全バックアップZIPを保存 → **別のChromeプロファイル**に拡張を入れて復元 → 画像・比較・Lab・シャッフルが一致。ZIPを解凍ツール（Windows標準・7-Zip等）で開ける
+- [ ] 完全バックアップZIPを保存 → **別のChromeプロファイル**で復元 → 画像・比較・Lab・シャッフルが一致。ZIPを解凍ツール（Windows標準・7-Zip等）で開ける
 - [ ] Windowsで日本語ファイル名のPNG、長いパスのダウンロード先での保存・取込
-- [ ] 高DPI（125%/150%）表示で画像比較のズーム・パンが崩れない
-- [ ] キーボードだけでタブ移動（←→ Home End）、Undo/Redo（Ctrl+Z/Y）、主要ボタンの操作ができる
+- [ ] 高DPI（125%/150%）表示で画像比較のズーム・パン、説明の表示位置が崩れない
+- [ ] キーボードだけでタブ移動（←→ Home End）、Undo/Redo（Ctrl+Z/Y）、主要ボタン・「?」の操作ができる
 
 ### NovelAI実サイト（ログイン後、読取りのみ）
 
-- [ ] 画像生成ページで「NovelAIの接続を確認」→ 対象タブ選択 → Positive/Negativeの読取りが一致する（装飾・マクロを含む場合は「推測しません」と表示される）。**表示言語ごと**に確認する（日本語は2026-11-19に外部レビューで構造を確認済み・issue #4。ログイン後の英語UIは未確認）
+- [ ] 画像生成ページで「NovelAIの接続を確認」→ 対象タブ選択 → Positive/Negativeの読取りが一致する。**表示言語ごと**に確認する（英語: 公開ページで確認済み。日本語: 構造を外部レビューで確認し模擬ページで検証済み、実ページでの再確認は未実施。ログイン後の英語UI: 未確認）
+- [ ] 装飾・マクロを含むプロンプトは「推測しません」と表示され、読み取らない
 - [ ] 書込みボタンが無効のままで、サイトの入力・生成に影響しない
 - [ ] シャッフルの「キャラクター欄: 0個（書込み不可）」「生成検知: 非対応」表示、コピーと手動記録で運用できる
 

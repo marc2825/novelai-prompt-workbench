@@ -46,6 +46,7 @@ Unofficial, local-first Chrome MV3 extension (side panel) for building NovelAI i
 ## Safety / Security Rules
 - Minimal permissions (currently `sidePanel` only); NovelAI image-page content script only, never arbitrary origins. No telemetry; data is local-only.
 - Never read, log or store credentials, cookies, tokens or sessions; never send prompts or images to external services.
+- The repository is public: never commit or post secrets, personal prompts/images, logged-in screenshots or machine-specific paths (use synthetic fixtures and Playwright `testInfo.outputPath`). Adding a runtime dependency requires updating `public/THIRD_PARTY_NOTICES.txt`. Keep GitHub Actions on `contents: read` with SHA-pinned actions.
 - No `eval`, remote code, untrusted HTML or external CDNs.
 - Undo/redo for destructive edits and explicit confirmation before overwriting NovelAI text or replacing all data are mandatory. Do not break existing features.
 

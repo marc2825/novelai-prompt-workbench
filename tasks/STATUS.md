@@ -1,6 +1,6 @@
 # 現在の状態と今後の作業
 
-更新: 2026-11-18（Asia/Tokyo）。過去の各フェーズの記録・検証ログは [docs/archive/status-history.md](../docs/archive/status-history.md)。
+更新: 2026-11-21。
 
 ## 機能の状態
 
@@ -11,49 +11,56 @@
 | A/B比較・PNG取込・画像比較 | 実装・自動テスト済み | NovelAI固有PNGメタデータは未対応 |
 | Prompt Shuffle | 実装・自動テスト済み（Mock E2E） | 読取りとコピーのみ。書込み・キャラクター欄・生成検知は**無効** |
 | Experiment Lab | 実装・自動テスト済み | 読取りとコピーのみ。設定の自動同期なし |
-| 完全バックアップ（画像原本込みZIP） | **2026-11-18 追加**・自動テスト済み | — |
-| サイトとの読取り | 実装（観測済みの単純なProseMirrorのみ） | 英語の公開ページ（2026-11-03）、日本語UIの構造（2026-11-19、issue #4）を確認。ログイン後の英語UIは未確認 |
+| 完全バックアップ（画像原本込みZIP） | 実装・自動テスト済み | — |
+| サイトとの読取り | 実装（観測済みの単純なProseMirrorのみ、英語・日本語） | 英語は公開ページで確認（2026-11-03）。日本語は実ページの構造報告（2026-11-19、issue #4）を模擬ページで再現して検証。修正後の実ページでの再確認・ログイン後の英語UIは未確認 |
 | サイトへの書込み | fixtureのみ | **未検証・無効** |
-| サイドパネル起動 | ツールバーボタンで開く（2026-11-18） | 実ボタンのクリックは手動確認待ち |
+| サイドパネル起動 | ツールバーボタンで開く | 実ボタンのクリックは手動確認待ち |
+| UI（ホバー説明・段階的表示） | 実装・自動テスト済み（400px幅のスクリーンショットで目視確認） | 実ブラウザ（Windows/macOS・高DPI）での目視は未実施 |
 
-## 2026-11-18の変更（監査・品質改善）
+## 検証結果（最新）
 
-1. **シャッフルのサイト状態の分離**: 反映前原文・最後の書込み・状態不明の欄を（タブ, ドキュメント, プロファイル）単位に分離。タブAの原文がタブBのRestoreに使われ得た不具合を修正。
-2. **自動シャッフルの安全停止**: 開始時に設定全体を固定し、変更・外部のカーソル変更・保存エラーで停止。停止後に新しい書込みを始めない。送信済みの書込みは記録。
-3. **生成ジョブカウント**: 開始時に生成中だったジョブを数えていた不具合を修正。
-4. **handler**: 書込み開始後の失敗を常に `WRITE_FAILED` に。広いタブ（`sidepanel.html#lab`）からの読取りが拒否されていた不具合を修正。
-5. **完全バックアップ/復元**: ZIP（manifest・data.json・画像原本・サムネイル）、検証→プレビュー→1トランザクションで復元、Undo可能。
-6. **UX**: ツールバーボタンでサイドパネル（popup廃止、最小のbackground）、別画面の保存通知、タブ順の整理・キーボード操作、初回ガイド、「広いタブで開く」。
-7. **性能**: 保存時の全ストア読込みと二重検証をなくした（2,000件で1編集 約74ms→約33ms、fake-indexeddb上）。
-8. **文書**: READMEを利用者向けに再構成。development / security / backup / release-checklist / SECURITY / PRIVACY（草案）を追加。codex・完了済みタスク・旧ログをアーカイブ。
+2026-11-21、Linux（WSL2）、Node 24.21.0、pnpm 10.34.5、Playwright 1.64.1 Chromium。E2Eは共有ライブラリ（libnspr4/libnss3/libasound2t64）を作業用ディレクトリに展開して実行（OSへのインストールなし）。
 
-## 検証結果（2026-11-18）
+| 検査 | 結果 |
+|---|---|
+| `corepack pnpm install --frozen-lockfile` | PASS（lockfile・依存の変更なし） |
+| `corepack pnpm test` | 423 PASS / 0 FAIL（24ファイル） |
+| `corepack pnpm typecheck` | PASS |
+| `corepack pnpm build` | PASS（permissions は `sidePanel` のみ） |
+| `corepack pnpm test:e2e` | 64 PASS / 0 FAIL（Mock E2E） |
+| `corepack pnpm audit` | 既知の脆弱性 0件（実行時・開発時とも） |
+| Gitleaks 8.30.1（全コミット・作業ツリー） | 検出なし |
+| 配布ZIPの内容 | 拡張機能のファイル＋`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt`のみ。source map・テスト・fixtureなし |
+| Markdownの相対リンク・アンカー | 切れなし |
 
-環境: Linux（WSL2）、Node 24.21.0、pnpm 10.34.5、Playwright 1.64.1 Chromium。E2Eは共有ライブラリ（libnspr4/libnss3/libasound2t64）を作業用ディレクトリに展開して実行（OSへのインストールなし）。
-
-| コマンド | 作業開始時 | 作業後 |
-|---|---|---|
-| `corepack pnpm install --frozen-lockfile` | PASS（lockfile変更なし） | PASS（lockfile・依存の変更なし） |
-| `corepack pnpm test` | 333 PASS / 0 FAIL（18ファイル） | 418 PASS / 0 FAIL（23ファイル） |
-| `corepack pnpm typecheck` | PASS | PASS |
-| `corepack pnpm build` | PASS | PASS（permissions は `sidePanel` のみ、background追加） |
-| `corepack pnpm test:e2e` | 53 PASS / 0 FAIL | 62 PASS / 0 FAIL |
-
-E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` を模擬HTMLに差し替えた実content script）。**実NovelAIでの確認は実施していない。**
+E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` を模擬HTMLに差し替えた実content script）。**実NovelAIのログイン後の環境での確認は実施していない。** 変更の経緯は [CHANGELOG.md](../CHANGELOG.md)・[docs/DECISIONS.md](../docs/DECISIONS.md)、過去の検証ログは [docs/archive/status-history.md](../docs/archive/status-history.md)。
 
 ## 今後の作業
 
 評価: 価値・コスト・リスクは 高/中/低。
 
-### P1（公開前に必要）
+### P1（配布前に必要）
 
 | 作業 | 価値 | コスト | リスク | 備考 |
 |---|---|---|---|---|
+| GitHubの設定（下記） | 高 | 低 | 低 | メンテナーがSettingsで実施。公開継続中に早めに推奨 |
+| Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | Releases配布の前に。手順は [release-checklist](../docs/release-checklist.md) |
 | 拡張アイコン（16/32/48/128px）の作成 | 高 | 低 | 低 | Chrome Web Storeで必須。NovelAIの意匠を模倣しない |
-| Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | 手順は release-checklist |
-| GitHub設定（branch protection、private vulnerability reporting） | 中 | 低 | 低 | 設定はメンテナーが実施 |
-| NovelAIサポートへの拡張機能公開の問い合わせ | 高 | 低 | 低 | 規約は拡張機能に言及なし（[security.md](../docs/security.md)）。一般公開前に推奨 |
-| PRIVACY.md草案の確定 | 中 | 低 | 低 | ストア申請時に必須 |
+| NovelAIサポートへの問い合わせ | 高 | 低 | 低 | 規約は拡張機能に言及なし（[security.md](../docs/security.md)）。Chrome Web Store公開の前に推奨。質問案は release-checklist |
+| ストア用の連絡先・掲載文・スクリーンショット | 中 | 中 | 低 | 連絡先はメンテナーが決定（PRIVACY.mdはGitHub Issuesを窓口として記載） |
+
+### GitHubの設定（推奨、2026-11-21時点で未設定）
+
+| 設定 | 推奨 | 理由 | 副作用 |
+|---|---|---|---|
+| Description | 「Unofficial Chrome extension (side panel) to organize, toggle and compare NovelAI image-generation prompts locally. No data leaves your browser.」 | リポジトリの目的と非公式であることが一覧で分かる | なし |
+| Topics | `chrome-extension`, `manifest-v3`, `novelai`, `prompt-engineering`, `prompt-manager`, `side-panel`, `react`, `typescript`, `wxt`, `local-first` | 検索性 | なし |
+| Dependabot alerts | ON | 依存の脆弱性を通知 | 通知が届く |
+| Dependabot security updates | ON | `.github/dependabot.yml` によりnpmはセキュリティ更新のPRだけ作成（通常の更新PRは作らない）。Actionsのハッシュ固定は月1回まとめて更新 | 対応が必要なときだけPRが届く |
+| Secret scanning・Push protection | ON | 誤ってトークン等をpushしたときに検出・ブロック | 検出時にpushが止まる（解除手順あり） |
+| `main` のルールセット | 必須: 削除の禁止・force push の禁止。任意: 「Require status checks to pass」に `check`（CI）。承認必須（レビュー人数）は付けない | 履歴の破壊・ブランチ削除を防ぐ。現在のPR経由のマージ運用なら、CI失敗のままのマージも防げる | 削除・force push禁止だけなら副作用なし。status checks を必須にすると `main` への直接pushはできなくなる（PR経由にするか、自分をbypassに追加） |
+| Actions の権限 | 現状のまま（既定トークンは読取りのみ、PRの承認不可、初回コントリビューターのPRは承認後に実行） | 既に最小権限 | なし |
+| Private vulnerability reporting | ON（2026-11-21に設定済み） | 非公開の報告窓口 | なし |
 
 ### P2（品質・使い勝手）
 
@@ -76,8 +83,8 @@ E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` �
 | NovelAI固有PNGメタデータの解析 | 中 | 中 | 中 | 公式に保存された実サンプルが必要 |
 | ZIP64（2GiB超）の完全バックアップ | 低 | 中 | 中 | |
 
-## 決定事項（2026-11-18）
+## 決定事項
 
-- ライセンス: MIT（`LICENSE`）。
-- 一部コミットの作者メール: 問題なし（履歴は書き換えない）。
+- ライセンス: MIT（`LICENSE`、2026-11-18）。配布物に `LICENSE.txt` と `THIRD_PARTY_NOTICES.txt` を同梱（2026-11-21）。
+- リポジトリはPublic（2026-11-21時点）。コミット作者のメールアドレスの公開はメンテナーが許容済み（履歴は書き換えない）。
 - NovelAI利用規約: 拡張機能への言及なし。読取り・コピーのみの現行機能を維持し、書込み・自動化の実サイト対応は無効のまま（[security.md](../docs/security.md)）。
