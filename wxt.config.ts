@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'wxt';
 import { APP_VERSION } from './src/version';
 
@@ -12,5 +13,9 @@ export default defineConfig({
     // (sidePanel.setPanelBehavior). No popup: a popup closes when the page is clicked.
     // Data lives in IndexedDB, so no storage/host/tabs permissions are needed.
     action: { default_title: 'Prompt Workbench を開く' },
+  },
+  hooks: {
+    // Ship the project's own MIT license with the build; third-party notices come from public/.
+    'build:publicAssets': (_wxt, files) => { files.push({ absoluteSrc: resolve('LICENSE'), relativeDest: 'LICENSE.txt' }); },
   },
 });
