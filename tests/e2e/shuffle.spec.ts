@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openFold } from './helpers';
 
 // Mock E2E only: the "site" is the local React fixture (tests/fixtures/site.tsx).
 // It proves the extension's own logic, not real NovelAI behaviour.
@@ -32,6 +33,7 @@ async function setup(page: Page, extra: [string, string][] = []) {
   await saved(page);
   await page.getByRole('tab', { name: 'シャッフル', exact: true }).click();
   await button(page, '＋ プロファイル').click();
+  await openSettings(page);
   for (const [name, fixed] of [['Alice', A], ['Bella', B], ...extra] as [string, string][]) await addCharacter(page, name, fixed);
   await page.getByText(/^役割テンプレート・ポーズセット/).click();
   await textbox(page, '新しいテンプレート名').fill('Pointing');
@@ -41,7 +43,10 @@ async function setup(page: Page, extra: [string, string][] = []) {
   await commitText(page, 'Pointing / 行動される側のプロンプト', RECIPIENT);
   await saved(page);
 }
+// Profile settings and the site controls are folded by default; open them like a user would.
+const openSettings = (page: Page) => openFold(page, /^シャッフルの設定/);
 async function connect(page: Page, tabId = '101') {
+  await openFold(page, /^NovelAIのページへ反映/);
   await button(page, 'シャッフル用にNovelAIを接続').click();
   await page.getByRole('combobox', { name: 'シャッフルの対象タブ', exact: true }).selectOption(tabId);
   await expect(page.getByRole('list', { name: 'シャッフルの対象サイトの対応状況' })).toBeVisible();
@@ -238,6 +243,7 @@ test('without a site connection: copy fallback, manual generation count and pers
   await page.reload();
   await saved(page);
   await page.getByRole('tab', { name: 'シャッフル', exact: true }).click();
+  await openSettings(page);
   await expect(textbox(page, 'シャッフルSeed')).toHaveValue(seed);
   await expect(page.getByRole('combobox', { name: '自動シャッフルの間隔', exact: true })).toHaveValue('custom');
   await expect(spinbutton(page, '任意の回数')).toHaveValue('4');

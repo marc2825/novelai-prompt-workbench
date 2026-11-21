@@ -5,7 +5,7 @@ import type { Workbench } from './useWorkbench';
 import { Empty, newId, now, Rename, Reorder } from './shared';
 import { PromptEditor } from './PromptEditor';
 import { Presets } from './Presets';
-import { InfoTip } from './InfoTip';
+import { Hint } from './InfoTip';
 
 export function Workspace({ workbench }: { workbench: Workbench }) {
   const data = workbench.data!;
@@ -13,6 +13,9 @@ export function Workspace({ workbench }: { workbench: Workbench }) {
   const [name, setName] = useState('');
   const [channel, setChannel] = useState<Channel>('positive');
   const [mode, setMode] = useState<SelectionMode>('multi');
+  // One member editor / group settings block open at a time keeps the list compact.
+  const [openMember, setOpenMember] = useState<string | null>(null);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const change = (update: (workspace: PromptWorkspace) => PromptWorkspace) => {
     if (!workspace) return false;
     return workbench.commit(previous => ({ ...previous, workspaces: previous.workspaces.map(item => item.id === workspace.id ? { ...update(item), updatedAt: now() } : item) }));
@@ -38,22 +41,26 @@ export function Workspace({ workbench }: { workbench: Workbench }) {
           return { ...rest, freeformNegative: raw, ...(spans ? { freeformNegativeSpans: spans } : {}) };
         })} />
       </section>
-      <form className="panel stack" aria-label="グループ作成" onSubmit={event => {
+      <details className="panel" open={!workspace.groups.length}><summary>＋ グループを追加</summary><form className="stack" aria-label="グループ作成" onSubmit={event => {
         event.preventDefault();
         if (!name.trim()) return;
         if (change(current => ({ ...current, groups: [...current.groups, { id: newId(), name, channel, mode, enabled: true, selectedMemberId: null, members: [] }] }))) setName('');
       }}>
-        <div className="section-title"><h2>グループ作成</h2><InfoTip label="グループ">グループは部品の入れ物です。「排他」は候補から1つだけ（ラジオ）、「複数」は好きな組み合わせ（チェック）で出力します。グループをOFFにしても選択は保持されます。</InfoTip></div><label>グループ名<input required maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label>
+        <Hint label="グループ" summary="部品の入れ物です。排他は1つだけ、複数は好きな組み合わせ">グループは部品の入れ物です。「排他」は候補から1つだけ（ラジオ）、「複数」は好きな組み合わせ（チェック）で出力します。グループをOFFにしても選択は保持されます。</Hint><label>グループ名<input required maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label>
         <div className="columns"><label>チャンネル<select value={channel} onChange={event => setChannel(event.target.value as Channel)}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>選択方式<select value={mode} onChange={event => setMode(event.target.value as SelectionMode)}><option value="multi">複数 (multi)</option><option value="exclusive">排他 (exclusive)</option></select></label></div><button type="submit" className="primary">グループ追加</button>
-      </form>
+      </form></details>
       {!workspace.groups.length && <Empty>グループを作成し、ライブラリタブで部品を追加してください。</Empty>}
       {workspace.groups.map((group, groupIndex) => <section className="panel stack" key={group.id} aria-label={group.name}>
         <div className="group-head">
           <div className="title"><strong>{group.name}</strong><span className={`badge ${group.channel}`}>{group.channel}</span><span className="badge">{group.mode === 'exclusive' ? '排他' : '複数'} · {group.members.length}</span></div>
-          <div className="toolbar"><Reorder name={group.name} first={groupIndex === 0} last={groupIndex === workspace.groups.length - 1} onMove={direction => change(current => ({ ...current, groups: moveById(current.groups, group.id, direction) }))} /><label className="inline"><input type="checkbox" checked={group.enabled} onChange={event => changeGroup(group.id, current => ({ ...current, enabled: event.target.checked }))} />グループ有効</label></div>
+          <div className="toolbar"><Reorder name={group.name} first={groupIndex === 0} last={groupIndex === workspace.groups.length - 1} onMove={direction => change(current => ({ ...current, groups: moveById(current.groups, group.id, direction) }))} /><button type="button" className="icon" aria-label="グループ設定" aria-expanded={openGroup === group.id} title="グループ設定（名前・チャンネル・方式・削除）" onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>⚙</button><label className="inline"><input type="checkbox" checked={group.enabled} onChange={event => changeGroup(group.id, current => ({ ...current, enabled: event.target.checked }))} />グループ有効</label></div>
         </div>
         <div className="stack">
-
+          {openGroup === group.id && <div className="stack notice" aria-label={`${group.name}の設定`}>
+            <Rename label="グループの名前" value={group.name} onSave={value => changeGroup(group.id, current => ({ ...current, name: value }))} />
+            <div className="columns"><label>グループのチャンネル<select value={group.channel} onChange={event => changeGroup(group.id, current => ({ ...current, channel: event.target.value as Channel }))}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>グループの選択方式<select value={group.mode} onChange={event => changeGroup(group.id, current => ({ ...current, mode: event.target.value as SelectionMode }))}><option value="multi">複数 (multi)</option><option value="exclusive">排他 (exclusive)</option></select></label></div>
+            <div className="actions"><button type="button" className="small danger" onClick={() => { if (confirm(`グループ「${group.name}」を削除しますか？`)) change(current => ({ ...current, groups: current.groups.filter(item => item.id !== group.id) })); }}>グループ削除</button></div>
+          </div>}
           {!group.members.length && <Empty>ライブラリタブからこのグループへ追加できます。</Empty>}
           {group.members.map((member, index) => {
             const entry = data.libraryEntries.find(item => item.id === member.entryId);
@@ -70,10 +77,10 @@ export function Workspace({ workbench }: { workbench: Workbench }) {
                   }
                 }}
               /><span className="member-title">{title}</span></label>
-                <span className="toolbar"><Reorder name={`${title} (${index + 1})`} first={index === 0} last={index === group.members.length - 1} onMove={direction => changeGroup(group.id, current => ({ ...current, members: moveById(current.members, member.id, direction) }))} /><button type="button" className="icon danger" aria-label="部品削除" title="構成から削除（ライブラリ原本は残ります）" onClick={() => { if (confirm(`構成から「${title}」を削除しますか？ライブラリ原本は残ります。`)) changeGroup(group.id, current => removeMember(current, member.id)); }}>✕</button></span></div>
+                <span className="toolbar"><Reorder name={`${title} (${index + 1})`} first={index === 0} last={index === group.members.length - 1} onMove={direction => changeGroup(group.id, current => ({ ...current, members: moveById(current.members, member.id, direction) }))} /><button type="button" className="icon" aria-label="原文を編集・移動" aria-expanded={openMember === member.id} title="この構成内の原文を編集・別グループへ移動" onClick={() => setOpenMember(openMember === member.id ? null : member.id)}>✎</button><button type="button" className="icon danger" aria-label="部品削除" title="構成から削除（ライブラリ原本は残ります）" onClick={() => { if (confirm(`構成から「${title}」を削除しますか？ライブラリ原本は残ります。`)) changeGroup(group.id, current => removeMember(current, member.id)); }}>✕</button></span></div>
               <pre className="member-raw">{member.overrideRaw ?? member.rawSnapshot}</pre>
               {!entry && <small>参照先はありませんが原文を保持しています。</small>}
-              <details><summary>原文を編集・別グループへ移動</summary><div className="stack">
+              {openMember === member.id && <div className="stack notice">
                 <PromptEditor label="構成内の原文" value={member.overrideRaw ?? member.rawSnapshot} spans={member.overrideSpans} undo={workbench.undo} redo={workbench.redo} onChange={(raw, spans) => changeGroup(group.id, current => ({ ...current, members: current.members.map(item => {
                   if (item.id !== member.id) return item;
                   const { overrideSpans: _old, ...rest } = item;
@@ -86,15 +93,11 @@ export function Workspace({ workbench }: { workbench: Workbench }) {
                   if (!target || (target.channel !== group.channel && !confirm(`${target.channel}チャンネルへ部品を移動しますか？`))) return;
                   change(current => ({ ...current, groups: current.groups.map(item => item.id === group.id ? removeMember(item, member.id) : item.id === targetId ? { ...item, members: [...item.members, member] } : item) }));
                 }}><option value="">移動先を選択</option>{workspace.groups.filter(item => item.id !== group.id).map(item => <option key={item.id} value={item.id}>{item.name} ({item.channel})</option>)}</select></label>
-              </div></details>
+              </div>}
             </article>;
           })}
           {group.mode === 'exclusive' && group.selectedMemberId !== null && <div className="actions"><button type="button" className="small" disabled={!group.enabled} onClick={() => changeGroup(group.id, current => ({ ...current, selectedMemberId: null }))}>選択解除</button></div>}
-          <details><summary>グループ設定（名前・チャンネル・方式・削除）</summary><div className="stack">
-            <Rename label="グループの名前" value={group.name} onSave={value => changeGroup(group.id, current => ({ ...current, name: value }))} />
-            <div className="columns"><label>グループのチャンネル<select value={group.channel} onChange={event => changeGroup(group.id, current => ({ ...current, channel: event.target.value as Channel }))}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>グループの選択方式<select value={group.mode} onChange={event => changeGroup(group.id, current => ({ ...current, mode: event.target.value as SelectionMode }))}><option value="multi">複数 (multi)</option><option value="exclusive">排他 (exclusive)</option></select></label></div>
-            <div className="actions"><button type="button" className="small danger" onClick={() => { if (confirm(`グループ「${group.name}」を削除しますか？`)) change(current => ({ ...current, groups: current.groups.filter(item => item.id !== group.id) })); }}>グループ削除</button></div>
-          </div></details>
+
         </div>
       </section>)}
     </>}

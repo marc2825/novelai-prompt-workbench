@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
+import { openFold, openPreview } from './helpers';
 import { emptyData } from '../../src/core/commands';
 import { exportBackup } from '../../src/data/backup';
 import { fixture, timestamp } from '../unit/helpers';
@@ -175,6 +176,7 @@ test('export → clear via validated replace → import restores assets; merge c
   await page.getByRole('combobox', { name: '取込方法', exact: true }).selectOption('replace');
   await page.getByRole('button', { name: '確認してインポート', exact: true }).click();
   await saved(page);
+  await openPreview(page);
   await expect(page.getByRole('textbox', { name: '出力 Positive', exact: true })).toHaveValue('');
   await upload(page, JSON.stringify(before));
   await page.getByRole('button', { name: '確認してインポート', exact: true }).click();
@@ -317,4 +319,38 @@ test('detail texts stay hidden until hover, focus or tap, and stay inside the na
   await expect(tip).toBeVisible();
   await page.getByRole('heading', { name: 'NovelAI Prompt Workbench', exact: true }).click();
   await expect(tip).toBeHidden();
+});
+
+test('workspace keeps details behind icons: member text editor, group settings, folded group creation and presets', async ({ page }) => {
+  await demo(page);
+  await page.getByRole('tab', { name: 'ワークスペース', exact: true }).click();
+  const group = page.getByRole('region', { name: '背景', exact: true });
+  const member = group.getByRole('article', { name: /^夜の街/ });
+  // Editors and settings are not shown until asked for.
+  await expect(page.getByRole('textbox', { name: '構成内の原文', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'グループの名前', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'グループ名', exact: true })).toHaveCount(0);
+  await member.getByRole('button', { name: '原文を編集・移動', exact: true }).click();
+  await page.getByRole('textbox', { name: '構成内の原文', exact: true }).fill('night, neon lights');
+  await saved(page);
+  await expect(page.getByRole('textbox', { name: '出力 Positive', exact: true })).toHaveValue('1girl, {{black hair}}, long hair, night, neon lights');
+  await member.getByRole('button', { name: '原文を編集・移動', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '構成内の原文', exact: true })).toHaveCount(0);
+  await group.getByRole('button', { name: 'グループ設定', exact: true }).click();
+  await page.getByRole('textbox', { name: 'グループの名前', exact: true }).fill('背景と光');
+  await page.getByRole('textbox', { name: 'グループの名前', exact: true }).press('Enter');
+  await saved(page);
+  await expect(page.getByRole('region', { name: '背景と光', exact: true })).toBeVisible();
+  // Group creation is folded once groups exist.
+  await openFold(page, /グループを追加/);
+  await page.getByRole('textbox', { name: 'グループ名', exact: true }).fill('小物');
+  await page.getByRole('button', { name: 'グループ追加', exact: true }).click(); await saved(page);
+  await expect(page.getByRole('region', { name: '小物', exact: true })).toBeVisible();
+  // Presets: select / apply / save stay visible, management is folded.
+  await page.getByRole('textbox', { name: '新しいプリセット名', exact: true }).fill('夜');
+  await page.getByRole('button', { name: '現在の構成をプリセット保存', exact: true }).click(); await saved(page);
+  await expect(page.getByRole('button', { name: 'プリセットを適用', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'プリセットを削除', exact: true })).toHaveCount(0);
+  await openFold(page, /^詳細（差分の内容/);
+  await expect(page.getByRole('button', { name: 'プリセットを削除', exact: true })).toBeVisible();
 });

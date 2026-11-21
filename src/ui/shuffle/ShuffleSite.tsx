@@ -13,7 +13,7 @@ import type { SiteClient } from '../../platform/novelai/client';
 import type { FieldsInspection, FieldsPreview, SiteInspection, Target } from '../../platform/novelai/protocol';
 import { newId } from '../shared';
 import { AutoShuffleRun } from './auto-run';
-import { Hint } from '../InfoTip';
+import { Hint, InfoTip } from '../InfoTip';
 
 const INTERVALS = [1, 3, 5, 10] as const;
 
@@ -51,6 +51,7 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
   const [notice, setNotice] = useState('');
   const [custom, setCustom] = useState(String(profile.settings.autoEvery ?? 2));
   const [manual, setManual] = useState<AutoCounter | null>(null);
+  const [siteOpen, setSiteOpen] = useState(false);
   const [auto, setAuto] = useState<{ armed: boolean; count: number; every: number; generating: boolean }>({ armed: false, count: 0, every: 0, generating: false });
   // Sessions are read synchronously by the auto-shuffle run; the state counter only re-renders.
   const sessions = useRef<SiteSessions>(emptySessions());
@@ -90,9 +91,9 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
   };
 
   if (!client) return <section className="panel stack" aria-label="シャッフルのサイト反映">
-    <h2>NovelAIへの反映</h2>
-    <p className="hint">サイト連携はChrome拡張から利用できます。ここでは各欄のコピーを使用してください。</p>
+    <CountTitle />
     <ManualCount every={every} armed={false} manual={manual} setManual={setManual} onShuffle={onShuffle} setNotice={setNotice} custom={custom} setCustom={setCustom} onAutoEveryChange={onAutoEveryChange} />
+    <p className="hint">サイト連携はChrome拡張から利用できます。ここでは各欄のコピーを使用してください。</p>
     {notice && <p role="status">{notice}</p>}
   </section>;
 
@@ -156,7 +157,10 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
   };
 
   return <section className="panel stack" aria-label="シャッフルのサイト反映">
-    <h2>NovelAIへの反映</h2>
+    <CountTitle />
+    <ManualCount every={every} armed={auto.armed} manual={manual} setManual={setManual} onShuffle={onShuffle} setNotice={setNotice} custom={custom} setCustom={setCustom} onAutoEveryChange={onAutoEveryChange} />
+    {auto.armed && <p role="status" aria-label="自動シャッフルの状態">{auto.armed ? `自動シャッフル: 動作中（${auto.count}/${auto.every}ジョブ${auto.generating ? '・生成中のため待機' : ''}）` : `自動シャッフル: 停止中${inspection && !inspection.generation.supported ? '（このページでは生成を検知できません。手動記録を使用してください）' : ''}`}</p>}
+    <details className="fold" open={siteOpen || auto.armed} onToggle={event => setSiteOpen(event.currentTarget.open)}><summary>NovelAIのページへ反映（対応ページのみ）</summary><div className="stack">
     <Hint label="シャッフルのサイト反映" summary="Applyで変更前後を確認してから反映します">Shuffle Nowだけではサイトを変更しません。Applyで変更前後を確認してから反映します。キャラクター欄の追加・削除、座標、生成ボタンは操作しません。</Hint>
     <button type="button" className="small" disabled={busy || auto.armed} onClick={() => void perform(async () => {
       setPreview(null); setInspection(null);
@@ -225,16 +229,18 @@ export function ShuffleSite({ client, profile, composed, onShuffle, onAutoEveryC
       </div>)}
     </div></details>}
 
-    <h3>生成回数に応じた自動シャッフル</h3>
-    <ManualCount every={every} armed={auto.armed} manual={manual} setManual={setManual} onShuffle={onShuffle} setNotice={setNotice} custom={custom} setCustom={setCustom} onAutoEveryChange={onAutoEveryChange} />
-    <Hint label="生成回数の数え方" summary="成功した生成ジョブの回数で切り替えます">回数は成功した生成ジョブ数です。1回の生成で複数枚を出力しても1回と数えます。自動シャッフルは生成ボタンを押しません。開始時点で生成中・表示中のジョブは数えません。実行中にシャッフル設定やベースプロンプトを変えると安全のため停止します。</Hint>
     <div className="actions">
       <button type="button" disabled={busy || auto.armed || !every || !target || !inspection?.generation.supported || !writable || !fieldsMode || !!composed.errors.length || !profile.settings.enabled} onClick={() => void perform(startAuto)}>自動シャッフルを開始</button>
       <button type="button" disabled={!auto.armed} onClick={() => stopAuto('自動シャッフルを停止しました。', false)}>自動シャッフルを停止</button>
     </div>
-    <p role="status" aria-label="自動シャッフルの状態">{auto.armed ? `自動シャッフル: 動作中（${auto.count}/${auto.every}ジョブ${auto.generating ? '・生成中のため待機' : ''}）` : `自動シャッフル: 停止中${inspection && !inspection.generation.supported ? '（このページでは生成を検知できません。手動記録を使用してください）' : ''}`}</p>
+    {!auto.armed && <p role="status" aria-label="自動シャッフルの状態">{auto.armed ? `自動シャッフル: 動作中（${auto.count}/${auto.every}ジョブ${auto.generating ? '・生成中のため待機' : ''}）` : `自動シャッフル: 停止中${inspection && !inspection.generation.supported ? '（このページでは生成を検知できません。手動記録を使用してください）' : ''}`}</p>}
+    </div></details>
     {issue && <p role="alert">{issue}</p>}{notice && <p role="status">{notice}</p>}
   </section>;
+}
+
+function CountTitle() {
+  return <div className="section-title"><h2>生成回数で切り替え</h2><InfoTip label="生成回数の数え方">生成が終わるたびに「生成完了を手動で記録（+1）」を押すと、選んだ回数ごとに次の構図へ切り替わります（サイトは変更しません。コピーして貼り付けてください）。対応ページでは成功した生成ジョブを自動で数えられます。1回の生成で複数枚を出力しても1回と数え、開始時点で生成中・表示中のジョブは数えません。生成ボタンは押しません。実行中にシャッフル設定やベースプロンプトを変えると安全のため停止します。</InfoTip></div>;
 }
 
 function RestoreText({ session, label, summary, open }: { session: SiteSession; label: string; summary?: string; open?: boolean }) {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { compileWorkspace } from '../core/compose';
 import { composeShuffle, describeSelection, diffComposed, type ComposeResult } from '../core/shuffle/compose';
 import { MODEL_IDS, MODEL_PROFILES } from '../core/shuffle/models';
@@ -29,15 +29,18 @@ function baseOf(data: WorkbenchData) {
 }
 
 function Outputs({ result, label, onCopy }: { result: ComposeResult; label: string; onCopy: (text: string, what: string) => void }) {
+  const id = useId();
+  const field = (key: string, name: string, value: string, rows: number, buttons: { text: string; short: string; value: string; what: string }[]) => <div className="stack" key={key}>
+    <div className="field-head"><label htmlFor={`${id}-${key}`}>{name}</label><span className="toolbar">{buttons.map(button => <button type="button" className="small" key={button.text} aria-label={button.text} title={button.text} onClick={() => onCopy(button.value, button.what)}>{button.short}</button>)}</span></div>
+    <textarea id={`${id}-${key}`} readOnly rows={rows} value={value} />
+  </div>;
   return <div className="stack" aria-label={label}>
-    {result.pipe !== null && <div className="stack"><label>{label}: |区切り（コピー専用）<textarea readOnly rows={3} value={result.pipe} /></label><button type="button" onClick={() => onCopy(result.pipe!, '|区切りプロンプト')}>|区切りをコピー</button></div>}
-    <label>{label}: ベース Prompt<textarea readOnly rows={2} value={result.base.positive} /></label>
-    <button type="button" onClick={() => onCopy(result.base.positive, 'ベース Prompt')}>ベース Promptをコピー</button>
-    {result.characters.map((item, index) => <div className="stack" key={item.characterId}>
-      <label>{label}: キャラクター{index + 1}（{item.name}{item.side ? ` / ${item.side === 'left' ? '左' : '右'}` : ''}）<textarea readOnly rows={2} value={item.positive} /></label>
-      <div className="actions"><button type="button" onClick={() => onCopy(item.positive, `${item.name}のPrompt`)}>{item.name}のPromptをコピー</button>
-        {item.negative !== null && <button type="button" onClick={() => onCopy(item.negative!, `${item.name}のUndesired Content`)}>{item.name}のUCをコピー</button>}</div>
-    </div>)}
+    {result.pipe !== null && field('pipe', `${label}: |区切り（コピー専用）`, result.pipe, 3, [{ text: '|区切りをコピー', short: 'コピー', value: result.pipe, what: '|区切りプロンプト' }])}
+    {field('base', `${label}: ベース Prompt`, result.base.positive, 2, [{ text: 'ベース Promptをコピー', short: 'コピー', value: result.base.positive, what: 'ベース Prompt' }])}
+    {result.characters.map((item, index) => field(item.characterId, `${label}: キャラクター${index + 1}（${item.name}${item.side ? ` / ${item.side === 'left' ? '左' : '右'}` : ''}）`, item.positive, 2, [
+      { text: `${item.name}のPromptをコピー`, short: 'コピー', value: item.positive, what: `${item.name}のPrompt` },
+      ...(item.negative !== null ? [{ text: `${item.name}のUCをコピー`, short: 'UCをコピー', value: item.negative, what: `${item.name}のUndesired Content` }] : []),
+    ]))}
   </div>;
 }
 
@@ -101,43 +104,15 @@ export function Shuffle({ workbench, siteClient }: { workbench: Workbench; siteC
       <div className="section-title"><h2>シャッフル</h2><InfoTip label="シャッフル">キャラクターの外見（固定プロンプト）は変えずに、役割・ポーズ・表情・カメラ・左右順だけを入れ替えます。Shuffle Nowで結果を確認し、各欄をコピーしてNovelAIに貼り付けます。プレビューとApplyまでNovelAIの入力欄は変更しません。</InfoTip></div>
       {autoRunning && <p role="status" aria-label="自動シャッフル実行中の注意" className="hint">⚠ 自動シャッフル実行中です。シャッフル設定・キャラクター・テンプレート・候補・ベースプロンプトを変更すると、安全のため自動で停止します。</p>}
       <label>シャッフルプロファイル<select value={profile?.id ?? ''} disabled={autoRunning} onChange={event => change(current => ({ ...current, activeProfileId: event.target.value || null }))}><option value="" disabled>プロファイルを選択</option>{shuffle.profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <form className="actions" aria-label="シャッフルプロファイル作成" onSubmit={event => {
+      {!profile && <>
+        <form className="actions" aria-label="シャッフルプロファイル作成" onSubmit={event => {
           event.preventDefault();
           const created = createProfile(newId(), profileName.trim() || `プロファイル${shuffle.profiles.length + 1}`, newSeed());
           if (change(current => addProfile(current, { ...created, characterIds: current.characters.map(item => item.id).slice(0, 6) }))) setProfileName('');
         }}><label>新しいプロファイル名<input maxLength={200} value={profileName} onChange={event => setProfileName(event.target.value)} /></label><button type="submit">＋ プロファイル</button></form>
-      {!profile ? <Empty>プロファイルを作成すると、シャッフル方式・Seed・対象キャラクターを設定できます。</Empty> : <>
-        <Rename label="プロファイル名" value={profile.name} onSave={name => changeProfile(current => ({ ...current, name }))} />
-        <label className="inline"><input type="checkbox" checked={profile.settings.enabled} onChange={event => setSettings({ enabled: event.target.checked })} />シャッフル有効</label>
-        <fieldset className="actions"><legend>対象カテゴリ</legend>{SHUFFLE_TARGETS.map(target => <label className="inline" key={target}><input type="checkbox" checked={profile.settings.targets[target]} onChange={event => setSettings({ targets: { ...profile.settings.targets, [target]: event.target.checked } })} />{TARGET_LABELS[target]}</label>)}</fieldset>
-        <div className="columns">
-          <label>シャッフル方式<select value={profile.settings.mode} onChange={event => setSettings({ mode: event.target.value as ShuffleSettings['mode'] })}>{Object.entries(MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <NumberCommit label="直近N件と同じ構図を避ける" value={profile.settings.avoidRecent} min={0} max={MAX_AVOID_RECENT} onCommit={avoidRecent => setSettings({ avoidRecent })} />
-        </div>
-        <label className="inline"><input type="checkbox" checked={profile.settings.avoidRepeat} onChange={event => setSettings({ avoidRepeat: event.target.checked })} />直前と同じ候補を避ける</label>
-        <div className="actions">
-          <TextCommit label="シャッフルSeed" value={profile.settings.seed} maxLength={128} required onCommit={seed => setSettings({ seed: seed.trim() })} />
-          <button type="button" onClick={() => setSettings({ seed: newSeed() })}>Seedを再生成</button>
-          <button type="button" disabled={!profile.cursor.step || autoRunning} onClick={() => changeProfile(resetCursor)}>ステップ0に戻す</button>
-        </div>
-        <small>ステップ {profile.cursor.step}。同じ設定・Seed・ステップ数で同じ結果を再現します。NovelAIの画像生成Seedとは別で、生成Seedは読み書きしません。</small>
-        <div className="columns">
-          <label>モデル<select value={profile.settings.model} onChange={event => setSettings({ model: event.target.value as ShuffleSettings['model'] })}>{MODEL_IDS.map(id => <option key={id} value={id}>{MODEL_PROFILES[id].label}</option>)}</select></label>
-          <label>出力形式<select value={profile.settings.outputMode} onChange={event => setSettings({ outputMode: event.target.value as ShuffleSettings['outputMode'] })}><option value="fields">キャラクター欄（推奨）</option><option value="pipe">|区切り（コピー専用）</option></select></label>
-        </div>
-        {profile.settings.targets.position && <div className="columns">
-          <TextCommit label="左側キャラクターの補助テキスト" value={profile.settings.positionHints.left} maxLength={1000} onCommit={left => setSettings({ positionHints: { ...profile.settings.positionHints, left } })} />
-          <TextCommit label="右側キャラクターの補助テキスト" value={profile.settings.positionHints.right} maxLength={1000} onCommit={right => setSettings({ positionHints: { ...profile.settings.positionHints, right } })} />
-        </div>}
-        <button type="button" className="small danger" onClick={() => { if (confirm(`プロファイル「${profile.name}」と、その履歴を削除しますか？キャラクター・テンプレートは残ります。Undoで戻せます。`)) change(current => removeProfile(current, profile.id)); }}>プロファイルを削除</button>
+        <Empty>プロファイルを作成すると、キャラクターの役割・ポーズなどを入れ替えられます。</Empty>
       </>}
     </section>
-
-    <CharacterList shuffle={shuffle} profile={profile} change={change} />
-    <TemplateList shuffle={shuffle} change={change} />
-    <PoolList shuffle={shuffle} change={change} />
-    <CameraList shuffle={shuffle} change={change} />
-    <ShuffleTransfer shuffle={shuffle} change={change} onError={workbench.setError} />
 
     {profile && composed && <section className="panel stack preview" aria-label="シャッフル結果">
       <div className="group-head"><h2>シャッフル結果</h2><small>ベース: {base.title ?? 'ワークスペースなし'}</small></div>
@@ -162,6 +137,44 @@ export function Shuffle({ workbench, siteClient }: { workbench: Workbench; siteC
 
     {profile && composed && <ShuffleSite client={siteClient} profile={profile} composed={composed} onShuffle={shuffleNow} onAutoEveryChange={autoEvery => setSettings({ autoEvery })}
       autoCheck={autoCheck} profileName={id => shuffle.profiles.find(item => item.id === id)?.name ?? '削除済みプロファイル'} onAutoChange={setAutoRunning} />}
+
+    {profile && <details className="panel" aria-label="プロファイルの設定"><summary>シャッフルの設定（方式・Seed・対象カテゴリ・プロファイル）</summary><div className="stack">
+        <Rename label="プロファイル名" value={profile.name} onSave={name => changeProfile(current => ({ ...current, name }))} />
+        <label className="inline"><input type="checkbox" checked={profile.settings.enabled} onChange={event => setSettings({ enabled: event.target.checked })} />シャッフル有効</label>
+        <fieldset className="actions"><legend>対象カテゴリ</legend>{SHUFFLE_TARGETS.map(target => <label className="inline" key={target}><input type="checkbox" checked={profile.settings.targets[target]} onChange={event => setSettings({ targets: { ...profile.settings.targets, [target]: event.target.checked } })} />{TARGET_LABELS[target]}</label>)}</fieldset>
+        <div className="columns">
+          <label>シャッフル方式<select value={profile.settings.mode} onChange={event => setSettings({ mode: event.target.value as ShuffleSettings['mode'] })}>{Object.entries(MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <NumberCommit label="直近N件と同じ構図を避ける" value={profile.settings.avoidRecent} min={0} max={MAX_AVOID_RECENT} onCommit={avoidRecent => setSettings({ avoidRecent })} />
+        </div>
+        <label className="inline"><input type="checkbox" checked={profile.settings.avoidRepeat} onChange={event => setSettings({ avoidRepeat: event.target.checked })} />直前と同じ候補を避ける</label>
+        <div className="actions">
+          <TextCommit label="シャッフルSeed" value={profile.settings.seed} maxLength={128} required onCommit={seed => setSettings({ seed: seed.trim() })} />
+          <button type="button" onClick={() => setSettings({ seed: newSeed() })}>Seedを再生成</button>
+          <button type="button" disabled={!profile.cursor.step || autoRunning} onClick={() => changeProfile(resetCursor)}>ステップ0に戻す</button>
+        </div>
+        <small>ステップ {profile.cursor.step}。同じ設定・Seed・ステップ数で同じ結果を再現します。NovelAIの画像生成Seedとは別で、生成Seedは読み書きしません。</small>
+        <div className="columns">
+          <label>モデル<select value={profile.settings.model} onChange={event => setSettings({ model: event.target.value as ShuffleSettings['model'] })}>{MODEL_IDS.map(id => <option key={id} value={id}>{MODEL_PROFILES[id].label}</option>)}</select></label>
+          <label>出力形式<select value={profile.settings.outputMode} onChange={event => setSettings({ outputMode: event.target.value as ShuffleSettings['outputMode'] })}><option value="fields">キャラクター欄（推奨）</option><option value="pipe">|区切り（コピー専用）</option></select></label>
+        </div>
+        {profile.settings.targets.position && <div className="columns">
+          <TextCommit label="左側キャラクターの補助テキスト" value={profile.settings.positionHints.left} maxLength={1000} onCommit={left => setSettings({ positionHints: { ...profile.settings.positionHints, left } })} />
+          <TextCommit label="右側キャラクターの補助テキスト" value={profile.settings.positionHints.right} maxLength={1000} onCommit={right => setSettings({ positionHints: { ...profile.settings.positionHints, right } })} />
+        </div>}
+        <button type="button" className="small danger" onClick={() => { if (confirm(`プロファイル「${profile.name}」と、その履歴を削除しますか？キャラクター・テンプレートは残ります。Undoで戻せます。`)) change(current => removeProfile(current, profile.id)); }}>プロファイルを削除</button>
+        <form className="actions" aria-label="シャッフルプロファイル作成" onSubmit={event => {
+          event.preventDefault();
+          const created = createProfile(newId(), profileName.trim() || `プロファイル${shuffle.profiles.length + 1}`, newSeed());
+          if (change(current => addProfile(current, { ...created, characterIds: current.characters.map(item => item.id).slice(0, 6) }))) setProfileName('');
+        }}><label>新しいプロファイル名<input maxLength={200} value={profileName} onChange={event => setProfileName(event.target.value)} /></label><button type="submit">＋ プロファイル</button></form>
+    </div></details>}
+
+    <CharacterList shuffle={shuffle} profile={profile} change={change} />
+    <TemplateList shuffle={shuffle} change={change} />
+    <PoolList shuffle={shuffle} change={change} />
+    <CameraList shuffle={shuffle} change={change} />
+    <ShuffleTransfer shuffle={shuffle} change={change} onError={workbench.setError} />
+
 
     {profile && <details className="panel"><summary>シャッフル履歴 ({history.length})</summary><div className="stack" aria-label="シャッフル履歴">
       {!history.length && <Empty>Shuffle Nowの結果がここに残ります（最大50件）。</Empty>}

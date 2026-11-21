@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { openFold, openPresetDetails, openPreview } from './helpers';
 import { unknownSettings } from '../../src/core/experiments';
 import { savePreset } from '../../src/core/presets';
 import { fixture, timestamp } from '../unit/helpers';
@@ -8,7 +9,8 @@ import { chunk, png } from '../fixtures/png';
 const field = (page: Page, name: string) => page.getByRole('textbox', { name, exact: true });
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const saved = (page: Page) => expect(page.getByText('保存済み · この端末のみ', { exact: true })).toBeVisible();
-const tab = async (page: Page, name: string) => page.getByRole('tab', { name, exact: true }).click();
+// The workspace output preview starts collapsed on the Compare / Settings tabs; open it like a user would.
+const tab = async (page: Page, name: string) => { await page.getByRole('tab', { name, exact: true }).click(); if (name === '比較' || name === '設定') await openPreview(page); };
 async function boot(page: Page, demo = true) {
   page.on('dialog', dialog => void dialog.accept()); await page.goto('/tests/fixtures/index.html'); await saved(page);
   if (demo) { await tab(page, '設定'); await button(page, 'デモを追加').click(); await saved(page); }
@@ -39,7 +41,7 @@ test('fixed A/B snapshots, local B changes, one-step Undo and session CRUD persi
 test('preset source remains reproducible after preset and library changes', async ({ page }) => {
   await boot(page); await tab(page, 'ワークスペース'); await field(page, '新しいプリセット名').fill('元プリセット'); await button(page, '現在の構成をプリセット保存').click(); await saved(page);
   const original = await field(page, '出力 Positive').inputValue(); await tab(page, '比較'); await page.getByRole('combobox', { name: '比較元', exact: true }).selectOption({ label: '元プリセット' }); await create(page);
-  await tab(page, 'ワークスペース'); await field(page, '自由入力 Positive').fill('changed current'); await button(page, '現在の構成で上書き保存').click(); await saved(page); await button(page, 'プリセットを削除').click(); await saved(page);
+  await tab(page, 'ワークスペース'); await field(page, '自由入力 Positive').fill('changed current'); await button(page, '現在の構成で上書き保存').click(); await saved(page); await openPresetDetails(page); await button(page, 'プリセットを削除').click(); await saved(page);
   await tab(page, '比較'); await expect(field(page, 'A positive')).toHaveValue(original); await expect(field(page, 'B positive')).toHaveValue(original); await expect(page.getByLabel('比較 A', { exact: true })).toContainText('参照先削除済み'); await expect(field(page, '出力 Positive')).toContainText('changed current');
 });
 
@@ -49,7 +51,7 @@ test('imports metadata/no-metadata PNG, deduplicates by SHA-256, supports drop, 
   const a = png(4, 4, { 'nai-prompt-workbench': raw }); await upload(page, 'A', a); await upload(page, 'B', a, 'same-bytes.png');
   await expect(page.getByText('同一ハッシュの画像を再利用しました。', { exact: true })).toBeVisible(); await expect(page.getByRole('heading', { name: '画像ライブラリ (1)', exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible();
-  await page.getByLabel('比較 A', { exact: true }).getByText('抽出メタデータ（信頼されないテキスト）', { exact: true }).click(); await expect(page.getByLabel('比較 A', { exact: true })).toContainText('900719925474099312345'); expect(await page.locator('img[onerror], script:not([src])').count()).toBe(0);
+  await openFold(page, /^画像の情報・照合（A/); await page.getByLabel('比較 A', { exact: true }).getByText('抽出メタデータ（信頼されないテキスト）', { exact: true }).click(); await expect(page.getByLabel('比較 A', { exact: true })).toContainText('900719925474099312345'); expect(await page.locator('img[onerror], script:not([src])').count()).toBe(0);
   await page.getByRole('combobox', { name: '表示モード', exact: true }).selectOption('diff'); await expect(page.getByLabel('画像比較', { exact: true })).toContainText('変更ピクセル 0 / 16');
   const bytes = [...png(2, 3, {}, 200)]; const target = page.getByLabel('比較 B', { exact: true }).locator('.drop-zone');
   const transfer = await page.evaluateHandle(bytes => { const transfer = new DataTransfer(); transfer.items.add(new File([new Uint8Array(bytes)], 'different.png', { type: 'image/png' })); return transfer; }, bytes);
@@ -71,7 +73,7 @@ test('rejects corrupt files without replacing snapshots or existing image and un
   const corruptPixels = Buffer.concat([png().subarray(0, 33), chunk('IDAT', Buffer.from([1, 2, 3])), chunk('IEND', Buffer.alloc(0))]);
   await page.getByLabel('AにPNGを取り込む', { exact: true }).setInputFiles({ name: 'corrupt-pixels.png', mimeType: 'image/png', buffer: corruptPixels });
   await expect(page.getByRole('alert')).toContainText('画像取込失敗'); await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible();
-  await button(page, '登録画像を削除').click(); await saved(page); await expect(page.getByRole('heading', { name: '画像ライブラリ (0)', exact: true })).toBeVisible();
+  await openFold(page, /^画像ライブラリ/); await button(page, '登録画像を削除').click(); await saved(page); await expect(page.getByRole('heading', { name: '画像ライブラリ (0)', exact: true })).toBeVisible();
   await button(page, '元に戻す').click(); await saved(page); await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible();
 });
 
@@ -116,10 +118,10 @@ test('manual image notes and original-file export preserve pixels and never rewr
   await boot(page); await create(page);
   await page.evaluate(() => { const urls = new Set<string>(); (window as unknown as { liveUrls: Set<string> }).liveUrls = urls; const create = URL.createObjectURL; const revoke = URL.revokeObjectURL; URL.createObjectURL = value => { const url = create(value); urls.add(url); return url; }; URL.revokeObjectURL = url => { urls.delete(url); revoke(url); }; });
   const bytes = png(3, 2); await upload(page, 'A', bytes); const before = await field(page, 'A positive').inputValue();
-  const slot = page.getByLabel('比較 A', { exact: true }); await slot.getByText('画像情報を手入力で補完', { exact: true }).click();
+  const slot = page.getByLabel('比較 A', { exact: true }); await openFold(page, /^画像の情報・照合（A/); await slot.getByText('画像情報を手入力で補完', { exact: true }).click();
   await slot.getByLabel('画像 Positive 注記', { exact: true }).fill('<script>手入力</script>'); await slot.getByLabel('画像 Negative 注記', { exact: true }).fill('manual negative'); await slot.getByRole('button', { name: '画像のプロンプト注記を保存', exact: true }).click(); await saved(page);
   await expect(slot).toContainText('画像Prompt取得元: manual'); await expect(field(page, 'A positive')).toHaveValue(before);
-  const event = page.waitForEvent('download'); await button(page, '画像原本を保存').click(); const path = await (await event).path(); expect(await readFile(path!)).toEqual(bytes);
+  await openFold(page, /^画像ライブラリ/); const event = page.waitForEvent('download'); await button(page, '画像原本を保存').click(); const path = await (await event).path(); expect(await readFile(path!)).toEqual(bytes);
   await tab(page, 'ライブラリ'); await expect.poll(() => page.evaluate(() => (window as unknown as { liveUrls: Set<string> }).liveUrls.size)).toBe(0);
   await page.reload(); await saved(page); await tab(page, '比較'); await expect(page.getByLabel('比較 A', { exact: true })).toContainText('画像Prompt取得元: manual');
 });

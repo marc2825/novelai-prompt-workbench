@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
+import { openFold } from './helpers';
 import { png } from '../fixtures/png';
 
 test('built MV3 extension loads unpacked and persists across a full browser restart', async ({}, testInfo) => {
@@ -166,6 +167,7 @@ test('real Content Script: shuffle reports unverified character fields, generati
     await panel.getByRole('button', { name: '＋ プロファイル', exact: true }).click();
     await panel.getByRole('textbox', { name: '新しいキャラクター名', exact: true }).fill('Solo');
     await panel.getByRole('button', { name: 'キャラクターを追加', exact: true }).click();
+    await openFold(panel, /^NovelAIのページへ反映/);
     await panel.getByRole('button', { name: 'シャッフル用にNovelAIを接続', exact: true }).click();
     const select = panel.getByRole('combobox', { name: 'シャッフルの対象タブ', exact: true });
     const tabId = await select.getByRole('option', { name: /Mock shuffle/ }).getAttribute('value');

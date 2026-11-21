@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
+import { openPresetDetails } from './helpers';
 import { emptyData } from '../../src/core/commands';
 import { commentRange } from '../../src/core/comments';
 import { compileWorkspace } from '../../src/core/compose';
@@ -24,6 +25,8 @@ async function save(page: Page, name: string) {
 }
 async function select(page: Page, name: string) {
   await page.getByRole('combobox', { name: 'プリセットを選択', exact: true }).selectOption({ label: name });
+  // In the Workspace tab the diff, search, rename and delete controls are folded; open them like a user would.
+  await openPresetDetails(page);
 }
 async function apply(page: Page) {
   await page.getByRole('button', { name: 'プリセットを適用', exact: true }).click(); await saved(page);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MAX_DIFF_PIXELS, pixelDifference } from '../core/experiments';
 import type { ImageRecord } from '../core/types';
 import { message, type Workbench } from './useWorkbench';
+import { InfoTip } from './InfoTip';
 
 export function useImage(workbench: Workbench, id: string | null, thumbnail = false) {
   const [result, setResult] = useState<{ url: string; blob?: Blob; missing: boolean }>({ url: '', missing: false });
@@ -53,14 +54,13 @@ export function ImageComparison({ workbench, a, b }: { workbench: Workbench; a?:
   const scale = Math.min(frameWidth / Math.max(a?.width ?? 1, b?.width ?? 1), 280 / Math.max(a?.height ?? 1, b?.height ?? 1)) * zoom;
   const picture = (url: string, image: ImageRecord | undefined, alt: string) => image && url ? <img draggable={false} src={url} alt={alt} style={{ width: image.width * scale, height: image.height * scale, transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))` }} /> : null;
   return <section className="panel stack" aria-label="画像比較">
-    <h3>画像比較</h3><label>表示モード<select value={mode} onChange={event => setMode(event.target.value)}><option value="side">A/B横並び</option><option value="wipe">重ね合わせスライダー</option><option value="diff">ピクセル差分</option></select></label>
+    <div className="section-title"><h3>画像比較</h3><InfoTip label="画像比較の操作">画像をドラッグするとA/Bが同じ位置で動きます（同期パン）。画像枠にフォーカスして矢印キーでも移動できます。ズームはA/B共通です。</InfoTip></div><label>表示モード<select value={mode} onChange={event => setMode(event.target.value)}><option value="side">A/B横並び</option><option value="wipe">重ね合わせスライダー</option><option value="diff">ピクセル差分</option></select></label>
     {(!a || !b) && <p>比較するPNGをA/B両方に関連付けてください。</p>}
     {(aa.missing || bb.missing) && <p role="alert">画像原本が欠落、またはメタデータと不整合です。JSONには画像バイナリを含みません。同一PNGを再取込すると復元できます。</p>}
     {a && b && <p>A: {a.width}×{a.height} / B: {b.width}×{b.height}</p>}
     {mismatch && <p role="alert">画像サイズが異なります。通常表示は同じ倍率で中央に配置します。</p>}
     {mode === 'diff' && <><p>ブラウザでデコードしたsRGB RGBA値の絶対差です。色管理による差を含み、原本は変更しません。</p>{mismatch && <label className="inline"><input type="checkbox" checked={resize} onChange={event => setResize(event.target.checked)} />BをAの幅・高さへ変形して比較（Canvas高品質補間、縦横比変更あり）</label>}{mismatch && !resize && <p>リサイズ条件を明示的に選ぶまで差分は計算しません。</p>}<p role="status">{diff.info}</p></>}
     <label>同期ズーム<input type="range" min="1" max="8" step="0.1" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label><button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>表示位置をリセット</button>
-    <p className="hint">画像をドラッグして同期パン。画像枠にフォーカスして矢印キーでも移動できます。</p>
     {mode === 'wipe' && <label>重ね合わせ位置<input type="range" min="0" max="100" value={wipe} onChange={event => setWipe(Number(event.target.value))} /></label>}
     <div className={mode === 'side' ? 'image-pair' : ''} onPointerDown={event => { drag.current = { x: event.clientX - pan.x, y: event.clientY - pan.y }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerMove={event => { if (drag.current) setPan({ x: event.clientX - drag.current.x, y: event.clientY - drag.current.y }); }} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
       <div ref={frame} className="image-frame" tabIndex={0} aria-label="同期画像枠" onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) { event.preventDefault(); setPan(value => ({ x: value.x + (event.key === 'ArrowLeft' ? -20 : event.key === 'ArrowRight' ? 20 : 0), y: value.y + (event.key === 'ArrowUp' ? -20 : event.key === 'ArrowDown' ? 20 : 0) })); } }}>
