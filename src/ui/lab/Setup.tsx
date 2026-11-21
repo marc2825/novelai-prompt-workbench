@@ -3,6 +3,7 @@ import { AXIS_KINDS, emptyAxis } from '../../core/lab/types';
 import { applyTemplate, PRESETS, SAMPLERS } from '../../core/lab/engine';
 import { consecutiveSeeds, seedList } from '../../core/lab/values';
 import { message } from '../useWorkbench';
+import { Hint } from '../InfoTip';
 export type Translate = (ja: string, en: string) => string;
 export const axisLabels = ['固定 / Fixed','タグ重み / Tag Weight','有無 / On–Off','タグ置換 / Replace','Prompt S/R','タグ位置 / Position','タググループ / Group','Prompt Variant','Seed','Steps','Prompt Guidance','Guidance Rescale','Sampler','Model','解像度 / Resolution','UC Variant','Quality Tags','Prompt Matrix'];
 export function Setup({ value: d, change, t }: { value: Definition; change: (d: Definition) => void; t: Translate }) {
@@ -29,7 +30,7 @@ export function Setup({ value: d, change, t }: { value: Definition; change: (d: 
         {['weight','onOff','replace','searchReplace','position'].includes(a.kind) && <div className="columns"><label>{['X','Y','Z'][i]} Target<input maxLength={1000} value={a.target} onChange={e => axis(i,{...a,target:e.target.value})} /></label><label>{t('出現番号（1から、S/Rのみ0=全件）','Occurrence (1-based; S/R only: 0=all)')}<input type="number" min={a.kind === 'searchReplace' ? 0 : 1} value={a.occurrence} onChange={e => axis(i,{...a,occurrence:Number(e.target.value)})} /></label></div>}
         <div className="columns"><label>Channel<select value={a.channel} disabled={a.kind === 'uc'} onChange={e => axis(i,{...a,channel:e.target.value as Axis['channel']})}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>{t('候補形式','Value format')}<select value={a.format} onChange={e => axis(i,{...a,format:e.target.value as Axis['format']})}><option value="lines">1 line = 1 candidate</option><option value="csv">CSV ("a, b",c)</option></select></label></div>
         <label>{['X','Y','Z'][i]} Values<textarea maxLength={100000} value={a.input} onChange={e => axis(i,{...a,input:e.target.value})} /></label>
-        <p className="hint">{t('数値: 0.5,1,1.5 / 0.5-2 (+0.25) / 0.5-2 [7]。有無: Off/On、位置: first/last、解像度: 1024x1024。テキストは1行1候補。','Numbers: 0.5,1,1.5 / 0.5-2 (+0.25) / 0.5-2 [7]. On/Off: Off/On. Position: first/last. Resolution: 1024x1024. Text: one candidate per line.')}</p>
+        <Hint label={`${['X','Y','Z'][i]}軸の値の書き方`} summary={t('値の書き方','How to write values')}>{t('数値: 0.5,1,1.5 / 0.5-2 (+0.25) / 0.5-2 [7]。有無: Off/On、位置: first/last、解像度: 1024x1024。テキストは1行1候補。','Numbers: 0.5,1,1.5 / 0.5-2 (+0.25) / 0.5-2 [7]. On/Off: Off/On. Position: first/last. Resolution: 1024x1024. Text: one candidate per line.')}</Hint>
       </>}
       <div className="actions"><button type="button" onClick={() => { const next = [...d.axes] as Definition['axes']; const j = (i+1)%3; [next[i],next[j]] = [next[j]!,next[i]!]; set('axes',next); }}>{t('次の軸と交換','Swap with next axis')}</button><button type="button" onClick={() => axis((i+1)%3,structuredClone(a))}>{t('次の軸へコピー','Copy to next axis')}</button></div>
     </fieldset>)}

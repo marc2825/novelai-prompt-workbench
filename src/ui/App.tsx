@@ -20,6 +20,8 @@ import { InfoTip } from './InfoTip';
 type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
 // Ordered by workflow: build prompts → save/vary them → compare results → settings & backup.
 const TABS: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット', 'シャッフル', '比較', 'Experiment Lab', '設定'];
+// The workspace output is the main result on these tabs; elsewhere it starts collapsed.
+const PREVIEW_OPEN: Tab[] = ['ライブラリ', 'ワークスペース', 'プリセット'];
 
 export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const workbench = useWorkbench();
@@ -61,8 +63,8 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const statusPill = <div className={`status ${workbench.storageError ? 'error' : !data ? 'loading' : workbench.saving ? 'saving' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>;
   return <main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
     <header className="app-header">
-      <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです">非公式</span><InfoTip label="このツール">原文を残したまま、プロンプトの部品を組み合わせて切り替えるための非公式ツールです（NovelAIの公式製品ではなく、提携もしていません）。データはこの端末だけに保存され、外部には送信しません。画像の生成はNovelAI上で行います。</InfoTip></div>
-      <div className="header-links">{!data && statusPill}<a href={location.pathname} target="_blank" rel="noreferrer" title="サイドパネルより広い画面で、同じデータを開きます">広いタブで開く</a></div>
+      <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです。データはこの端末だけに保存され、画像の生成はNovelAI上で行います">非公式</span></div>
+      <div className="header-links">{!data && statusPill}<a href={location.pathname} target="_blank" rel="noreferrer" aria-label="広いタブで開く" title="広いタブで開く（サイドパネルより広い画面で、同じデータを開きます）">↗ タブ</a></div>
     </header>
     {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データをJSONで退避するか、DBの復旧用ファイルを保存してください。</p><div className="actions">
       {data && <button type="button" className="primary" onClick={workbench.retry}>保存を再試行</button>}
@@ -105,7 +107,10 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
         {tab === 'Experiment Lab' && <Lab workbench={workbench} siteClient={siteClient} onDraftChange={setComparisonDraft} />}
         {tab === 'シャッフル' && <Shuffle workbench={workbench} siteClient={siteClient} />}
       </div>
-      {tab !== 'Experiment Lab' && <section className="panel stack preview" aria-label="ライブプレビュー"><div className="group-head"><div className="title"><h2>出力プレビュー</h2><InfoTip label="出力プレビュー">現在のワークスペースから合成したプロンプトです。コピーしてNovelAIに貼り付け、NovelAI上で生成してください。OFFにした部品・範囲は出力しません。</InfoTip></div><small>{workspace?.title ?? '構成なし'}</small></div>
+      {tab !== 'Experiment Lab' && <details className="panel preview" aria-label="ライブプレビュー" open={PREVIEW_OPEN.includes(tab)}>
+        <summary>出力プレビュー<small>{workspace?.title ?? '構成なし'}</small></summary>
+        <div className="stack">
+        <InfoTip label="出力プレビュー">現在のワークスペースから合成したプロンプトです。コピーしてNovelAIに貼り付け、NovelAI上で生成してください。OFFにした部品・範囲は出力しません。</InfoTip>
         {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}>
           <div className="field-head"><label htmlFor={`preview-${channel}`}>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}</label><button type="button" className="small primary" onClick={() => void copy(channel)}>{channel === 'positive' ? 'Positiveをコピー' : 'Negativeをコピー'}</button></div>
           <textarea id={`preview-${channel}`} readOnly rows={2} value={compiled[channel]} />
@@ -119,8 +124,9 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
             const { freeformNegativeSpans: _spans, ...rest } = item; return { ...rest, freeformNegative: raw, updatedAt: now() };
           }) }));
         }} />
-      </section>}
+        </div>
+      </details>}
     </>}
-    <footer>非公式ツール・データはこの端末のみ・生成はNovelAI上で手動。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
+    <footer>非公式ツール・データはこの端末のみ。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
   </main>;
 }

@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openPreview } from './helpers';
 import { png } from '../fixtures/png';
 
 const field = (page: Page, name: string) => page.getByRole('textbox', { name, exact: true });
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const saved = (page: Page) => expect(page.getByText('保存済み · この端末のみ', { exact: true })).toBeVisible();
-const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true }).click();
+const tab = async (page: Page, name: string) => { await page.getByRole('tab', { name, exact: true }).click(); if (name === '比較') await openPreview(page); };
 async function select(page: Page, label: string, text: string, last = false) {
   await field(page, label).evaluate((element: HTMLTextAreaElement, { text, last }) => {
     element.focus(); const start = last ? element.value.lastIndexOf(text) : element.value.indexOf(text); element.setSelectionRange(start, start + text.length);
