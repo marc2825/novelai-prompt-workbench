@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 脆弱性の報告（非公開） / Report a security vulnerability
+    url: https://github.com/marc2825/novelai-prompt-workbench/security/advisories/new
+    about: 脆弱性は公開Issueに書かず、こちらから非公開で報告してください。Do not open a public issue for vulnerabilities.
+  - name: NovelAI本体の不具合・アカウントの問題 / NovelAI service issues
+    url: https://novelai.net/
+    about: この拡張機能は非公式です。NovelAIのサービス・アカウント・課金に関する問題はNovelAIへお問い合わせください。
