@@ -14,13 +14,13 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 - [x] CI: `contents: read`、Actionをハッシュ固定、`persist-credentials: false`、Dependabot設定（`.github/dependabot.yml`）
 - [x] Issue/PRテンプレート、[CONTRIBUTING.md](../CONTRIBUTING.md)、[PRIVACY.md](../PRIVACY.md)
 
-### GitHubの設定（メンテナーの操作が必要）
+### GitHubの設定（2026-11-21に設定済み）
 
-推奨値と理由は [tasks/STATUS.md](../tasks/STATUS.md) の「GitHubの設定」を参照。
+- [x] Description・Topics
+- [x] Dependabot alerts / Dependabot security updates / Secret scanning・Push protection
+- [x] `main` のルールセット（削除・force push の禁止。CI成功の必須化は運用に合わせて任意）
 
-- [ ] Description・Topics の設定
-- [ ] Dependabot alerts / Dependabot security updates / Secret scanning・Push protection の有効化
-- [ ] `main` のルールセット（force push・削除の禁止。CIの成功を必須にするかは運用に合わせて選択。承認必須にはしない）
+詳細は [tasks/STATUS.md](../tasks/STATUS.md) の「GitHubの設定」。
 
 ## 2. GitHub Releases での配布（未実施）
 
