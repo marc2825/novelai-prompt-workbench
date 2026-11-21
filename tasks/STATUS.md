@@ -15,6 +15,7 @@
 | サイトとの読取り | 実装（観測済みの単純なProseMirrorのみ、英語・日本語） | 英語は公開ページで確認（2026-11-03）。日本語は実ページの構造報告（2026-11-19、issue #4）を模擬ページで再現して検証。修正後の実ページでの再確認・ログイン後の英語UIは未確認 |
 | サイトへの書込み | fixtureのみ | **未検証・無効** |
 | サイドパネル起動 | ツールバーボタンで開く | 実ボタンのクリックは手動確認待ち |
+| GitHub Releases配布 | ワークフロー・検証・手順を整備（リリースZIPの展開・読込・更新時のデータ保持を自動テスト） | 初回リリースは未公開 |
 | UI（ホバー説明・段階的表示） | 実装・自動テスト済み（400px幅のスクリーンショットで目視確認） | 実ブラウザ（Windows/macOS・高DPI）での目視は未実施 |
 
 ## 検証結果（最新）
@@ -52,7 +53,8 @@ E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` �
 
 | 作業 | 価値 | コスト | リスク | 備考 |
 |---|---|---|---|---|
-| Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | Releases配布の前に。手順は [release-checklist](../docs/release-checklist.md) |
+| 初回リリース v0.1.0（Pre-release）の公開 | 高 | 低 | 低 | 仕組みは整備済み。タグ `v0.1.0` のpushで自動公開（メンテナーが実施）。手順は [development.md](../docs/development.md#リリース) |
+| Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | 公開の前後に。手順は [release-checklist](../docs/release-checklist.md) |
 | NovelAIサポートへの問い合わせ | 高 | 低 | 低 | 規約は拡張機能に言及なし（[security.md](../docs/security.md)）。Chrome Web Store公開の前に推奨。質問案は release-checklist |
 | ストア用の連絡先・掲載文・スクリーンショット（アイコンは2026-11-21に作成済み） | 中 | 中 | 低 | 連絡先はメンテナーが決定（PRIVACY.mdはGitHub Issuesを窓口として記載） |
 

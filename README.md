@@ -23,24 +23,23 @@ NovelAIの画像生成プロンプト（タグ）を、部品として登録・�
 
 ## インストール
 
-Chrome Web Store・GitHub Releasesでの配布はまだありません。ソースコードからビルドします。
+Node.js などは不要です。Chrome Web Store 版ではないため、自動更新はありません。
 
-必要なもの: Git、Node.js 22.12以上、pnpm 10
+1. [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) から最新の `novelai-prompt-workbench-<バージョン>-chrome.zip` をダウンロードする
+2. 置き場所のフォルダを1つ決めて、ZIPの中身を展開する（フォルダの直下に `manifest.json` がある状態にする）
+3. Chromeで `chrome://extensions` を開き、「デベロッパーモード」をONにする
+4. 「パッケージ化されていない拡張機能を読み込む」で、そのフォルダを選ぶ
+5. 拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すとサイドパネルが開く（ピン留めがおすすめ）
 
-```bash
-git clone https://github.com/marc2825/novelai-prompt-workbench.git
-cd novelai-prompt-workbench
-corepack pnpm install --frozen-lockfile
-corepack pnpm build
-```
+Releases にまだファイルがない場合や、開発版を使いたい場合は、[ソースからビルド](docs/development.md)してください。
 
-> Node.js 25以降は Corepack が付属しません。`npm install -g pnpm@10` でpnpmを入れ、`corepack pnpm` を `pnpm` に読み替えてください。
+### 更新するとき
 
-1. Chromeで `chrome://extensions` を開き、「デベロッパーモード」をONにする
-2. 「パッケージ化されていない拡張機能を読み込む」で `.output/chrome-mv3` フォルダを選ぶ
-3. 拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すとサイドパネルが開く（ピン留めがおすすめ）
+1. 「設定」→「完全バックアップをZIPで保存」でバックアップを取る
+2. 新しいZIPをダウンロードし、**前回と同じフォルダ**の中身を入れ替える
+3. `chrome://extensions` で拡張機能の再読み込みボタンを押す
 
-更新するときは `git pull` してから同じ手順でビルドし、`chrome://extensions` で再読み込みします。
+> **別のフォルダから読み込まないでください。** Chromeはフォルダの場所で拡張機能を区別するため、別のフォルダだと保存したデータが表示されません。詳しくは [docs/install.md](docs/install.md)。
 
 ## 使い方
 

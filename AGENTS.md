@@ -54,4 +54,5 @@ Unofficial, local-first Chrome MV3 extension (side panel) for building NovelAI i
 - Implement only the requested scope plus strict prerequisites; prefer existing project standards.
 - Tests added/updated; `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm test:e2e` run with exact results reported, plus any untested real-site behaviour.
 - Update README (user-facing only), `docs/DECISIONS.md`, `tasks/STATUS.md` (and `docs/shuffle/` / `docs/backup.md` when affected).
+- Releases: never push a `vX.Y.Z` tag, publish/edit a GitHub Release or submit to the Chrome Web Store without explicit maintainer approval; version changes update `src/version.ts`, `package.json` and `CHANGELOG.md` together (`docs/development.md`).
 - No commit/push/deploy, license choice, repository-visibility change or real-site write enablement without explicit user direction; no external service calls beyond standard dependency installation.
