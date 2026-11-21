@@ -76,7 +76,8 @@ JSON・完全バックアップZIP・PNG・Lab JSONは**信頼できない入力
 - インストール済みの全155パッケージのライセンスは MIT / BSD / ISC / Apache-2.0 / MPL-2.0（MPL-2.0はビルドツールのみで配布物に含まれない）。
 - 配布物（`.output/chrome-mv3` と `pnpm zip` のZIP）には、拡張機能のコードと `LICENSE.txt`、同梱したサードパーティのライセンス表示 `THIRD_PARTY_NOTICES.txt`（React・React DOM・scheduler・Viteのpreload helper・WXTの実行時コード）だけを含めます。source map・テスト・fixtureは含みません（`extension.spec.ts` がファイル一覧を検証、`tests/unit/release.test.ts` がライセンス表示の欠落を検出）。
 - バンドル内の `fetch` はViteのmodule preload helper（拡張機能自身のchunkの先読み）だけで、外部URLへの通信はありません。
-- GitHub Actions: ワークフローのトークンは `contents: read` のみ、checkoutは認証情報を保存しない（`persist-credentials: false`）、Actionはコミットのフルハッシュで固定し、Dependabotで更新します。シークレットは使いません。
+- リリース: `release.yml` はCIを再利用して迂回できず、ビルド・検証は読取り専用トークンで行い、公開ジョブだけが `contents: write`（プロジェクトのコードを実行しない）。ZIPには `.sha256` を添付する。
+- GitHub Actions: 通常のワークフローのトークンは `contents: read` のみ、checkoutは認証情報を保存しない（`persist-credentials: false`）、Actionはコミットのフルハッシュで固定し、Dependabotで更新します。シークレットは使いません。
 - 秘密情報の検査: Gitleaks 8.30.1 で全コミット・作業ツリーを検査し検出なし（2026-11-21）。
 
 ## 確認済み・未確認

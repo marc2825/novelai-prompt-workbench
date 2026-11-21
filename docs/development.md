@@ -6,6 +6,17 @@
 - pnpm 10.34.5（`corepack pnpm` で固定版を使用。Node.js 25以降はCorepackが同梱されないため `npm install -g pnpm@10.34.5` で入れ、`corepack pnpm` を `pnpm` に読み替え）
 - E2E: Playwright 1.64.1 の Chromium
 
+## ソースからビルドして使う
+
+```bash
+git clone https://github.com/marc2825/novelai-prompt-workbench.git
+cd novelai-prompt-workbench
+corepack pnpm install --frozen-lockfile
+corepack pnpm build
+```
+
+`chrome://extensions` でデベロッパーモードをONにし、「パッケージ化されていない拡張機能を読み込む」で `.output/chrome-mv3` を選びます。更新は `git pull` → 同じ手順でビルド → `chrome://extensions` で再読み込みです。`.output/chrome-mv3` とReleases版の置き場所フォルダは別の拡張機能として扱われ、データは共有されません（移すときは完全バックアップ → 復元）。
+
 ## コマンド
 
 ```bash
@@ -34,6 +45,7 @@ fixtureはReactの開発ビルド（`NODE_ENV=development`）で作るため、S
 | 種類 | ファイル | 内容 |
 |---|---|---|
 | Mock E2E（fixture） | `workbench`, `presets`, `comparisons`, `weights`, `site`, `shuffle`, `lab`, `backup` | UI・保存・模擬サイトへの書込みフロー |
+| リリースZIPのE2E | `release.spec.ts` | `wxt zip` のZIPを展開して読み込み、再起動後の保持・同じフォルダへの更新でのデータ保持・別フォルダでは別の拡張機能になることを確認 |
 | 実拡張E2E | `extension.spec.ts` | `.output/chrome-mv3` をunpackedで読み込み、manifest・再起動後の保持・実content script。`https://novelai.net/**` はPlaywrightで模擬HTMLに差し替え、実サイトへは通信しない |
 
 Mock E2Eや模擬HTMLでの成功を、実NovelAIでの動作確認として報告しないでください。
@@ -65,7 +77,7 @@ src/
 tests/unit/           Vitest（perf/ は性能計測用データ）
 tests/e2e/            Playwright
 tests/fixtures/       fixtureページ・合成PNG・旧DB
-scripts/              E2E用fixtureの配信（serve-fixture.mjs）、アイコンの原本と描き出し（icon/, render-icons.mjs）
+scripts/              E2E用fixtureの配信（serve-fixture.mjs）、アイコン（icon/, render-icons.mjs）、リリースの検証とノート生成（verify-release.mjs, release-notes.mjs, release-lib.mjs）
 public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.txt、icon/）
 ```
 
@@ -103,7 +115,25 @@ public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.tx
 
 ## リリース
 
-1. `src/version.ts` と `package.json` の `version` を同時に更新（テストで一致を確認）。`CHANGELOG.md` の Unreleased を版番号にする。
-2. 4つのチェック → `corepack pnpm zip`。
-3. ZIPの中身が `manifest.json`・`background.js`・`sidepanel.html`・`assets/`・`chunks/`・`content-scripts/`・`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt` だけであることを確認（fixture・テスト・source mapを含まない。`extension.spec.ts` も検証）。
-4. 手動確認項目は [release-checklist.md](release-checklist.md)。
+リリースは `vX.Y.Z` 形式のタグのpushで `.github/workflows/release.yml` が自動で作成します。タグのpushとリリースの公開はメンテナーの判断で行います（エージェントは明示的な許可なしに行わない）。
+
+ワークフローの流れ（どれかが失敗するとリリースは作られません）:
+
+1. `ci` — 通常のCI（`ci.yml` を呼び出し）: 単体テスト・型検査・ビルド・E2E。リリースがこの検査を迂回することはありません。
+2. `package`（読取り専用トークン）— タグのコミットが `main` 上にあることを確認 → `pnpm zip` → `node scripts/verify-release.mjs --tag <タグ>` → リリースノート生成 → 成果物をワークフローのartifactに保存。
+3. `publish`（このジョブだけ `contents: write`。プロジェクトのコードは実行しない）— artifactのSHA-256を照合し、`gh release create` でZIPと `.sha256` を添付。v0.x は Pre-release として公開。
+
+`verify-release.mjs` が確認する内容: `package.json`・`src/version.ts`・ビルドしたmanifest・タグのバージョンが一致、ZIPの直下に `manifest.json`、許可したファイルだけ（source map・テスト・fixture・想定外のファイルなし）、`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt`・アイコン4種あり、権限は `sidePanel` のみ、content scriptはNovelAIの画像生成ページのみ、認証情報らしき文字列なし。
+
+リリースノートは `CHANGELOG.md` の `## [X.Y.Z]` の節から作ります（節が無いと失敗）。確認できていないこと・制限もその節に書きます。
+
+### 手順
+
+1. `src/version.ts` と `package.json` の `version` を更新する（単体テストが一致を確認）。
+2. `CHANGELOG.md` の `## [Unreleased]` の内容を `## [X.Y.Z]` の節にまとめる。
+3. PRでmainにマージし、CIの成功を確認する。
+4. 手動確認（[release-checklist.md](release-checklist.md)）。事前にZIPを確認したい場合は、Actions の「Release」→「Run workflow」（dry run。ZIPを検証してartifactに保存するだけで、リリースは作らない）を使う。
+5. `git tag vX.Y.Z <mainのコミット>` → `git push origin vX.Y.Z`。
+6. Actions の「Release」が成功したら、Releases ページで内容を確認する。
+
+ローカルでの確認: `corepack pnpm zip && node scripts/verify-release.mjs`（`.output/` にZIPと `.sha256`）。`tests/e2e/release.spec.ts` は、実際にZIPを展開して読み込み、再起動後のデータ保持と、同じフォルダへの更新でデータが保たれることを確認します。

@@ -1,0 +1,10 @@
+export function sha256(bytes: Uint8Array): string;
+export function zipName(version: string): string;
+export const ALLOWED_FILE: RegExp;
+export const REQUIRED_FILES: string[];
+export function readZip(buffer: Uint8Array): { name: string; directory: boolean; data: Buffer }[];
+export function verifyReleaseZip(buffer: Uint8Array, expectedVersion: string): { problems: string[]; files: string[]; manifest: Record<string, unknown> | null };
+export function checkVersions(input: { packageVersion: string; sourceVersion: string | null; manifestVersion?: string; tag?: string }): string[];
+export function sourceVersionOf(versionTs: string): string | null;
+export function isPrerelease(version: string): boolean;
+export function changelogSection(markdown: string, version: string): string | null;

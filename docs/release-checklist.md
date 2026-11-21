@@ -22,14 +22,22 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 
 詳細は [tasks/STATUS.md](../tasks/STATUS.md) の「GitHubの設定」。
 
-## 2. GitHub Releases での配布（未実施）
+## 2. GitHub Releases での配布（仕組みは整備済み・初回リリースは未実施）
 
-- [ ] `src/version.ts` と `package.json` のバージョンを決めて更新（テストで一致を確認）
-- [ ] `CHANGELOG.md` の Unreleased をバージョン番号に置き換える
-- [ ] 4つのチェック（test・typecheck・build・test:e2e）→ `corepack pnpm zip`
-- [ ] ZIPの中身が `manifest.json`・`background.js`・`sidepanel.html`・`assets/`・`chunks/`・`content-scripts/`・`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt` だけであることを確認（`extension.spec.ts` も検証）
-- [ ] 下の「手動確認」の主要項目を、配布するZIPで実施
-- [ ] リリースノートに「非公式」「書込みは無効」「実NovelAIで確認した範囲」を明記
+自動化済み（2026-11-21）:
+
+- [x] `vX.Y.Z` タグのpushで、CI → ZIP生成 → 内容・バージョンの検証 → SHA-256 → リリース作成（v0.x は Pre-release）。手順は [development.md](development.md#リリース)
+- [x] `package.json`・`src/version.ts`・manifest・タグのバージョン不一致、想定外のファイル（source map・テスト・fixture）、ライセンス表示やアイコンの欠落、権限の増加は検証で失敗する（`scripts/verify-release.mjs`、単体テストあり）
+- [x] ZIPを展開して読み込み、再起動後のデータ保持と、同じフォルダへの更新でのデータ保持を確認（`tests/e2e/release.spec.ts`、Chromium）
+- [x] リリースノートは `CHANGELOG.md` の該当バージョンの節から生成（確認できていないこと・制限を含む）
+- [x] 利用者向けのインストール・更新手順（[install.md](install.md)、README）
+
+初回 v0.1.0 の公開前にメンテナーが行うこと:
+
+- [ ] 下の「手動確認」の主要項目を実機で実施（少なくとも: ZIPを展開して読み込み、サイドパネルが開く、保存・再起動後の保持、同じフォルダへの更新）
+- [ ] `CHANGELOG.md` の `## [0.1.0]` の内容を確認
+- [ ] `git tag v0.1.0 <mainの最新コミット>` → `git push origin v0.1.0`（Actions の「Release」が成功するとPre-releaseとして公開される）
+- [ ] 公開後、ReleasesページのZIPで [install.md](install.md) の手順どおりにインストールできることを確認
 
 ## 3. Chrome Web Store での一般公開（未実施）
 

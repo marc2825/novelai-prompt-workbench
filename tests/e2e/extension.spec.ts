@@ -7,6 +7,7 @@ import { openFold } from './helpers';
 import { png } from '../fixtures/png';
 
 test('built MV3 extension loads unpacked and persists across a full browser restart', async ({}, testInfo) => {
+  test.setTimeout(90_000); // two full browser launches; the 30s default was exceeded once on a slow CI runner
   const extensionPath = resolve('.output/chrome-mv3');
   const manifest = JSON.parse(await readFile(join(extensionPath, 'manifest.json'), 'utf8')) as {
     manifest_version: number; permissions: string[]; host_permissions?: string[];
