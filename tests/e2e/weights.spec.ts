@@ -54,7 +54,7 @@ test('B weight workflow preserves A and workspace, clears stale B image, restore
   await slider.focus(); await slider.press('ArrowRight'); await expect(slider).toHaveValue('1.05'); await slider.fill('1.4');
   await expect(button(page, 'Bの変更を確定')).toBeDisabled();
   expect((await page.getByRole('region', { name: 'B変更案 positiveのタグ重み', exact: true }).boundingBox())!.width).toBeLessThanOrEqual(400);
-  await page.getByRole('region', { name: 'B変更案 positiveのタグ重み', exact: true }).screenshot({ path: '/tmp/nai-tag-weight-control.png' });
+  await page.getByRole('region', { name: 'B変更案 positiveのタグ重み', exact: true }).screenshot({ path: test.info().outputPath('nai-tag-weight-control.png') });
   await button(page, '重みを反映').click();
   await expect(field(page, 'B確定前 Positive')).toHaveValue(original.replace('1girl', '1.4::1girl::'));
   await button(page, '変更案をUndo').click(); await expect(field(page, 'B変更案 positive')).toHaveValue('1girl');
@@ -73,7 +73,7 @@ test('B weight workflow preserves A and workspace, clears stale B image, restore
   await page.getByRole('combobox', { name: '表示モード', exact: true }).selectOption('wipe');
   await page.getByRole('slider', { name: '重ね合わせ位置', exact: true }).fill('40');
   await expect(page.getByRole('img', { name: '比較画像B', exact: true })).toBeVisible();
-  await page.getByLabel('画像比較', { exact: true }).screenshot({ path: '/tmp/nai-weight-comparison.png' });
+  await page.getByLabel('画像比較', { exact: true }).screenshot({ path: test.info().outputPath('nai-weight-comparison.png') });
   await page.reload(); await saved(page); await tab(page, '比較');
   await expect(field(page, 'B positive')).toHaveValue(original.replace('1girl', '1.4::1girl::'));
   await expect(page.getByRole('img', { name: '比較画像B', exact: true })).toBeVisible();
