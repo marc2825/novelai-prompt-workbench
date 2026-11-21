@@ -22,7 +22,7 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 
 詳細は [tasks/STATUS.md](../tasks/STATUS.md) の「GitHubの設定」。
 
-## 2. GitHub Releases での配布（仕組みは整備済み・初回リリースは未実施）
+## 2. GitHub Releases での配布（v0.1.0 を公開済み）
 
 自動化済み（2026-11-21）:
 
@@ -32,12 +32,13 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 - [x] リリースノートは `CHANGELOG.md` の該当バージョンの節から生成（確認できていないこと・制限を含む）
 - [x] 利用者向けのインストール・更新手順（[install.md](install.md)、README）
 
-初回 v0.1.0 の公開前にメンテナーが行うこと:
+初回 v0.1.0:
 
-- [ ] 下の「手動確認」の主要項目を実機で実施（少なくとも: ZIPを展開して読み込み、サイドパネルが開く、保存・再起動後の保持、同じフォルダへの更新）
-- [ ] `CHANGELOG.md` の `## [0.1.0]` の内容を確認
-- [ ] `git tag v0.1.0 <mainの最新コミット>` → `git push origin v0.1.0`（Actions の「Release」が成功するとPre-releaseとして公開される）
-- [ ] 公開後、ReleasesページのZIPで [install.md](install.md) の手順どおりにインストールできることを確認
+- [x] タグ `v0.1.0`（`cd1395f`）をpushし、Actions の「Release」（ci → package → publish）が成功。[Pre-releaseとして公開](https://github.com/marc2825/novelai-prompt-workbench/releases/tag/v0.1.0)（2026-11-21）
+- [x] 公開されたZIPをダウンロードし、`.sha256` と一致、`verifyReleaseZip` の検査で問題0件（14ファイル）。SHA-256 `87e2c281…d2d9` はローカル・クリーンなclone・事前の試験実行のビルドと同一
+- [ ] 下の「手動確認」の主要項目を実機で実施（少なくとも: ReleasesのZIPを展開して読み込み、サイドパネルが開く、保存・再起動後の保持、同じフォルダへの更新）。公開前の実機確認は未実施
+
+次のバージョンからの手順: `CHANGELOG.md` に `## [X.Y.Z]` を追加し、`package.json`・`src/version.ts` を更新してmainにマージ → `git tag vX.Y.Z` → `git push origin vX.Y.Z`（[development.md](development.md#リリース)）
 
 ## 3. Chrome Web Store での一般公開（未実施）
 
