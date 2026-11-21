@@ -31,7 +31,7 @@ Node.js などは不要です。Chrome Web Store 版ではないため、自動�
 4. 「パッケージ化されていない拡張機能を読み込む」で、そのフォルダを選ぶ
 5. 拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すとサイドパネルが開く（ピン留めがおすすめ）
 
-Releases にまだファイルがない場合や、開発版を使いたい場合は、[ソースからビルド](docs/development.md)してください。
+開発中の最新版を使いたい場合は、[ソースからビルド](docs/development.md)してください。
 
 ### 更新するとき
 
