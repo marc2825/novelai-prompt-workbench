@@ -17,8 +17,8 @@ process.stdout.write(`> **非公式ツールです。** NovelAI（Anlatan Inc.�
 
 ## インストール・更新
 
-1. 下の Assets から \`${zipName(version)}\` をダウンロードして展開します。
-2. Chromeの \`chrome://extensions\` で「デベロッパーモード」をONにし、「パッケージ化されていない拡張機能を読み込む」で展開したフォルダ（\`manifest.json\` があるフォルダ）を選びます。
+1. 下の Assets から \`${zipName(version)}\` をダウンロードして展開します。**「Source code (zip)」「Source code (tar.gz)」はGitHubが自動で付けるソースコードで、そのままでは読み込めません。**
+2. Chromeの \`chrome://extensions\` で「デベロッパーモード」をONにし、「パッケージ化されていない拡張機能を読み込む」で展開したフォルダ（\`manifest.json\` があるフォルダ。Windowsで拡張子が非表示の場合は \`manifest\` と表示されます）を選びます。
 
 **更新するときは、必ず前回と同じフォルダの中身を置き換えてください**（別のフォルダから読み込むと別の拡張機能として扱われ、保存したデータが表示されません）。更新の前に「設定」→「完全バックアップ」を保存してください。自動更新はありません。詳しい手順: [docs/install.md](${repository}/blob/v${version}/docs/install.md)
 

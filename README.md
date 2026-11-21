@@ -25,8 +25,8 @@ NovelAIの画像生成プロンプト（タグ）を、部品として登録・�
 
 Node.js などは不要です。Chrome Web Store 版ではないため、自動更新はありません。
 
-1. [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) から最新の `novelai-prompt-workbench-<バージョン>-chrome.zip` をダウンロードする
-2. 置き場所のフォルダを1つ決めて、ZIPの中身を展開する（フォルダの直下に `manifest.json` がある状態にする）
+1. [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) から最新の `novelai-prompt-workbench-<バージョン>-chrome.zip` をダウンロードする（「Source code」のZIPではありません）
+2. 置き場所のフォルダを1つ決めて、ZIPの中身を展開する（フォルダの直下に `manifest.json` がある状態にする。Windowsで拡張子が非表示だと `manifest` と表示されます）
 3. Chromeで `chrome://extensions` を開き、「デベロッパーモード」をONにする
 4. 「パッケージ化されていない拡張機能を読み込む」で、そのフォルダを選ぶ
 5. 拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すとサイドパネルが開く（ピン留めがおすすめ）
