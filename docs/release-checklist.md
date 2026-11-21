@@ -33,7 +33,7 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 
 ## 3. Chrome Web Store での一般公開（未実施）
 
-- [ ] **アイコンがない**（manifestに `icons` なし。16/32/48/128px が必要）。NovelAIのロゴ・配色を模倣しない独自デザインにする
+- [x] アイコン 16/32/48/128px（2026-11-21、独自デザイン: 青の角丸に部品のバー3本、下の1本がOFF。NovelAIのロゴ・意匠は不使用。原本は `scripts/icon/*.svg`、`node scripts/render-icons.mjs` で再生成）
 - [ ] ストア掲載文（日本語/英語）・スクリーンショット。名称・説明に「非公式」「NovelAIとは提携していない」を明記
 - [ ] プライバシーポリシーの公開URL（[PRIVACY.md](../PRIVACY.md) のGitHub上のURLで可）と、ストアの「データの使用」申告（収集なし）、単一用途の説明
 - [ ] 権限の正当化: `sidePanel`（UI表示）、content script（NovelAI画像生成ページのプロンプト欄の読取り）

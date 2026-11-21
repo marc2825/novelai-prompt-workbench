@@ -61,7 +61,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const statusPill = <div className={`status ${workbench.storageError ? 'error' : !data ? 'loading' : workbench.saving ? 'saving' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>;
   return <main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
     <header className="app-header">
-      <div className="app-title"><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです">非公式</span><InfoTip label="このツール">原文を残したまま、プロンプトの部品を組み合わせて切り替えるための非公式ツールです（NovelAIの公式製品ではなく、提携もしていません）。データはこの端末だけに保存され、外部には送信しません。画像の生成はNovelAI上で行います。</InfoTip></div>
+      <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです">非公式</span><InfoTip label="このツール">原文を残したまま、プロンプトの部品を組み合わせて切り替えるための非公式ツールです（NovelAIの公式製品ではなく、提携もしていません）。データはこの端末だけに保存され、外部には送信しません。画像の生成はNovelAI上で行います。</InfoTip></div>
       <div className="header-links">{!data && statusPill}<a href={location.pathname} target="_blank" rel="noreferrer" title="サイドパネルより広い画面で、同じデータを開きます">広いタブで開く</a></div>
     </header>
     {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データをJSONで退避するか、DBの復旧用ファイルを保存してください。</p><div className="actions">

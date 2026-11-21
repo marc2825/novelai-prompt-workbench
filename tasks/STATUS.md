@@ -53,9 +53,8 @@ E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` �
 | 作業 | 価値 | コスト | リスク | 備考 |
 |---|---|---|---|---|
 | Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | Releases配布の前に。手順は [release-checklist](../docs/release-checklist.md) |
-| 拡張アイコン（16/32/48/128px）の作成 | 高 | 低 | 低 | Chrome Web Storeで必須。NovelAIの意匠を模倣しない |
 | NovelAIサポートへの問い合わせ | 高 | 低 | 低 | 規約は拡張機能に言及なし（[security.md](../docs/security.md)）。Chrome Web Store公開の前に推奨。質問案は release-checklist |
-| ストア用の連絡先・掲載文・スクリーンショット | 中 | 中 | 低 | 連絡先はメンテナーが決定（PRIVACY.mdはGitHub Issuesを窓口として記載） |
+| ストア用の連絡先・掲載文・スクリーンショット（アイコンは2026-11-21に作成済み） | 中 | 中 | 低 | 連絡先はメンテナーが決定（PRIVACY.mdはGitHub Issuesを窓口として記載） |
 
 ### GitHubの設定（2026-11-21に設定済み）
 

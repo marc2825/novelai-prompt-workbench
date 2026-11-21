@@ -65,8 +65,8 @@ src/
 tests/unit/           Vitest（perf/ は性能計測用データ）
 tests/e2e/            Playwright
 tests/fixtures/       fixtureページ・合成PNG・旧DB
-scripts/              E2E用fixtureのビルド・配信（serve-fixture.mjs）
-public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.txt）
+scripts/              E2E用fixtureの配信（serve-fixture.mjs）、アイコンの原本と描き出し（icon/, render-icons.mjs）
+public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.txt、icon/）
 ```
 
 詳細な設計は [ARCHITECTURE.md](ARCHITECTURE.md)、データ形式は [DATA_MODEL.md](DATA_MODEL.md) と [backup.md](backup.md)、安全方針は [security.md](security.md)。
@@ -96,6 +96,10 @@ public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.tx
 ## ライセンス表示
 
 配布物には `LICENSE.txt`（`wxt.config.ts` の `build:publicAssets` でルートの `LICENSE` をコピー）と `public/THIRD_PARTY_NOTICES.txt`（バンドルされる React・React DOM・scheduler・Viteのpreload helper・WXTの実行時コードのライセンス表示）を同梱します。実行時の依存を追加・更新したら `THIRD_PARTY_NOTICES.txt` を更新してください（`tests/unit/release.test.ts` が依存の一覧とライセンス本文・バージョンの不一致を検出します）。
+
+## アイコン
+
+原本は `scripts/icon/icon.svg`（48・128px用）と `scripts/icon/icon-small.svg`（16・32px用、ピクセルに合わせた簡略版）です。変更したら `node scripts/render-icons.mjs` で `public/icon/<サイズ>.png` を再生成します（PlaywrightのChromiumを使用）。WXTが `public/icon/` から `manifest.icons` を自動で設定します。NovelAIのロゴや意匠に似せないでください。
 
 ## リリース
 
