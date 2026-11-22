@@ -10,5 +10,6 @@
 8. WXT docs — React module: https://wxt.dev/guide/essentials/frontend-frameworks
 9. WXT docs — Manifest/permissions: https://wxt.dev/guide/essentials/config/manifest
 10. Codex AGENTS.md official: https://learn.chatgpt.com/docs/agent-configuration/agents-md
+11. NovelAI公式「novelai-image-metadata」（MIT License、Copyright (c) 2023 NovelAI）— `README.md`・`nai_meta.py`・`nai_meta_writer.py` を2026-11-22に確認: https://github.com/NovelAI/novelai-image-metadata 。PNGテキストのキー（Title / Description / Software / Source / Generation time / Comment、Commentは文字列のJSON）と、アルファチャンネルの形式（最下位ビットを列優先で8ビットずつ、`stealth_pngcomp`・32ビットのビット長・gzip圧縮JSON、任意の誤り訂正データ）を参照し、この拡張では同じ形式を独自に実装した（コードの複製ではない）。**実際にNovelAIで保存したPNGのサンプルは入手できておらず、`Comment` 内の各項目（prompt・uc・seed・steps・scale・sampler等）の意味は公式に文書化されていないため未検証**。拡張はこれらを「候補」としてだけ表示する（ADR-099）。
 
-これらは実装時にも再確認。DOMセレクタ、実行可能API、自動化の許可、正確なPNGキーなどは**ここでは検証済みとしない**。
+これらは実装時にも再確認。DOMセレクタ、実行可能API、自動化の許可、PNGメタデータ内の各項目の意味などは**ここでは検証済みとしない**（PNGの入れ物の形式は11の公式スクリプトで確認）。

@@ -2,6 +2,9 @@ export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 export const MAX_IMAGE_PIXELS = 16_777_216;
 export const MAX_TEXT_BYTES = 262_144;
 export interface PngTextChunk { type: string; bytes: Uint8Array }
+/** IHDR fields needed to decode pixels (width/height are returned separately). */
+export interface PngHeader { bitDepth: number; colorType: number; interlace: number }
+export interface InspectedPng { width: number; height: number; header: PngHeader; texts: PngTextChunk[]; /** IDAT chunk data in file order (views into the input, not copies). */ idat: Uint8Array[] }
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let index = 0; index < 256; index++) {
@@ -17,12 +20,12 @@ export function crc32(bytes: Uint8Array): number {
   for (let index = 0; index < bytes.length; index++) crc = CRC_TABLE[(crc ^ bytes[index]!) & 0xff]! ^ (crc >>> 8);
   return (crc ^ 0xffffffff) >>> 0;
 }
-export function inspectPng(bytes: Uint8Array) {
+export function inspectPng(bytes: Uint8Array): InspectedPng {
   if (bytes.length > MAX_IMAGE_BYTES) throw new Error('PNGは20MiBまでです');
   if (![137, 80, 78, 71, 13, 10, 26, 10].every((value, i) => bytes[i] === value)) throw new Error('PNG署名が不正です。対応形式はPNGです');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 8; let width = 0; let height = 0; let count = 0; let textBytes = 0; let image = false; let end = false;
-  const texts: PngTextChunk[] = [];
+  const texts: PngTextChunk[] = []; const idat: Uint8Array[] = []; let header: PngHeader = { bitDepth: 0, colorType: 0, interlace: 0 };
   while (offset < bytes.length) {
     if (++count > 4096 || offset + 12 > bytes.length) throw new Error('PNGチャンクが破損または過大です');
     const size = view.getUint32(offset); const next = offset + 12 + size;
@@ -36,7 +39,8 @@ export function inspectPng(bytes: Uint8Array) {
       width = view.getUint32(offset + 8); height = view.getUint32(offset + 12);
       if (!width || !height || width > 8192 || height > 8192 || width * height > MAX_IMAGE_PIXELS) throw new Error('画像は各辺8192px・合計16Mpxまでです');
       if (chunk[10] !== 0 || chunk[11] !== 0 || ![0, 1].includes(chunk[12]!)) throw new Error('未対応のPNG方式です');
-    } else if (type === 'IDAT') image = true;
+      header = { bitDepth: chunk[8]!, colorType: chunk[9]!, interlace: chunk[12]! };
+    } else if (type === 'IDAT') { image = true; idat.push(chunk); }
     else if (type === 'IEND') { if (size || !image || next !== bytes.length) throw new Error('PNG終端が不正です'); end = true; }
     else if (type === 'acTL') throw new Error('アニメーションPNGは未対応です');
     else if (['tEXt', 'zTXt', 'iTXt'].includes(type)) {
@@ -47,5 +51,5 @@ export function inspectPng(bytes: Uint8Array) {
     offset = next;
   }
   if (!end) throw new Error('PNGが途中で切れています');
-  return { width, height, texts };
+  return { width, height, header, texts, idat };
 }

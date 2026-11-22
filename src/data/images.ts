@@ -1,16 +1,10 @@
 import { unknownSettings } from '../core/experiments';
-import { inspectPng, MAX_IMAGE_BYTES, MAX_TEXT_BYTES, type PngTextChunk } from '../core/png';
+import { inspectPng, MAX_IMAGE_BYTES, MAX_TEXT_BYTES, type InspectedPng, type PngTextChunk } from '../core/png';
 import type { ImageMetadata, ImageRecord } from '../core/types';
+import { describeNovelAI, inflateBounded, NOVELAI_NOT_FOUND_UNCHECKED_WARNING, NOVELAI_NOT_FOUND_WARNING, readStealth, type StealthRead } from './novelai-metadata';
 import { validateGenerationSettings, validateSafeJson } from './validation';
 
-async function inflate(bytes: Uint8Array): Promise<Uint8Array> {
-  const reader = new Blob([new Uint8Array(bytes)]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
-  const parts: Uint8Array[] = []; let length = 0;
-  try { while (true) { const part = await reader.read(); if (part.done) break; length += part.value.length; if (length > MAX_TEXT_BYTES) throw new Error('展開したメタデータが256KiBを超えています'); parts.push(part.value); } }
-  finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
-  const result = new Uint8Array(length); let offset = 0;
-  for (const part of parts) { result.set(part, offset); offset += part.length; } return result;
-}
+const inflate = (bytes: Uint8Array) => inflateBounded(bytes, 'deflate', MAX_TEXT_BYTES, '展開したメタデータが256KiBを超えています');
 async function textChunk(chunk: PngTextChunk): Promise<[string, string]> {
   const bytes = chunk.bytes; const end = bytes.indexOf(0);
   if (end < 1 || end > 79) throw new Error('PNGテキストのキーワードが不正です');
@@ -28,8 +22,9 @@ async function textChunk(chunk: PngTextChunk): Promise<[string, string]> {
   }
   return [key, chunk.type === 'iTXt' ? new TextDecoder('utf-8', { fatal: true }).decode(content) : latin(content)];
 }
-// Replaceable parser contract. NovelAI-specific fields intentionally remain unknown
-// until a real, officially saved sample has been checked. No guessed field mapping.
+// Replaceable parser contract for *confirmed* settings. NovelAI's official containers are read
+// separately (novelai-metadata.ts) and only offered as unverified candidates: their field
+// meanings are undocumented and no real, officially saved sample has been checked.
 export interface GenerationMetadataParser { parse(texts: Readonly<Record<string, string>>): Partial<Pick<ImageMetadata, 'positive' | 'negative' | 'settings'>> }
 export const workbenchMetadataParser: GenerationMetadataParser = {
   parse(texts) {
@@ -43,7 +38,12 @@ export const workbenchMetadataParser: GenerationMetadataParser = {
     return { positive: data.positive as string | null, negative: data.negative as string | null, settings: { ...structuredClone(data.settings), evidence: 'png-metadata' } as ImageMetadata['settings'] };
   },
 };
-export async function extractMetadata(chunks: PngTextChunk[], parser: GenerationMetadataParser = workbenchMetadataParser): Promise<ImageMetadata> {
+/**
+ * `stealth` is the alpha-channel read of the same PNG (readStealth). Callers that only have text
+ * chunks get 'unchecked'. NovelAI containers are recorded in `metadata.novelai` but never change
+ * `settings` / `positive` / `negative`: their field meanings are not officially documented.
+ */
+export async function extractMetadata(chunks: PngTextChunk[], parser: GenerationMetadataParser = workbenchMetadataParser, stealth: StealthRead = { status: 'unchecked' }): Promise<ImageMetadata> {
   const result: ImageMetadata = { positive: null, negative: null, settings: unknownSettings(), texts: {}, warnings: [] };
   let length = 0;
   for (const chunk of chunks) {
@@ -54,16 +54,23 @@ export async function extractMetadata(chunks: PngTextChunk[], parser: Generation
   }
   try { Object.assign(result, parser.parse(result.texts)); }
   catch { result.warnings.push('生成メタデータを検証できません。原文テキストを保持し、生成条件は不明とします。'); }
-  if (result.settings.evidence === 'unknown') result.warnings.push('NovelAI固有メタデータは未検証です。生成条件を手入力してください。');
+  const novelai = describeNovelAI(result.texts, stealth);
+  if (novelai.info) result.novelai = novelai.info;
+  result.warnings.push(...novelai.warnings);
+  if (!novelai.info && result.settings.evidence === 'unknown') result.warnings.push(stealth.status === 'unchecked' ? NOVELAI_NOT_FOUND_UNCHECKED_WARNING : NOVELAI_NOT_FOUND_WARNING);
   result.promptEvidence = result.positive === null && result.negative === null ? 'unknown' : 'png-metadata';
   return result;
+}
+/** Structure check, alpha-channel read and text metadata of one PNG (no browser decode). */
+export async function readPngMetadata(bytes: Uint8Array, parser: GenerationMetadataParser = workbenchMetadataParser): Promise<{ png: InspectedPng; metadata: ImageMetadata }> {
+  const png = inspectPng(bytes);
+  return { png, metadata: await extractMetadata(png.texts, parser, await readStealth(png)) };
 }
 export interface ImageWrite { id: string; original: Blob; thumbnail: Blob }
 export interface PreparedImage extends ImageWrite { record: ImageRecord }
 export async function prepareImage(file: File, id: string, now: string): Promise<PreparedImage> {
   if (!file.size || file.size > MAX_IMAGE_BYTES) throw new Error('画像は空でない20MiB以下のPNGを選択してください');
-  const bytes = new Uint8Array(await file.arrayBuffer()); const png = inspectPng(bytes);
-  const metadata = await extractMetadata(png.texts);
+  const bytes = new Uint8Array(await file.arrayBuffer()); const { png, metadata } = await readPngMetadata(bytes);
   const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(value => value.toString(16).padStart(2, '0')).join('');
   const original = new Blob([bytes], { type: 'image/png' });
   const bitmap = await createImageBitmap(original);

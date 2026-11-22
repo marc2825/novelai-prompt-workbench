@@ -100,7 +100,7 @@ interface NovelAIAdapter {
 ## P4画像・比較実装
 
 - `core/experiments.ts`: immutable snapshot作成/複製、raw文字差分、group設定差分、未知値を含む生成設定比較、RGBA差分。snapshot合成は共通composeのみ。DOM/乱数/時計APIを持たない。
-- `core/png.ts`: PNG署名/CRC/チャンク/寸法/サイズ上限の純粋検証。`data/images.ts`がbounded DecompressionStream、標準text、交換可能metadata parser、crypto SHA-256、ブラウザdecodeとthumbnailを担当する。公式NovelAIサンプル未取得のため固有形式はunknown fallback。
+- `core/png.ts`: PNG署名/CRC/チャンク/寸法/サイズ上限の純粋検証。`data/images.ts`がbounded DecompressionStream、標準text、交換可能metadata parser、crypto SHA-256、ブラウザdecodeとthumbnailを担当する。公式NovelAIサンプル未取得のため固有形式はunknown fallback。NovelAI公式形式の入れ物（PNGテキスト・アルファチャンネル）は`core/png-stealth.ts`（行フィルタ解除とアルファ最下位ビット、純粋）と`data/novelai-metadata.ts`（展開・検証・候補）で読み、`ui/NovelAIInfo.tsx`で未確認の候補として表示する（ADR-099）。
 - `data/repository.ts`: v3にexperiments/images/imageOriginals/imageThumbnailsを追加。v1/v2 backup upgrade、revisionによる競合検出と原子保存。JSONにBlobは入れない。
 - `ui/useWorkbench.ts`: 画像writeを保存キューへstageし、metadata/slotと共にcommit。失敗時は未保存状態とBlobを維持しretry可能。Undoはmetadataのみを保持、明示purge時は履歴/backupを保護する。
 - `ui/Comparisons.tsx`: source選択→A/B固定→B案編集/preview/確定→手動copy→各PNG取込。セッションCRUD/設定diff/metadata照合と手入力/容量/欠落通知。workspaceやサイトを暗黙に更新しない。
