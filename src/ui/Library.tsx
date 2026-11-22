@@ -4,6 +4,7 @@ import type { Channel, LibraryEntry } from '../core/types';
 import type { Workbench } from './useWorkbench';
 import { Empty, newId, now, Rename } from './shared';
 import { InfoTip } from './InfoTip';
+import { TagDictionaryPanel } from './TagDictionary';
 
 const PAGE_SIZE = 50;
 
@@ -62,6 +63,7 @@ export function Library({ workbench, addToGroup }: { workbench: Workbench; addTo
         if (confirm(`カテゴリ「${category.name}」を削除し、登録項目を未分類にしますか？`)) { workbench.commit(previous => ({ ...previous, categories: previous.categories.filter(item => item.id !== category.id), libraryEntries: previous.libraryEntries.map(entry => entry.categoryId === category.id ? { ...entry, categoryId: null } : entry) })); setCategoryId(''); }
       }}>カテゴリ削除</button></div>)}
     </div></details>
+    <TagDictionaryPanel workbench={workbench} />
     <section className="panel stack" aria-label="部品の追加先">
       <div className="field-head"><span>追加先: {workspace?.title ?? 'ワークスペース未作成'}</span><InfoTip label="構成への追加">「構成に追加」を押すと、現在のワークスペースの選んだグループに原文をスナップショット（その時点のコピー）として追加します。あとでライブラリを編集しても構成側は変わりません。</InfoTip></div>
       <label>追加先グループ<select value={groupId} onChange={event => setTargetGroup(event.target.value)}><option value="" disabled>ワークスペースでグループを作成</option>{workspace?.groups.map(group => <option key={group.id} value={group.id}>{group.name} ({group.channel})</option>)}</select></label>

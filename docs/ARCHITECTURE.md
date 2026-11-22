@@ -124,3 +124,9 @@ interface NovelAIAdapter {
 - シャッフルのサイト状態: `src/core/shuffle/site-session.ts`（対象別セッション）、`src/ui/shuffle/auto-run.ts`（自動シャッフルの実行単位）。詳細は [shuffle/site-adapter.md](shuffle/site-adapter.md)。
 - 保存: 通常の保存はrevisionだけを読み、検証済みオブジェクトを再検証しない（ADR-077）。別パネル/タブの保存は `BroadcastChannel` で通知（ADR-076）。
 - 送信元URL照合の修正（`isPanelSender`、ADR-075）。
+
+## タグ辞書・入力補完（2026-11-22）
+
+- `core/tags.ts`: 照合用の正規化、キャレット位置の判定（`completionTokenAt`）、範囲置換（`applyCompletion`）、ライブラリ原文からのタグ抽出、ソート済み索引と二分探索の候補検索、表記ゆれ・重複の一覧。純粋関数で外部データ・通信なし。
+- `ui/TagCompletion.tsx`: Appが索引のsourceをContextで渡し、`PromptEditor`が使う。索引は最初の検索時に作り、ライブラリ原文・辞書が実際に変わったときだけ作り直す。確定は`insertText`（ブラウザのUndoと通常のinputイベント）で行い、使えない場合は通常の`onChange`。
+- `ui/TagDictionary.tsx`: ライブラリタブの辞書管理と読取り専用の表記ゆれ一覧。検証は`data/validation.ts`。

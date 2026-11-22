@@ -195,3 +195,30 @@ interface NovelAIImageInfo {
 `WorkbenchData.lab?: LabData` はmetadata.extraに保存する。正本: `src/core/lab/types.ts`。Definitionはベース両channel・settings・XYZ Axis・共通Seedリスト・反復数・任意の参考単価。LabExperimentはUUID、Definition snapshot、条件配列、状態、日時を保持する。Condition IDは実験UUIDと決定的な展開番号の組。座標・Seed index・反復・固定Prompt/UC・settings・factor provenance、手動進捗・imageId・評価・メモを持つ。
 
 保存前に定義から再展開して固定条件の一致を検証し、未知safe fieldは保持する。画像資産は既存images/Blob storesを共有、JSONにはmetadataのみ。旧資産形式やstore変更はなくmigrationは不要。詳細と上限は [Lab仕様](lab/README.md)。
+
+## タグ辞書と入力補完（DB/JSON v3のまま追加、辞書 schemaVersion 1）
+
+正本: `src/core/types.ts`（`TagDictionary` / `TagDictionaryEntry`）、`src/core/tags.ts`、検証は `src/data/validation.ts`。
+
+```ts
+interface TagDictionary { schemaVersion: 1; entries: TagDictionaryEntry[] }
+interface TagDictionaryEntry {
+  id: string;          // UUID。全資産と同じID空間で一意
+  tag: string;         // 補完で入る表記（1〜200文字、前後空白なし）
+  aliases: string[];   // 検索用の別名（日本語名・略称など）。最大20件
+  note: string;        // メモ（最大1000文字、空可）
+  createdAt: string;
+  updatedAt: string;
+}
+// WorkbenchData.tagDictionary?: TagDictionary   （省略＝空）
+// Settings.tagCompletion?: boolean             （省略＝ON）
+```
+
+- `WorkbenchData.tagDictionary` は省略可能。`metadata.extra` に保存され、同じtransaction・revision・JSONバックアップ（完全バックアップの `data.json`）に含まれる。storeの追加・DB版の変更・migrationはない。旧データ（フィールドなし）はそのまま有効で、勝手に作成しない。
+- `settings.tagCompletion` は省略時ON。存在する場合は真偽値のみ。
+- 検証: 辞書の `schemaVersion` は1のみ。項目10,000件、別名は1項目20件・合計50,000件。タグ・別名は200文字、カンマ・改行などの制御文字・`{ } [ ] | \`・`::` を含めない（重み・括弧は入力欄の原文で付ける）。日時はISO 8601。
+- 一意性: 照合用の正規化（NFKCで全角→半角、小文字化、`_`→空白、空白の連続を1つ、前後の空白除去）で同じになるタグは重複としてエラー。別名は自分のタグ・自分の他の別名と同じ表記にできず、別の項目のタグとも同じにできない（別の項目どうしで同じ別名は可）。正規化した値は照合だけに使い、保存しない。
+- 辞書のIDは全資産と同じID空間で重複を拒否するが、ライブラリ等の合計10,000レコードの上限には数えない（辞書は独自の10,000件上限）。10MiB・JSON要素数の上限は全体で維持。
+- 取込: 全置換は入力の辞書で置換。追加は現在の項目→取込項目の順に連結し、ID衝突・同じタグ（表記ゆれを含む）・別名と他のタグの衝突はエラーで、何も変更しない。
+- 完全バックアップのmanifest `counts` のキーは変えない（旧版が厳格に検証するため）。辞書の件数はプレビューで `data.json` から表示する。
+- 未知の安全なフィールドは辞書・項目とも保持する。
