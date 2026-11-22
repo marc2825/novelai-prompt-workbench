@@ -4,7 +4,7 @@ import {
   type ShuffleData, type ShuffleRecovery,
 } from '../core/shuffle/types';
 import { recoveryJson } from './recovery';
-import { MAX_BYTES, ValidationError, validateSafeJson } from './validation';
+import { MAX_DOCUMENT_BYTES, serializeDocument, ValidationError, validateSafeJson } from './validation';
 
 // Untrusted-input validation for Prompt Shuffle data (DB load, JSON import, every commit).
 
@@ -256,10 +256,10 @@ export const SHUFFLE_EXPORT_FORMAT = 'nai-prompt-workbench-shuffle';
 export function exportShuffle(shuffle: ShuffleData, now: string): string {
   const { history: _history, ...rest } = validateShuffleData(shuffle);
   const profiles = rest.profiles.map(profile => ({ ...profile, current: null }));
-  return JSON.stringify({ format: SHUFFLE_EXPORT_FORMAT, exportedAt: now, shuffle: { ...rest, profiles, history: [] } }, null, 2);
+  return serializeDocument({ format: SHUFFLE_EXPORT_FORMAT, exportedAt: now, shuffle: { ...rest, profiles, history: [] } });
 }
 export function parseShuffleExport(input: string): ShuffleData {
-  if (new TextEncoder().encode(input).byteLength > MAX_BYTES) fail('JSON', '10MiBを超えています');
+  if (new TextEncoder().encode(input).byteLength > MAX_DOCUMENT_BYTES) fail('JSON', `${MAX_DOCUMENT_BYTES / 1048576}MiBを超えています`);
   let parsed: unknown;
   try { parsed = JSON.parse(input); } catch { fail('JSON', 'JSONの構文が不正です'); }
   validateSafeJson(parsed);

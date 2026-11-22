@@ -5,13 +5,30 @@ import { assertCommentSpans } from '../core/comments';
 import { normalizeShuffle, validateRecoveries } from './shuffle';
 
 export const FORMAT = 'nai-prompt-workbench';
+export class ValidationError extends Error {}
 export const SCHEMA_VERSION = 3;
+/** Limit of the data itself (compact JSON of the payload). Saving enforces it. */
 export const MAX_BYTES = 10 * 1024 * 1024;
+/**
+ * Limit of a JSON file that contains a payload (backup, shuffle export, Lab JSON):
+ * the payload limit plus room for the header and indentation (issue #19). Every
+ * payload that can be saved can therefore be exported and imported again; the
+ * payload inside is still checked against MAX_BYTES.
+ */
+export const MAX_DOCUMENT_BYTES = 2 * MAX_BYTES;
+/** Serializes a document: indented when it stays within MAX_BYTES (readable by older versions), compact otherwise. */
+export function serializeDocument(document: unknown): string {
+  const encoder = new TextEncoder();
+  const pretty = JSON.stringify(document, null, 2);
+  if (encoder.encode(pretty).byteLength <= MAX_BYTES) return pretty;
+  const compact = JSON.stringify(document);
+  if (encoder.encode(compact).byteLength > MAX_DOCUMENT_BYTES) throw new ValidationError(`ファイルが${MAX_DOCUMENT_BYTES / 1048576}MiBを超えます`);
+  return compact;
+}
 export const MAX_RECORDS = 10_000;
 export const MAX_DEPTH = 32;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export class ValidationError extends Error {}
 
 // Objects returned by validateData. The code base treats data as immutable, so an
 // object in this set is still valid and the save path need not validate it again.
@@ -255,7 +272,7 @@ export function validatePreImageData(input: unknown): WorkbenchData {
 }
 
 export function parseBackup(text: string): BackupDocument {
-  if (new TextEncoder().encode(text).byteLength > MAX_BYTES) fail('JSON', '10MiBを超えています');
+  if (new TextEncoder().encode(text).byteLength > MAX_DOCUMENT_BYTES) fail('JSON', `${MAX_DOCUMENT_BYTES / 1048576}MiBを超えています`);
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { fail('JSON', 'JSONの構文が不正です'); }
   validateSafeJson(parsed);

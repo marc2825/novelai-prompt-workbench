@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import initialFixture from '../fixtures/sample-library-v1.json';
 import { emptyData } from '../../src/core/commands';
 import { exportBackup, prepareImport } from '../../src/data/backup';
-import { MAX_BYTES, MAX_DEPTH, parseBackup, validateData } from '../../src/data/validation';
+import { MAX_BYTES, MAX_DEPTH, MAX_DOCUMENT_BYTES, parseBackup, validateData } from '../../src/data/validation';
 import { fixture, timestamp } from './helpers';
 
 describe('backup validation / AC08, AC09', () => {
@@ -73,7 +73,8 @@ describe('backup validation / AC08, AC09', () => {
     expect(current).toEqual(original);
   });
   it('rejects oversized UTF-8 before JSON parsing and excessive depth', () => {
-    expect(() => parseBackup('🌟'.repeat(MAX_BYTES / 4 + 1))).toThrow('10MiB');
+    // Files may be up to MAX_DOCUMENT_BYTES (payload limit + header/indent room, issue #19); larger input is rejected unparsed.
+    expect(() => parseBackup('🌟'.repeat(MAX_DOCUMENT_BYTES / 4 + 1))).toThrow(`${MAX_DOCUMENT_BYTES / 1048576}MiB`);
     expect(() => parseBackup('['.repeat(MAX_DEPTH + 2) + '0' + ']'.repeat(MAX_DEPTH + 2))).toThrow('深さ');
   });
   it('rejects excessive record count, dangerous keys and malformed comparison assets', () => {

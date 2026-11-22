@@ -16,6 +16,8 @@ import { recoveryJson } from '../data/recovery';
 import { Comparisons } from './Comparisons';
 import { Shuffle } from './Shuffle';
 import { InfoTip } from './InfoTip';
+import { saveFullBackup } from './FullBackup';
+import { UnsavedRecovery } from './UnsavedRecovery';
 
 type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
 // Ordered by workflow: build prompts → save/vary them → compare results → settings & backup.
@@ -28,6 +30,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const [tab, setTab] = useState<Tab>(location.hash === '#lab' ? 'Experiment Lab' : 'ライブラリ');
   const [notice, setNotice] = useState('');
   const [comparisonDraft, setComparisonDraft] = useState(false);
+  const [rescuing, setRescuing] = useState(false);
   const data = workbench.data;
   const workspace = data?.workspaces.find(item => item.id === data.settings.activeWorkspaceId);
   const compiled = useMemo(() => workspace ? compileWorkspace(workspace) : { positive: '', negative: '', warnings: [] }, [workspace]);
@@ -66,8 +69,9 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
       <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです。データはこの端末だけに保存され、画像の生成はNovelAI上で行います">非公式</span></div>
       <div className="header-links">{!data && statusPill}<a href={location.pathname} target="_blank" rel="noreferrer" aria-label="広いタブで開く" title="広いタブで開く（サイドパネルより広い画面で、同じデータを開きます）">↗ タブ</a></div>
     </header>
-    {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データをJSONで退避するか、DBの復旧用ファイルを保存してください。</p><div className="actions">
+    {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データを、画像も含めて完全バックアップで退避できます。</p><div className="actions">
       {data && <button type="button" className="primary" onClick={workbench.retry}>保存を再試行</button>}
+      {data && <button type="button" disabled={rescuing} onClick={() => { setRescuing(true); void saveFullBackup(workbench).then(setNotice).catch(error => workbench.setError(message(error))).finally(() => setRescuing(false)); }}>未保存の変更を含めて完全バックアップを保存</button>}
       <button type="button" onClick={() => { if (confirm('未保存の画面上の編集を破棄して、保存データを再読込しますか？')) location.reload(); }}>再読込</button>
       <button type="button" disabled={!workbench.repository.current && !workbench.migrationRecovery} onClick={() => {
         if (workbench.migrationRecovery) downloadText(recoveryJson(workbench.migrationRecovery), 'nai-migration-recovery.json');
@@ -78,6 +82,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
       <p>別の画面（サイドパネル・広いタブ）でデータが保存されました。この画面のまま編集すると保存時に競合します。</p>
       <div className="actions"><button type="button" className="primary" disabled={workbench.saving} onClick={() => void workbench.reloadFromStorage().then(() => setNotice('他の画面で保存された最新の内容を読み込みました（元に戻す履歴はリセットされました）。')).catch(error => workbench.setError(message(error)))}>他の画面の変更を読み込む</button></div>
     </section>}
+    {data && !!workbench.unsaved.length && <UnsavedRecovery workbench={workbench} onDone={setNotice} />}
     {workbench.error && <div className="error" role="alert">{workbench.error}<button type="button" onClick={() => workbench.setError('')}>閉じる</button></div>}
     {!data && workbench.storageError && <Recovery workbench={workbench} />}
     {data && <>

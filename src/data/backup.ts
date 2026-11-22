@@ -1,16 +1,10 @@
 import type { BackupDocument, WorkbenchData } from '../core/types';
-import { FORMAT, MAX_BYTES, SCHEMA_VERSION, ValidationError, validateData } from './validation';
+import { FORMAT, SCHEMA_VERSION, serializeDocument, validateData } from './validation';
 import { mergeShuffle } from './shuffle';
 
 export function exportBackup(data: WorkbenchData, now: string): string {
   const document: BackupDocument = { format: FORMAT, schemaVersion: SCHEMA_VERSION, exportedAt: now, imageBinariesIncluded: false, payload: validateData(data) };
-  const result = JSON.stringify(document, null, 2);
-  if (new TextEncoder().encode(result).byteLength > MAX_BYTES) {
-    const compact = JSON.stringify(document);
-    if (new TextEncoder().encode(compact).byteLength > MAX_BYTES) throw new ValidationError('バックアップが10MiBを超えています');
-    return compact;
-  }
-  return result;
+  return serializeDocument(document);
 }
 
 export function prepareImport(current: WorkbenchData, incoming: WorkbenchData, mode: 'merge' | 'replace'): WorkbenchData {

@@ -3,7 +3,7 @@ import type { BackupDocument, ImageRecord, WorkbenchData } from '../core/types';
 import { APP_NAME, APP_VERSION } from '../version';
 import { exportBackup, prepareImport } from './backup';
 import type { ImageWrite } from './images';
-import { MAX_BYTES, parseBackup, SCHEMA_VERSION, validateSafeJson } from './validation';
+import { MAX_DOCUMENT_BYTES, parseBackup, SCHEMA_VERSION, validateSafeJson } from './validation';
 import { readZipDirectory, readZipEntry, writeZip, zipEntryBlob, ZipError, type ZipEntry, type ZipInput } from './zip';
 
 // Complete backup: every text asset (data.json, the regular JSON backup) plus the
@@ -59,6 +59,29 @@ export function fullBackupFilename(time: string): string {
 }
 
 export interface BinarySource { image(id: string, thumbnail: boolean): Promise<Blob | undefined> }
+
+type Binding = Pick<ImageRecord, 'hash' | 'width' | 'height' | 'byteLength' | 'thumbnailBytes'>;
+export const sameBinding = (a: Binding, b: Binding) => a.hash === b.hash && a.width === b.width && a.height === b.height && a.byteLength === b.byteLength && a.thumbnailBytes === b.thumbnailBytes;
+export interface StagedBinary { record: Binding; original: Blob; thumbnail: Blob }
+
+/**
+ * A binary source pinned to one snapshot (issue #20). `staged` holds imports not
+ * yet committed; it is copied now, so later Undo/edits that drop them from the
+ * live map do not affect the export. Every binary is looked up by the snapshot's
+ * own record (`read` must verify the stored binding against it).
+ */
+export function pinnedBinarySource(snapshot: WorkbenchData, staged: ReadonlyMap<string, StagedBinary>, read: (record: ImageRecord, thumbnail: boolean) => Promise<Blob | undefined>): BinarySource {
+  const records = new Map(snapshot.images.map(image => [image.id, image]));
+  const captured = new Map([...staged].filter(([id]) => records.has(id)));
+  return {
+    async image(id, thumbnail) {
+      const record = records.get(id); if (!record) return undefined;
+      const item = captured.get(id);
+      if (item && sameBinding(item.record, record)) return thumbnail ? item.thumbnail : item.original;
+      return read(record, thumbnail);
+    },
+  };
+}
 export interface ExportResult { blob: Blob; manifest: FullBackupManifest; missing: string[]; warnings: string[] }
 export type Progress = (done: number, total: number) => void;
 
@@ -120,7 +143,7 @@ export function validateManifest(input: unknown): FullBackupManifest {
   if (typeof manifest.exportedAt !== 'string' || !Number.isFinite(Date.parse(manifest.exportedAt))) fail('manifest.exportedAt が不正です');
   const generator = object(manifest.generator, 'generator');
   if (typeof generator.name !== 'string' || generator.name.length > 100 || typeof generator.version !== 'string' || generator.version.length > 50) fail('manifest.generator が不正です');
-  const data = digest(manifest.data, 'data', 'data.json', MAX_BYTES);
+  const data = digest(manifest.data, 'data', 'data.json', MAX_DOCUMENT_BYTES);
   if (!Array.isArray(manifest.images) || !Array.isArray(manifest.missingImages)) fail('manifest.images / missingImages が不正です');
   const ids = new Set<string>();
   const images = (manifest.images as unknown[]).map((value, index) => {
@@ -172,7 +195,7 @@ export async function inspectFullBackup(file: Blob, onProgress?: Progress): Prom
   const manifest = validateManifest(parseJson(await readZipEntry(file, byName.get('manifest.json')!, MANIFEST_MAX_BYTES), 'manifest.json'));
   const dataEntry = byName.get('data.json') ?? fail('data.jsonがありません');
   if (dataEntry.size !== manifest.data.bytes) fail('data.jsonのサイズがmanifestと一致しません');
-  const dataBytes = await readZipEntry(file, dataEntry, MAX_BYTES);
+  const dataBytes = await readZipEntry(file, dataEntry, MAX_DOCUMENT_BYTES);
   if (await sha256(dataBytes) !== manifest.data.sha256) fail('data.jsonのSHA-256がmanifestと一致しません（改変または破損しています）');
   let document: BackupDocument;
   try { document = parseBackup(decoder.decode(dataBytes)); }

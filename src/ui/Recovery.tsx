@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BackupDocument } from '../core/types';
-import { MAX_BYTES, parseBackup } from '../data/validation';
+import { MAX_DOCUMENT_BYTES, parseBackup } from '../data/validation';
 import { message, type Workbench } from './useWorkbench';
 
 export function Recovery({ workbench }: { workbench: Workbench }) {
@@ -12,7 +12,7 @@ export function Recovery({ workbench }: { workbench: Workbench }) {
     <label>復旧用JSON<input type="file" accept=".json,application/json" disabled={busy || !workbench.repository.current} onChange={event => {
       const file = event.target.files?.[0]; event.target.value = ''; setBackup(null);
       if (!file) return;
-      if (file.size > MAX_BYTES) { workbench.setError('ファイルが10MiBを超えています'); return; }
+      if (file.size > MAX_DOCUMENT_BYTES) { workbench.setError(`ファイルが${MAX_DOCUMENT_BYTES / 1048576}MiBを超えています`); return; }
       setBusy(true);
       void file.text().then(text => setBackup(parseBackup(text))).catch(error => workbench.setError(message(error))).finally(() => setBusy(false));
     }} /></label>

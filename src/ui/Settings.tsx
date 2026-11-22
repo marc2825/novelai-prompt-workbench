@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { BackupDocument } from '../core/types';
 import { exportBackup, prepareImport } from '../data/backup';
 import { createDemo } from '../data/demo';
-import { MAX_BYTES, parseBackup, validateData } from '../data/validation';
+import { MAX_DOCUMENT_BYTES, parseBackup, validateData } from '../data/validation';
 import { downloadText, newId, now } from './shared';
 import { message, type Workbench } from './useWorkbench';
 import { recoveryJson } from '../data/recovery';
@@ -29,7 +29,7 @@ export function Settings({ workbench }: { workbench: Workbench }) {
         event.target.value = '';
         setDocument(null); setNotice('');
         if (!file) return;
-        if (file.size > MAX_BYTES) { workbench.setError('ファイルが10MiBを超えています。元データは変更しません'); return; }
+        if (file.size > MAX_DOCUMENT_BYTES) { workbench.setError(`ファイルが${MAX_DOCUMENT_BYTES / 1048576}MiBを超えています。元データは変更しません`); return; }
         setReading(true);
         void file.text().then(text => { setDocument(parseBackup(text)); workbench.setError(''); }).catch(error => workbench.setError(`${message(error)}。元データは変更していません`)).finally(() => setReading(false));
       }} /></label>

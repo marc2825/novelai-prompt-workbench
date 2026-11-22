@@ -97,6 +97,9 @@ interface Experiment {
 ## 現在のストア
 
 - `libraryEntries` / `categories` / `workspaces` / `presets` / `experiments` / `images` / `imageOriginals` / `imageThumbnails` / `metadata`。
+- 「画像バイナリを整理」（`purgeUnreferenced`）は、現在のデータ・この画面のUndo/Redo履歴・取込前バックアップが参照しない原本とサムネイルを削除し、revisionを1つ進めます。Undo履歴は各画面のメモリにしかないため、**この拡張機能の他の画面が開いている間は実行しません**（各画面が持つWeb Lock `nai-prompt-workbench:window:<ランダムID>` で判定。判定できない環境でも実行しない）。
+- 未保存の変更の一時退避（issue #17）: 保存待ち・保存中・保存エラーのまま画面が隠れる/閉じるとき、localStorageの `nai-prompt-workbench:unsaved:<画面ID>` に `{format: 'nai-prompt-workbench-unsaved', version: 1, windowId, savedAt, baseRevision, reason, missingImageIds, data}` を同期的に書きます。保存が完了すると削除します。次に開いた画面は、閉じた画面（Web Lockを持たない画面）のものだけを、取込と同じ検証（`validateData`）を通して「保存されていない変更があります」として示し、復元（通常の編集として適用、元に戻せる）・JSONで保存・破棄を選べます。保存済みデータと同じ内容・読み取れない内容は黙って削除します。画像の原本はlocalStorageに入らないため、未保存だった画像は `missingImageIds` に記録し、復元後は欠落として表示します。約450万文字を超える場合は書けません（保証範囲は下記）。
+- 保存の保証範囲: 「保存済み」は最後のIndexedDBトランザクションの完了後にだけ表示します。保存待ち・保存中に画面を閉じた場合、DBには最後に完了した保存までが残り、それ以降の変更は上記の一時退避から復元できます。一時退避も書けなかった場合（大きすぎる・ブラウザが書込みを拒否）は失われます。広いタブでは、未保存の変更があるとブラウザの「ページを離れますか」が表示されます（サイドパネルでは表示できません）。
 - image binaryは原本PNGとサムネイルを別に持ち、参照カウント/削除時の孤立blobを清掃。
 - 現在のJSONは `format: 'nai-prompt-workbench'`, `schemaVersion: 3`, `imageBinariesIncluded: false`, `exportedAt`, `payload: {...}`。v1/v2入力も検証・正規化して読み込み、書出しはv3。
 
@@ -106,7 +109,7 @@ interface Experiment {
 
 - 画像はP1のテキストJSONには**含まない**。UIにその旨明示。
 - import前にサマリーを提示して`merge`/`replace`選択。初期は衝突IDへの安全なリネームもしくは明示エラーを優先。
-- サイズ上限（暫定10MB）、レコード件数上限（暫定10000件）、JSONの深さ制限を設定。入力のHTMLは実行しない。
+- サイズ上限（データ本体10MiB・ファイル20MiB、[backup.md](backup.md#上限)）、レコード件数上限（10000件）、JSONの深さ制限を設定。入力のHTMLは実行しない。
 - 失敗時は元のDBを変更しない。成功時だけコミット。
 
 ## P1時点の実装（DB v1）
