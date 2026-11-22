@@ -203,6 +203,23 @@ export function useWorkbench() {
       return existing ? '同一ハッシュの画像を再利用しました。' : '画像を取り込みました。';
     },
     /**
+     * Adds several prepared images as ONE edit (one Undo step), staging their binaries like
+     * attachImage. Images whose SHA-256 is already in the library are skipped and reported.
+     */
+    addImages: (items: readonly PreparedImage[]): { added: number; duplicates: string[] } => {
+      const state = current.current?.present;
+      if (!state) throw new Error('データを読み込めていません');
+      const known = new Set(state.images.map(image => image.hash)); const fresh: PreparedImage[] = []; const duplicates: string[] = [];
+      for (const item of items) { if (known.has(item.record.hash)) { duplicates.push(item.record.name); continue; } known.add(item.record.hash); fresh.push(item); }
+      if (!fresh.length) return { added: 0, duplicates };
+      for (const item of fresh) imageWrites.current.set(item.id, { id: item.id, original: item.original, thumbnail: item.thumbnail, record: item.record });
+      if (!commit(data => ({ ...data, images: [...data.images, ...fresh.map(item => item.record)] }))) {
+        for (const item of fresh) imageWrites.current.delete(item.id);
+        throw new Error('画像メタデータの検証に失敗しました（件数・容量の上限を確認してください）');
+      }
+      return { added: fresh.length, duplicates };
+    },
+    /**
      * Frees binaries no record references. Refused while this page has unsaved
      * work, an export is reading a snapshot, or another extension page is open:
      * that page's Undo/Redo could still need the binaries (issue #16).

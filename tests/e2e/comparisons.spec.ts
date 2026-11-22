@@ -212,3 +212,38 @@ test('disagreeing NovelAI containers are both shown and adoption requires choosi
   await page.getByRole('combobox', { name: '採用する取得元（B）', exact: true }).selectOption({ label: 'アルファチャンネル' }); await button(page, 'NovelAIの候補を確認して採用（B）').click(); await saved(page);
   const slot = page.getByLabel('比較 B', { exact: true }); await variantSettings(slot).getByText('生成設定の確認・手入力', { exact: true }).click(); await expect(variantSettings(slot).getByLabel('Seed', { exact: true })).toHaveValue('42');
 });
+
+test('bulk import reports failures and duplicates, is one Undo step, and images can be reviewed, tagged and filtered (issue #28)', async ({ page }) => {
+  await boot(page);
+  await tab(page, '比較'); await openFold(page, /^画像ライブラリ/);
+  const files = [1, 2, 3].map(n => ({ name: `bulk-${n}.png`, mimeType: 'image/png', buffer: png(4, 4, {}, 40 * n) }));
+  await page.getByLabel('PNGをまとめて取り込む', { exact: true }).setInputFiles([...files, { name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('not a png') }, { ...files[0]!, name: 'same-as-1.png' }]);
+  await expect(page.getByRole('status').filter({ hasText: '3件を取り込みました' })).toContainText('既にある同じ画像1件は追加していません');
+  await expect(page.getByLabel('取り込めなかったPNG', { exact: true })).toContainText('broken.png');
+  await saved(page);
+  await expect(page.getByRole('heading', { name: '画像ライブラリ (3)', exact: true })).toBeVisible();
+  // One Undo removes the whole batch; Redo brings it back with the pictures.
+  await button(page, '元に戻す').click(); await saved(page);
+  await expect(page.getByRole('heading', { name: '画像ライブラリ (0)', exact: true })).toBeVisible();
+  await button(page, 'やり直す').click(); await saved(page);
+  await expect(page.getByRole('img', { name: 'bulk-2.png', exact: true })).toBeVisible();
+  // Review and tags.
+  await page.getByRole('combobox', { name: 'bulk-1.pngの評価', exact: true }).selectOption('adopted'); await saved(page);
+  await page.getByRole('combobox', { name: 'bulk-2.pngの評価', exact: true }).selectOption('rejected'); await saved(page);
+  await button(page, 'bulk-1.pngのタグ・メモを編集').click();
+  await page.getByRole('textbox', { name: 'bulk-1.pngのタグ', exact: true }).fill('夜景, 候補');
+  await page.getByRole('textbox', { name: 'bulk-1.pngのメモ', exact: true }).fill('背景がよい');
+  await button(page, 'bulk-1.pngのタグ・メモを保存').click(); await saved(page);
+  await expect(page.getByRole('article', { name: 'bulk-1.png', exact: true })).toContainText('タグ: 夜景、候補 · メモ: 背景がよい');
+  await page.getByRole('combobox', { name: '評価で絞る', exact: true }).selectOption('adopted');
+  await expect(page.getByRole('status', { name: '画像の件数', exact: true })).toHaveText('1件 / 全3件');
+  await page.getByRole('combobox', { name: '評価で絞る', exact: true }).selectOption('none');
+  await expect(page.getByRole('article', { name: 'bulk-3.png', exact: true })).toBeVisible();
+  await expect(page.getByRole('status', { name: '画像の件数', exact: true })).toHaveText('1件 / 全3件');
+  await page.getByRole('combobox', { name: '評価で絞る', exact: true }).selectOption('all');
+  await page.getByRole('combobox', { name: '画像のタグで絞る', exact: true }).selectOption('夜景');
+  await expect(page.getByRole('status', { name: '画像の件数', exact: true })).toHaveText('1件 / 全3件');
+  // Persisted after reload.
+  await page.reload(); await saved(page); await tab(page, '比較'); await openFold(page, /^画像ライブラリ/);
+  await expect(page.getByRole('combobox', { name: 'bulk-2.pngの評価', exact: true })).toHaveValue('rejected');
+});

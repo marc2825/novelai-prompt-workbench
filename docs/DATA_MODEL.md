@@ -186,6 +186,8 @@ interface NovelAIImageInfo {
 - 検証: 取得元の数と `agreement` の整合、`text` ならtextsに `Comment` があること、`stealth` の有無と取得元・一致状態の整合、キー1〜79文字・128件以下、値262,144文字以下、全体のJSON 524,288文字以下、`__proto__` 等の危険なキーと非JSON値の拒否。未知の安全なフィールドは保持する。
 - `Comment` のJSONは保存時に解釈しない。表示のたびに `validateSafeJson` を通して読み、候補（型・範囲を満たす値だけ）を計算する。候補は利用者が確認ダイアログで採用したときだけ、比較スロットの `settings`（`evidence: 'png-metadata'`・`extrasConfirmed: false`・候補のない項目はnull）や画像の `positive` / `negative`（`promptEvidence: 'png-metadata'`）になる。取込時の `settings` は常に `unknown`。
 
+- 画像の評価・タグ・メモ（2026-11-22、issue #28、任意フィールド）: `ImageRecord.review?: 'adopted' | 'pending' | 'rejected'`、`tags?: string[]`（最大20、各50文字、前後の空白・重複なし）、`note?: string`（2000文字）。値がないときはフィールドごと省く。旧データ・旧形式のバックアップはそのまま有効。
+
 ## Prompt Shuffle（DB/JSON v3のまま追加）
 
 - `WorkbenchData.shuffle?: ShuffleData`（独自 `schemaVersion: 1`）と `shuffleRecovery?: ShuffleRecovery[]`。`metadata.extra` に保存され、同じtransaction・revision・JSONバックアップに含まれる。
