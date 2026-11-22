@@ -107,6 +107,8 @@ public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.tx
 
 `.github/workflows/ci.yml` が push・pull request で4つのチェックを実行します。トークンは `contents: read`、Actionはコミットのフルハッシュで固定（コメントにタグ）し、`.github/dependabot.yml` が月1回まとめて更新PRを作ります。npm依存はセキュリティ更新のPRだけ（リポジトリ設定の Dependabot security updates が有効な場合）。
 
+`.github/workflows/security.yml`（「Security」）が、週1回（月曜 03:17 UTC）・手動・`main` へのPRとpushで、依存関係の監査（`pnpm audit`）、PRの依存関係レビュー（脆弱性・ライセンス）、Gitleaksによる全履歴の秘密情報の検査、CodeQLによるコードとワークフローの静的解析を行います。`ci.yml` とは別のワークフローで、リリース（`release.yml`）の経路には入りません。開発用ツールの新しい勧告ではPRを止めず、週1回の実行で失敗させます。方針・失敗したときの対応・ローカルでの再現方法は [security.md](security.md#セキュリティ検査ci) にあります。Actionと同じくGitleaksの版もハッシュで固定しており、Dependabotの対象外なので手動で更新します（同じ節）。
+
 ## ライセンス表示
 
 配布物には `LICENSE.txt`（`wxt.config.ts` の `build:publicAssets` でルートの `LICENSE` をコピー）と `public/THIRD_PARTY_NOTICES.txt`（バンドルされる React・React DOM・scheduler・Viteのpreload helper・WXTの実行時コードのライセンス表示）を同梱します。実行時の依存を追加・更新したら `THIRD_PARTY_NOTICES.txt` を更新してください（`tests/unit/release.test.ts` が依存の一覧とライセンス本文・バージョンの不一致を検出します）。
@@ -133,7 +135,7 @@ public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.tx
 
 1. `src/version.ts` と `package.json` の `version` を更新する（単体テストが一致を確認）。
 2. `CHANGELOG.md` の `## [Unreleased]` の内容を `## [X.Y.Z]` の節にまとめる。
-3. PRでmainにマージし、CIの成功を確認する。
+3. PRでmainにマージし、CIと「Security」ワークフローの成功、Security タブに未対応の警告がないことを確認する（リリースのワークフローはSecurityの検査を実行しない）。
 4. 手動確認（[release-checklist.md](release-checklist.md)）。事前にZIPを確認したい場合は、Actions の「Release」→「Run workflow」（dry run。ZIPを検証してartifactに保存するだけで、リリースは作らない）を使う。
 5. `git tag vX.Y.Z <mainのコミット>` → `git push origin vX.Y.Z`。
 6. Actions の「Release」が成功したら、Releases ページで内容を確認する。
