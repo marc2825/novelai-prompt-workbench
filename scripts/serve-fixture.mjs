@@ -2,7 +2,8 @@
 // server). A dev server streams hundreds of ES modules per page load, which can
 // exhaust sockets/file handles on small machines (issue #4); a build serves a few files.
 // NODE_ENV=development keeps React's development build (StrictMode checks) and
-// import.meta.env.DEV, which enables the deep freeze of validated data in E2E.
+// import.meta.env.DEV, which exposes the benchmark hook (tests/perf). Validated data is
+// deep-frozen in every build.
 // Usage: node scripts/serve-fixture.mjs [--build-only]
 import { fileURLToPath } from 'node:url';
 

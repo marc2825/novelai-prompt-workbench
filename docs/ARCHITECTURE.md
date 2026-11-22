@@ -122,5 +122,5 @@ interface NovelAIAdapter {
 
 - 完全バックアップ: `src/data/zip.ts`（無圧縮ZIPの書込み・厳格な読取り）、`src/data/full-backup.ts`（書出し・検証・復元計画）、`src/ui/FullBackup.tsx`、`useWorkbench.restoreFull`（1トランザクションの直接保存、実行中は編集不可）。形式は [backup.md](backup.md)。
 - シャッフルのサイト状態: `src/core/shuffle/site-session.ts`（対象別セッション）、`src/ui/shuffle/auto-run.ts`（自動シャッフルの実行単位）。詳細は [shuffle/site-adapter.md](shuffle/site-adapter.md)。
-- 保存: 通常の保存はrevisionだけを読み、検証済みオブジェクトを再検証しない（ADR-077）。別パネル/タブの保存は `BroadcastChannel` で通知（ADR-076）。
+- 保存: 通常の保存はrevisionだけを読み、検証済みオブジェクトを再検証しない（ADR-077）。`validateData` は未変更のノードを前の結果と共有して凍結し、保存は同じ画面が直前にコミットした状態からの差分だけを書く（ADR-105、計測は `pnpm bench:chromium`）。別パネル/タブの保存は `BroadcastChannel` で通知（ADR-076）。
 - 送信元URL照合の修正（`isPanelSender`、ADR-075）。

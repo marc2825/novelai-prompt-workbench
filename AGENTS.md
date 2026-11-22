@@ -15,7 +15,7 @@ Unofficial, local-first Chrome MV3 extension (side panel) for building NovelAI i
 - `src/platform/novelai`: the only place with NovelAI DOM/selectors (Site Adapter). It exposes capabilities and returns errors.
 - `src/ui`: React presentation and commands; no DOM scraping, no shuffle/compose algorithms.
 - UI: keep visible text to actions and state; put explanations behind `InfoTip`/`Hint` (never inside a `<label>`, heading or `<summary>`), keep accessible names stable and unique, and use the `primary`/`danger`/`small`/`icon` button styles (`docs/UX_FLOWS.md`).
-- Data is immutable: never mutate objects returned by `validateData` (they are frozen in dev/E2E builds and the save path trusts them). Prefer stable IDs over array positions. Keep library records independent of workspace state.
+- Data is immutable: never mutate objects returned by `validateData` (they are deep-frozen in every build, shared between commits and Undo snapshots, and the save path trusts them and writes only records whose object changed). Prefer stable IDs over array positions. Keep library records independent of workspace state.
 - The version lives in `src/version.ts` (must match `package.json`).
 
 ## NovelAI Integration Rules
