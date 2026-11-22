@@ -107,6 +107,8 @@ public/               配布物にそのままコピー（THIRD_PARTY_NOTICES.tx
 
 `.github/workflows/ci.yml` が push・pull request で4つのチェックを実行します。トークンは `contents: read`、Actionはコミットのフルハッシュで固定（コメントにタグ）し、`.github/dependabot.yml` が月1回まとめて更新PRを作ります。npm依存はセキュリティ更新のPRだけ（リポジトリ設定の Dependabot security updates が有効な場合）。
 
+`.github/workflows/cross-platform.yml`（「Cross-platform」）が、週1回・手動・配布物に関わるPRで、Windows・macOS・LinuxのランナーでリリースZIPのインストール・再起動・同じフォルダへの更新・**公開済みの最新リリースからの更新**を確認します（`tests/e2e/release.spec.ts`・`tests/e2e/extension.spec.ts`）。手元で公開済みリリースからの更新を試すには、`gh release download vX.Y.Z --pattern '*-chrome.zip*'` で取得して `.sha256` を照合し、`PREVIOUS_RELEASE_ZIP=<zipのパス> corepack pnpm exec playwright test tests/e2e/release.spec.ts` を実行します（未設定ならそのテストはskipと表示されます）。拡張機能IDはOSごとに導出方法が違うため、テストはservice workerのURLから読みます。
+
 `.github/workflows/security.yml`（「Security」）が、週1回（月曜 03:17 UTC）・手動・`main` へのPRとpushで、依存関係の監査（`pnpm audit`）、PRの依存関係レビュー（脆弱性・ライセンス）、Gitleaksによる全履歴の秘密情報の検査、CodeQLによるコードとワークフローの静的解析を行います。`ci.yml` とは別のワークフローで、リリース（`release.yml`）の経路には入りません。開発用ツールの新しい勧告ではPRを止めず、週1回の実行で失敗させます。方針・失敗したときの対応・ローカルでの再現方法は [security.md](security.md#セキュリティ検査ci) にあります。Actionと同じくGitleaksの版もハッシュで固定しており、Dependabotの対象外なので手動で更新します（同じ節）。
 
 ## ライセンス表示
