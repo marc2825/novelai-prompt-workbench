@@ -207,3 +207,6 @@ progress { width: 100%; accent-color: var(--accent); }
 @media (max-width: 360px) {
   .columns.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.tag-diff { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; overflow-wrap: anywhere; }
+.tag-diff .added { color: var(--success); }
+.tag-diff .removed { color: var(--danger); }
