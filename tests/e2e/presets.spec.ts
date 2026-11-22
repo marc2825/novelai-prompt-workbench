@@ -213,3 +213,37 @@ test('a corrupt legacy database remains v1 and can be downloaded without automat
   });
   expect(stored).toEqual({ version: 1, presets: false });
 });
+
+test('overwriting a preset keeps earlier versions that can be compared tag by tag, restored and undone (issue #30)', async ({ page }) => {
+  await boot(page);
+  await field(page, '自由入力 Positive').fill('first tag, shared tag'); await saved(page);
+  await save(page, '履歴つき');
+  await field(page, '自由入力 Positive').fill('shared tag, 1.3::first tag::, second tag'); await saved(page);
+  await select(page, '履歴つき');
+  // The apply preview explains the change tag by tag.
+  const preview = page.getByRole('group', { name: '適用によるpositiveの変化の差分', exact: true });
+  await expect(preview).toContainText('削除 1: second tag');
+  await page.getByRole('button', { name: '現在の構成で上書き保存', exact: true }).click(); await saved(page);
+  const history = page.getByLabel('プリセットの保存履歴', { exact: true });
+  await expect(history.getByRole('heading', { name: '保存履歴（1）', exact: true })).toBeVisible();
+  await history.getByRole('button', { name: '版1と比較', exact: true }).click();
+  const diff = history.getByRole('group', { name: '版1 → 今のプリセットのpositiveの差分', exact: true });
+  await expect(diff).toContainText('追加 1: second tag');
+  await expect(diff).toContainText('重み・括弧の変更 1: first tag → 1.3::first tag::');
+  await expect(diff).toContainText('並び順の変更 1:');
+  // Restoring keeps the overwritten content as another version, and is one Undo step.
+  await history.getByRole('button', { name: '版1に戻す', exact: true }).click(); await saved(page);
+  await expect(history.getByRole('heading', { name: '保存履歴（1）', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'プリセットを適用', exact: true }).click(); await saved(page);
+  await expect(field(page, '自由入力 Positive')).toHaveValue('first tag, shared tag');
+  await page.getByRole('button', { name: '元に戻す', exact: true }).click(); await saved(page);
+  await page.getByRole('button', { name: '元に戻す', exact: true }).click(); await saved(page);
+  await expect(field(page, '自由入力 Positive')).toHaveValue('shared tag, 1.3::first tag::, second tag');
+  await page.reload(); await saved(page);
+  await page.getByRole('tab', { name: 'プリセット', exact: true }).click();
+  await page.getByRole('combobox', { name: 'プリセットを選択', exact: true }).selectOption({ label: '履歴つき' });
+  const reloaded = page.getByLabel('プリセットの保存履歴', { exact: true });
+  await expect(reloaded.getByRole('heading', { name: '保存履歴（1）', exact: true })).toBeVisible();
+  await reloaded.getByRole('button', { name: '版1を削除', exact: true }).click(); await saved(page);
+  await expect(page.getByLabel('プリセットの保存履歴', { exact: true })).toHaveCount(0);
+});
