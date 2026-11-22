@@ -24,7 +24,7 @@ NovelAIのサービス自体の脆弱性は、NovelAIに報告してください
 
 | バージョン | 対応 |
 |---|---|
-| 最新の [GitHub Release](https://github.com/marc2825/spellbinder-for-novelai/releases)（0.2.0 ベータ）と `main` ブランチ | 修正対象 |
+| 最新の [GitHub Release](https://github.com/marc2825/spellbinder-for-novelai/releases)（0.2.1 ベータ）と `main` ブランチ | 修正対象 |
 | それより前のリリース・過去のコミット | 対象外（最新のリリースに更新してください） |
 
 安全性の設計（権限、メッセージ検証、取込データの扱い）は [docs/security.md](docs/security.md) を参照してください。
