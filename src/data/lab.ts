@@ -29,7 +29,8 @@ export function validateLab(input: unknown, imageIds: Set<unknown>): LabData {
       str(c.note, 10_000); str(c.error, 10_000);
     }
   }
-  return structuredClone(data) as unknown as LabData;
+  // Checks only: validateData (the only caller) copies and freezes what is not shared yet.
+  return data as unknown as LabData;
 }
 export function duplicateLab(source: LabExperiment, id: string, time: string): LabExperiment {
   const copy = createLab(id, { ...source.definition, name: `${source.definition.name.slice(0,180)} copy` }, time);

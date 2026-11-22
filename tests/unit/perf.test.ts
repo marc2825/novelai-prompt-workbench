@@ -35,7 +35,11 @@ describe('commit → save performance', () => {
     const load = await elapsed(() => repository.load(), 3);
     let history = startHistory(data);
     for (let step = 0; step < 31; step++) history = record(history, validation.validateData(editOne(data, step)));
-    console.log(`[perf] ${size} records: JSON ${(json / 1024).toFixed(0)} KiB, validate ${validateOnly.toFixed(1)} ms, commit+save ${perEdit.toFixed(1)} ms, load ${load.toFixed(1)} ms, undo history ≈ ${((history.past.length + 1) * json / 1048576).toFixed(1)} MiB (${history.past.length + 1} full copies)`);
+    // Structural sharing (ADR-105): the snapshots share every unchanged entry.
+    const snapshots = [...history.past, history.present];
+    const distinct = new Set(snapshots.flatMap(state => state.libraryEntries)).size;
+    console.log(`[perf] ${size} records: JSON ${(json / 1024).toFixed(0)} KiB, validate ${validateOnly.toFixed(1)} ms, commit+save ${perEdit.toFixed(1)} ms, load ${load.toFixed(1)} ms, undo history: ${snapshots.length} snapshots hold ${distinct} distinct entries (not ${snapshots.length * size})`);
+    expect(distinct).toBe(size - 1 + snapshots.length);
     // A normal save checks only the revision (no full read of every store) …
     expect(readsDuringSave).toBe(0);
     // … and does not validate the already-validated object again (one call per commit only).

@@ -3,7 +3,7 @@ import type { BackupDocument, PromptSpan, WorkbenchData } from '../core/types';
 import { compileWorkspace } from '../core/compose';
 import { MAX_PRESET_REVISIONS } from '../core/presets';
 import { assertCommentSpans } from '../core/comments';
-import { normalizeShuffle, validateRecoveries } from './shuffle';
+import { checkShuffle, validateRecoveries } from './shuffle';
 import { normalizeTag, TAG_DICTIONARY_SCHEMA_VERSION, TAG_LIMITS, tagTextIssue } from '../core/tags';
 
 export const FORMAT = 'nai-prompt-workbench';
@@ -33,20 +33,35 @@ export const MAX_IMAGE_TAGS = 20;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 
-// Objects returned by validateData. The code base treats data as immutable, so an
-// object in this set is still valid and the save path need not validate it again.
-// Dev/E2E builds deep-freeze it, turning any accidental mutation into an error.
+// Roots returned by validateData. They are deep-frozen (below), so an object in this
+// set is still valid and the save path need not validate it again (ADR-077).
 const validated = new WeakSet<object>();
-const FREEZE_VALIDATED = typeof window !== 'undefined' && (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+// Every object/array inside a validateData result, in every build (ADR-105). Each one
+// is frozen when it is created, so it cannot have changed since it was validated: a
+// later result reuses it instead of copying it (structural sharing). Undo snapshots
+// and the differential save then share/skip unchanged records. Validation still runs
+// over the whole input every time; only the copy is avoided.
+const shared = new WeakSet<object>();
 export function isValidated(value: unknown): value is WorkbenchData { return typeof value === 'object' && value !== null && validated.has(value); }
-function deepFreeze(root: object) {
-  const stack: object[] = [root];
-  while (stack.length) {
-    const value = stack.pop()!;
-    if (Object.isFrozen(value)) continue;
-    Object.freeze(value);
-    for (const child of Object.values(value)) if (child && typeof child === 'object') stack.push(child as object);
-  }
+/** Whether a value is (part of) a validateData result: frozen and shared between results. */
+export function isShared(value: unknown): boolean { return typeof value === 'object' && value !== null && shared.has(value); }
+/**
+ * Copies the nodes of already validated JSON (validateSafeJson: plain objects/arrays,
+ * no cycles, depth ≤ MAX_DEPTH) that are not shared yet, freezing every copy; shared
+ * nodes are kept as they are. The caller's objects are never frozen or modified.
+ */
+function share(value: unknown, copies: Map<object, object>): unknown {
+  if (value === null || typeof value !== 'object' || shared.has(value)) return value;
+  const known = copies.get(value);
+  if (known) return known;
+  const copy = Array.isArray(value)
+    ? value.map(child => share(child, copies))
+    // fromEntries defines properties (never invokes setters); dangerous keys were rejected already.
+    : Object.fromEntries(Object.entries(value).map(([key, child]) => [key, share(child, copies)]));
+  Object.freeze(copy);
+  shared.add(copy);
+  copies.set(value, copy);
+  return copy;
 }
 function fail(path: string, reason: string): never { throw new ValidationError(`${path}: ${reason}`); }
 function object(value: unknown, path: string): Record<string, unknown> {
@@ -278,12 +293,12 @@ export function validateData(input: unknown): WorkbenchData {
   if (settings.tagCompletion !== undefined) boolean(settings.tagCompletion, 'settings.tagCompletion');
   if (settings.activeWorkspaceId !== null && !workspaceIds.has(settings.activeWorkspaceId)) fail('settings.activeWorkspaceId', 'ワークスペースが存在しません');
   // Prompt Shuffle data is optional and versioned independently (docs/shuffle/data-model.md).
-  const shuffle = data.shuffle === undefined ? undefined : normalizeShuffle(data.shuffle);
+  const shuffle = data.shuffle === undefined ? undefined : checkShuffle(data.shuffle);
   const shuffleRecovery = data.shuffleRecovery === undefined ? undefined : validateRecoveries(data.shuffleRecovery);
   const result = { ...data, categories, presets, experiments, images, settings, ...(shuffle ? { shuffle } : {}), ...(shuffleRecovery ? { shuffleRecovery } : {}) } as unknown as WorkbenchData;
   if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MAX_BYTES) fail('payload', '10MiBを超えています');
-  const output = structuredClone(result);
-  if (FREEZE_VALIDATED) deepFreeze(output);
+  // Nothing is copied or frozen before every check has passed. The root is always new.
+  const output = share(result, new Map()) as WorkbenchData;
   validated.add(output);
   return output;
 }

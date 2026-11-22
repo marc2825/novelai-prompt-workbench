@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION } from '../../src/data/validation';
+import { SCHEMA_VERSION, validateData } from '../../src/data/validation';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { commentRange } from '../../src/core/comments';
@@ -38,6 +38,28 @@ describe('P3 v1 → v2 IndexedDB migration', () => {
     repository.close();
     const reopened = await WorkbenchRepository.open('migrate', factory);
     expect(await reopened.load()).toEqual({ data, revision: 8 });
+    expect(await reopened.migrationBackup()).toEqual(backup);
+    reopened.close();
+  });
+  it('after a migration the first save writes everything, the next only the change, and the backup stays (issue #22)', async () => {
+    const data = fixture(); data.future = { safe: true };
+    const old = await seedLegacyDatabase(factory, 'migrate-then-save', data); old.close();
+    const repository = await WorkbenchRepository.open('migrate-then-save', factory);
+    const loaded = await repository.load();
+    const backup = await repository.migrationBackup();
+    const clear = vi.spyOn(IDBObjectStore.prototype, 'clear');
+    const first = validateData({ ...loaded.data, libraryEntries: loaded.data.libraryEntries.slice(1) });
+    const second = validateData({ ...first, libraryEntries: first.libraryEntries.map((entry, index) => index === 0 ? { ...entry, raw: 'edited' } : entry) });
+    try {
+      await repository.save(first, loaded.revision);
+      expect(clear).toHaveBeenCalledTimes(6);
+      clear.mockClear();
+      await repository.save(second, loaded.revision + 1);
+      expect(clear).not.toHaveBeenCalled();
+    } finally { clear.mockRestore(); }
+    repository.close();
+    const reopened = await WorkbenchRepository.open('migrate-then-save', factory);
+    expect(await reopened.load()).toEqual({ data: second, revision: loaded.revision + 2 });
     expect(await reopened.migrationBackup()).toEqual(backup);
     reopened.close();
   });

@@ -81,8 +81,10 @@ describe('P2 non-destructive range comments', () => {
     const restored = parseBackup(exportBackup(data, timestamp)).payload;
     expect(compileWorkspace(restored.workspaces[0]!).positive).toBe('1girl, long hair, night, city lights');
     expect(restored.libraryEntries[0]!.raw).toBe(before);
-    restored.workspaces[0]!.groups[0]!.enabled = false;
-    expect(compileWorkspace(restored.workspaces[0]!).positive).toBe('1girl, night, city lights');
+    // Validated data is frozen in every build (ADR-105): disable the group on a new object.
+    const restoredWorkspace = restored.workspaces[0]!;
+    const disabled = { ...restoredWorkspace, groups: restoredWorkspace.groups.map((group, index) => index === 0 ? { ...group, enabled: false } : group) };
+    expect(compileWorkspace(disabled).positive).toBe('1girl, night, city lights');
     expect(restored.workspaces[0]!.groups[0]!.members[0]!.overrideSpans).toEqual(member.overrideSpans);
   });
 });
