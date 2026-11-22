@@ -59,6 +59,7 @@ Status: settings incomplete — cannot claim a strictly controlled comparison
 - 標準PNG textと手入力を提供。**NovelAI固有PNGは実サンプル未取得のためparser interfaceとunknown fallbackに限定**。syntheticなworkbench形式の構造化抽出成功を、実NovelAI対応の根拠にしない。
 - 横並び/ワイプ、同期zoom/pan、サイズ違いの警告、明示resize時のみpixel diff。原本不変。詳細な上限・保存形式はDATA_MODEL、回帰結果はtasks/STATUSを参照。
 - JSONは画像metadataと比較を保存するが原本/thumbnailは含まない。元PNGは画像ライブラリから別途保存可能。復元時に欠落を検出し、同一PNGを再取込して修復する。
+- 画像ライブラリ（比較タブ下部）は全件を対象に、名前・SHA-256の先頭・プロンプトの注記・使用先（比較のA/B、Experiment Lab）で検索し、新しい順・古い順・名前順・大きい順に並べ、24件ずつページ送りで表示する。削除は比較・Labの関連付けも外し、「元に戻す」で戻せる（原本は「参照されない画像バイナリを解放」まで残る）。
 - P2の実サイトwriteは無効。今回の自動テストから実NovelAIへのアクセス・生成・画像送信は行っていない。
 
 ## タグ重み比較UI（2026-11-16）
