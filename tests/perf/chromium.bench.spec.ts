@@ -13,6 +13,8 @@ import { dataset, nearLimitDataset } from '../unit/perf/dataset';
 // - edit → saved: commit until the save transaction it started has completed (保存済み is then checked)
 // - save (isolated): WorkbenchRepository.save of an edit in a separate DB, without React
 // - full save: the same right after load() (no trusted previous state: every record is written)
+// - load: WorkbenchRepository.load of the isolated DB (IndexedDB read + validateData of fresh data)
+// - reference (JSON only): structuredClone and a deep freeze of the whole data, as the old commit path did
 // - heap: performance.memory.usedJSHeapSize after CDP HeapProfiler.collectGarbage, after load
 //   and after 31 edits (30 Undo steps, the maximum)
 // Results: a table on stdout and JSON in test-results/bench-chromium-<BENCH_LABEL|latest>.json.
@@ -22,7 +24,7 @@ interface Bench {
   commit(change: (data: WorkbenchData) => WorkbenchData): boolean;
   validateData(input: unknown): WorkbenchData;
   Repository: {
-    open(name: string): Promise<{ save(data: WorkbenchData, revision: number): Promise<number>; load(): Promise<unknown>; close(): void }>;
+    open(name: string): Promise<{ save(data: WorkbenchData, revision: number): Promise<number>; load(): Promise<{ data: WorkbenchData; revision: number }>; close(): void }>;
     prototype: { save(...args: unknown[]): Promise<number> };
   };
   latest(): WorkbenchData | null;
@@ -43,6 +45,7 @@ const KEYSTROKES = 20;
 const VALIDATIONS = 15;
 const FULL_SAVES = 5;
 const SAVES = 15;
+const LOADS = 5;
 
 const median = (values: number[]) => { const sorted = [...values].sort((a, b) => a - b); const middle = sorted.length >> 1; return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2; };
 const records = (value: unknown): number => {
@@ -54,7 +57,7 @@ const records = (value: unknown): number => {
 interface Result {
   scenario: string; entries: number; workspaces: number; presets: number; records: number; jsonBytes: number;
   validateMs: number; validateFreshMs: number; commitMs: number; inputFrameMs: number; inputCommitMs: number;
-  savedMs: number; firstSavedMs: number; appSaveMs: number; saveMs: number; fullSaveMs: number;
+  savedMs: number; firstSavedMs: number; appSaveMs: number; saveMs: number; fullSaveMs: number; loadMs: number; cloneMs: number; freezeMs: number;
   heapLoadedBytes: number; heapHistoryBytes: number; undoDepth: number;
   raw: Record<string, number[]>;
 }
@@ -151,7 +154,7 @@ for (const scenario of SCENARIOS) {
     const validation = await page.evaluate(async ({ json, rounds, fresh }) => {
       const bench = (window as BenchWindow).__workbenchBench!;
       const base = bench.latest()!;
-      const edit: number[] = []; const whole: number[] = [];
+      const edit: number[] = []; const whole: number[] = []; const clone: number[] = []; const freeze: number[] = [];
       for (let round = 0; round < rounds; round++) {
         const input = { ...base, libraryEntries: base.libraryEntries.map((entry, index) => index === 0 ? { ...entry, raw: `validate ${round}` } : entry) };
         const start = performance.now(); bench.validateData(input); edit.push(performance.now() - start);
@@ -160,11 +163,20 @@ for (const scenario of SCENARIOS) {
         const input = JSON.parse(json) as unknown;
         const start = performance.now(); bench.validateData(input); whole.push(performance.now() - start);
       }
-      return { edit, whole };
+      // Reference: what the old validateData did after its checks (structuredClone; dev builds then deep-froze it).
+      for (let round = 0; round < fresh; round++) {
+        const input = JSON.parse(json) as object;
+        let start = performance.now(); const copy = structuredClone(input); clone.push(performance.now() - start);
+        start = performance.now();
+        const stack: object[] = [copy];
+        while (stack.length) { const value = stack.pop()!; Object.freeze(value); for (const child of Object.values(value)) if (child && typeof child === 'object') stack.push(child as object); }
+        freeze.push(performance.now() - start);
+      }
+      return { edit, whole, clone, freeze };
     }, { json, rounds: VALIDATIONS, fresh: FULL_SAVES });
 
     // The repository alone, in a separate database: a save right after load() and consecutive saves.
-    const storage = await page.evaluate(async ({ json, fullSaves, saves }) => {
+    const storage = await page.evaluate(async ({ json, fullSaves, saves, loads }) => {
       const bench = (window as BenchWindow).__workbenchBench!;
       const name = 'nai-prompt-workbench-bench';
       const edit = (data: WorkbenchData, round: number) => bench.validateData({ ...data, libraryEntries: data.libraryEntries.map((entry, index) => index === 0 ? { ...entry, raw: `stored ${round}` } : entry) });
@@ -181,12 +193,14 @@ for (const scenario of SCENARIOS) {
         data = edit(data, fullSaves + round);
         const start = performance.now(); revision = await repository.save(data, revision); incremental.push(performance.now() - start);
       }
-      const stored = await repository.load() as { data: WorkbenchData; revision: number };
+      const stored = await repository.load();
       if (stored.revision !== revision || stored.data.libraryEntries[0]!.raw !== data.libraryEntries[0]!.raw || JSON.stringify(stored.data) !== JSON.stringify(data)) throw new Error('isolated database does not match the last save');
+      const load: number[] = [];
+      for (let round = 0; round < loads; round++) { const start = performance.now(); await repository.load(); load.push(performance.now() - start); }
       repository.close();
       await new Promise((resolve, reject) => { const request = indexedDB.deleteDatabase(name); request.onsuccess = resolve; request.onerror = () => reject(request.error); });
-      return { full, incremental };
-    }, { json, fullSaves: FULL_SAVES, saves: SAVES });
+      return { full, incremental, load };
+    }, { json, fullSaves: FULL_SAVES, saves: SAVES, loads: LOADS });
 
     const later = edits.slice(1);
     results.push({
@@ -194,9 +208,9 @@ for (const scenario of SCENARIOS) {
       validateMs: median(validation.edit), validateFreshMs: median(validation.whole),
       commitMs: median(later.map(item => item.commit)), inputCommitMs: median(keystrokes.map(item => item.commit)), inputFrameMs: median(keystrokes.map(item => item.frame)),
       savedMs: median(later.map(item => item.saved)), firstSavedMs: edits[0]!.saved, appSaveMs: median(later.map(item => item.save)),
-      saveMs: median(storage.incremental), fullSaveMs: median(storage.full),
+      saveMs: median(storage.incremental), fullSaveMs: median(storage.full), loadMs: median(storage.load), cloneMs: median(validation.clone), freezeMs: median(validation.freeze),
       heapLoadedBytes: heapLoaded, heapHistoryBytes: heapHistory, undoDepth,
-      raw: { validateEdit: validation.edit, validateFresh: validation.whole, commit: edits.map(item => item.commit), saved: edits.map(item => item.saved), appSave: edits.map(item => item.save), inputCommit: keystrokes.map(item => item.commit), inputFrame: keystrokes.map(item => item.frame), save: storage.incremental, fullSave: storage.full },
+      raw: { validateEdit: validation.edit, validateFresh: validation.whole, commit: edits.map(item => item.commit), saved: edits.map(item => item.saved), appSave: edits.map(item => item.save), inputCommit: keystrokes.map(item => item.commit), inputFrame: keystrokes.map(item => item.frame), save: storage.incremental, fullSave: storage.full, load: storage.load, clone: validation.clone, freeze: validation.freeze },
     });
     expect(undoDepth).toBe(30);
   });
@@ -207,9 +221,11 @@ test.afterAll(() => {
   const mib = (bytes: number) => (bytes / 1048576).toFixed(1);
   const ms = (value: number) => value.toFixed(1);
   const lines = [
-    '| データ | JSON | レコード | 検証（1件編集） | 検証（全件新規） | commit | 入力→描画 | 編集→保存完了 | 初回保存（読込直後） | 保存（単体） | 全件保存（単体） | ヒープ（読込後） | ヒープ（Undo 30） | 履歴の増分 |',
-    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
-    ...results.map(item => `| ${item.scenario} | ${mib(item.jsonBytes)} MiB | ${item.records} | ${ms(item.validateMs)} ms | ${ms(item.validateFreshMs)} ms | ${ms(item.commitMs)} ms | ${ms(item.inputFrameMs)} ms | ${ms(item.savedMs)} ms | ${ms(item.firstSavedMs)} ms | ${ms(item.saveMs)} ms | ${ms(item.fullSaveMs)} ms | ${mib(item.heapLoadedBytes)} MiB | ${mib(item.heapHistoryBytes)} MiB | ${mib(item.heapHistoryBytes - item.heapLoadedBytes)} MiB |`),
+    '| データ | JSON | レコード | 検証（1件編集） | 検証（全件新規） | commit | 入力→描画 | 編集→保存完了 | 初回保存（読込直後） | 保存（単体） | 全件保存（単体） | 読込（単体） | ヒープ（読込後） | ヒープ（Undo 30） | 履歴の増分 |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+    ...results.map(item => `| ${item.scenario} | ${mib(item.jsonBytes)} MiB | ${item.records} | ${ms(item.validateMs)} ms | ${ms(item.validateFreshMs)} ms | ${ms(item.commitMs)} ms | ${ms(item.inputFrameMs)} ms | ${ms(item.savedMs)} ms | ${ms(item.firstSavedMs)} ms | ${ms(item.saveMs)} ms | ${ms(item.fullSaveMs)} ms | ${ms(item.loadMs)} ms | ${mib(item.heapLoadedBytes)} MiB | ${mib(item.heapHistoryBytes)} MiB | ${mib(item.heapHistoryBytes - item.heapLoadedBytes)} MiB |`),
+    '',
+    `参考（全件）: structuredClone ${results.map(item => `${item.scenario} ${ms(item.cloneMs)} ms`).join(' / ')}; deep freeze ${results.map(item => `${item.scenario} ${ms(item.freezeMs)} ms`).join(' / ')}`,
   ];
   const environment = { date: new Date().toISOString(), label: process.env.BENCH_LABEL ?? 'latest', chromium: browserVersion, node: process.version, os: `${platform()} ${release()} ${arch()}`, cpu: cpus()[0]?.model ?? 'unknown', cpus: cpus().length, memoryGiB: Math.round(totalmem() / 1073741824) };
   console.log(`\n[bench:chromium] ${JSON.stringify(environment)}\n${lines.join('\n')}\n`);
