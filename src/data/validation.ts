@@ -4,6 +4,7 @@ import { compileWorkspace } from '../core/compose';
 import { MAX_PRESET_REVISIONS } from '../core/presets';
 import { assertCommentSpans } from '../core/comments';
 import { normalizeShuffle, validateRecoveries } from './shuffle';
+import { normalizeTag, TAG_DICTIONARY_SCHEMA_VERSION, TAG_LIMITS, tagTextIssue } from '../core/tags';
 
 export const FORMAT = 'nai-prompt-workbench';
 export class ValidationError extends Error {}
@@ -238,6 +239,7 @@ export function validateData(input: unknown): WorkbenchData {
     if (Object.keys(texts).length > 128 || JSON.stringify(texts).length > 524_288) fail('metadata.texts', '大きすぎるメタデータです');
     for (const [key, value] of Object.entries(texts)) { string(key, 'metadata.key', 79); string(value, 'metadata.value', 262_144); }
     array(meta.warnings, 'metadata.warnings', 128).forEach(value => string(value, 'metadata.warning', 1000));
+    if (meta.novelai !== undefined) validateNovelAIInfo(meta.novelai, texts);
   }
   for (const item of experiments) {
     const experiment = object(item, 'experiment'); register(experiment.id, 'experiment.id'); title(experiment.name, 'experiment.name');
@@ -256,8 +258,16 @@ export function validateData(input: unknown): WorkbenchData {
     }
   }
   if (data.lab !== undefined) validateLab(data.lab, imageIds);
+  // Dictionary IDs share the global ID scope (no collisions with any asset) but have
+  // their own entry limit, so a large dictionary does not crowd out the library.
+  if (data.tagDictionary !== undefined) validateTagDictionary(data.tagDictionary, (value, path) => {
+    id(value, path);
+    if (allIds.has(value as string)) fail(path, '重複IDです');
+    allIds.add(value as string);
+  });
   const settings = object(data.settings ?? { activeWorkspaceId: null, librarySort: 'title' }, 'settings');
   oneOf(settings.librarySort, ['title', 'updatedAt'], 'settings.librarySort');
+  if (settings.tagCompletion !== undefined) boolean(settings.tagCompletion, 'settings.tagCompletion');
   if (settings.activeWorkspaceId !== null && !workspaceIds.has(settings.activeWorkspaceId)) fail('settings.activeWorkspaceId', 'ワークスペースが存在しません');
   // Prompt Shuffle data is optional and versioned independently (docs/shuffle/data-model.md).
   const shuffle = data.shuffle === undefined ? undefined : normalizeShuffle(data.shuffle);
@@ -295,6 +305,47 @@ export function parseBackup(text: string): BackupDocument {
   return { ...document, schemaVersion: SCHEMA_VERSION, payload: document.schemaVersion === 1 ? validateLegacyData(document.payload) : document.schemaVersion === 2 ? validatePreImageData(document.payload) : validateData(document.payload) } as BackupDocument;
 }
 
+function tagText(value: unknown, path: string): string {
+  string(value, path, TAG_LIMITS.tag);
+  const issue = tagTextIssue(value);
+  if (issue) fail(path, issue);
+  return value;
+}
+
+/** Optional tag dictionary (own schemaVersion). Unknown safe fields are kept by the caller's copy. */
+function validateTagDictionary(input: unknown, register: (value: unknown, path: string) => void) {
+  const dictionary = object(input, 'tagDictionary');
+  if (dictionary.schemaVersion !== TAG_DICTIONARY_SCHEMA_VERSION) fail('tagDictionary.schemaVersion', `対応していないタグ辞書のバージョンです（${String(dictionary.schemaVersion)}）`);
+  const tags = new Map<string, string>();
+  const aliases: { key: string; alias: string; path: string }[] = [];
+  for (const [index, item] of array(dictionary.entries, 'tagDictionary.entries', TAG_LIMITS.entries).entries()) {
+    const path = `tagDictionary.entries[${index}]`;
+    const entry = object(item, path);
+    register(entry.id, `${path}.id`);
+    const tag = tagText(entry.tag, `${path}.tag`);
+    const key = normalizeTag(tag);
+    const existing = tags.get(key);
+    if (existing !== undefined) fail(`${path}.tag`, `「${tag}」は「${existing}」と同じタグです（大文字小文字・_と空白・全角半角の違いは同じとみなします）`);
+    tags.set(key, tag);
+    const own = new Set([key]);
+    for (const [aliasIndex, value] of array(entry.aliases, `${path}.aliases`, TAG_LIMITS.aliasesPerEntry).entries()) {
+      const alias = tagText(value, `${path}.aliases[${aliasIndex}]`);
+      const aliasKey = normalizeTag(alias);
+      if (own.has(aliasKey)) fail(`${path}.aliases[${aliasIndex}]`, `別名「${alias}」はタグ「${tag}」またはその別名と同じ表記です（表記ゆれは自動で照合します）`);
+      own.add(aliasKey);
+      aliases.push({ key: aliasKey, alias, path: `${path}.aliases[${aliasIndex}]` });
+      if (aliases.length > TAG_LIMITS.totalAliases) fail('tagDictionary', `別名は合計${TAG_LIMITS.totalAliases}件までです`);
+    }
+    string(entry.note, `${path}.note`, TAG_LIMITS.note);
+    date(entry.createdAt, `${path}.createdAt`);
+    date(entry.updatedAt, `${path}.updatedAt`);
+  }
+  for (const alias of aliases) {
+    const owner = tags.get(alias.key);
+    if (owner !== undefined) fail(alias.path, `別名「${alias.alias}」は別の項目のタグ「${owner}」と同じです`);
+  }
+}
+
 function integer(value: unknown, path: string, min: number, max: number) {
   if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max) fail(path, '整数の範囲が不正です');
 }
@@ -315,4 +366,22 @@ export function validateGenerationSettings(input: unknown): asserts input is imp
     if (value !== null && !['string', 'number', 'boolean'].includes(typeof value)) fail('extra', '追加設定はプリミティブ値のみです');
     if (typeof value === 'string') string(value, 'extra.value', 10_000);
   }
+}
+/** `ImageMetadata.novelai`: official container flags plus the stealth payload as a bounded string dictionary. */
+export function validateNovelAIInfo(input: unknown, texts: Readonly<Record<string, unknown>>): asserts input is import('../core/types').NovelAIImageInfo {
+  const info = object(input, 'metadata.novelai');
+  const sources = array(info.sources, 'novelai.sources', 2);
+  if (!sources.length || new Set(sources).size !== sources.length) fail('novelai.sources', '取得元は1件または2件（重複なし）です');
+  sources.forEach(source => oneOf(source, ['text', 'stealth'], 'novelai.sources'));
+  oneOf(info.agreement, ['single', 'match', 'mismatch'], 'novelai.agreement');
+  if ((sources.length === 1) !== (info.agreement === 'single')) fail('novelai.agreement', '取得元の数と一致状態が矛盾しています');
+  if (sources.includes('text') && !Object.hasOwn(texts, 'Comment')) fail('novelai.sources', 'PNGテキストのCommentがありません');
+  if (info.stealth !== null) {
+    const stealth = object(info.stealth, 'novelai.stealth');
+    const keys = Object.keys(stealth);
+    if (keys.length > 128 || JSON.stringify(stealth).length > 524_288) fail('novelai.stealth', '大きすぎるメタデータです');
+    for (const key of keys) { string(key, 'novelai.stealth.key', 79); if (!key) fail('novelai.stealth.key', '空のキーは使用できません'); string(stealth[key], 'novelai.stealth.value', 262_144); }
+  }
+  if (!sources.includes('stealth') && info.stealth !== null) fail('novelai.stealth', 'アルファチャンネルの取得元がありません');
+  if (info.stealth === null && sources.includes('stealth') && info.agreement !== 'match') fail('novelai.stealth', 'アルファチャンネルの内容がありません');
 }

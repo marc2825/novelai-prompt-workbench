@@ -31,6 +31,24 @@ export interface Category {
 export interface Settings {
   activeWorkspaceId: string | null;
   librarySort: 'title' | 'updatedAt';
+  /** Tag completion in prompt editors. Absent = on. */
+  tagCompletion?: boolean;
+}
+
+/** One user-defined tag. `tag` is what completion inserts; aliases only help find it. */
+export interface TagDictionaryEntry {
+  id: string;
+  tag: string;
+  aliases: string[];
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Local tag dictionary (optional; absent = empty). Has its own schemaVersion. */
+export interface TagDictionary {
+  schemaVersion: 1;
+  entries: TagDictionaryEntry[];
 }
 
 export interface WorkbenchData {
@@ -44,6 +62,8 @@ export interface WorkbenchData {
   /** Prompt Shuffle state (optional; absent = empty). Has its own schemaVersion. */
   shuffle?: ShuffleData;
   lab?: LabData;
+  /** User tag dictionary for completion and spelling-variant review. */
+  tagDictionary?: TagDictionary;
   /** Quarantined unreadable shuffle data found at load time, kept for manual recovery. */
   shuffleRecovery?: ShuffleRecovery[];
   // Forward-compatible, inert JSON fields survive backup/restore.
@@ -150,6 +170,18 @@ export interface Experiment {
   updatedAt: string;
 }
 
+/**
+ * NovelAI's official PNG metadata containers found at import (docs/DATA_MODEL.md). The meaning of
+ * the fields is unverified: they are shown as candidates and never become settings by themselves.
+ */
+export interface NovelAIImageInfo {
+  /** 'text' = PNG text chunks with a `Comment` key (values stay in ImageMetadata.texts); 'stealth' = alpha-channel `stealth_pngcomp` payload. */
+  sources: ('text' | 'stealth')[];
+  /** 'single' with one container; with both, whether every stealth key equals the PNG text chunk of the same key. */
+  agreement: 'single' | 'match' | 'mismatch';
+  /** Stealth payload (values as strings). null when absent, or when identical to the PNG text chunks (not duplicated). */
+  stealth: Record<string, string> | null;
+}
 export interface ImageMetadata {
   promptEvidence?: 'manual' | 'png-metadata' | 'unknown';
   positive: string | null;
@@ -157,6 +189,8 @@ export interface ImageMetadata {
   settings: GenerationSettings;
   texts: Record<string, string>;
   warnings: string[];
+  /** Absent for PNGs without NovelAI containers and for images imported before this field existed. */
+  novelai?: NovelAIImageInfo;
 }
 export interface ImageRecord {
   id: string;
