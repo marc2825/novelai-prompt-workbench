@@ -3,6 +3,7 @@ import type { BackupDocument, PromptSpan, WorkbenchData } from '../core/types';
 import { compileWorkspace } from '../core/compose';
 import { assertCommentSpans } from '../core/comments';
 import { normalizeShuffle, validateRecoveries } from './shuffle';
+import { normalizeTag, TAG_DICTIONARY_SCHEMA_VERSION, TAG_LIMITS, tagTextIssue } from '../core/tags';
 
 export const FORMAT = 'nai-prompt-workbench';
 export const SCHEMA_VERSION = 3;
@@ -228,8 +229,16 @@ export function validateData(input: unknown): WorkbenchData {
     }
   }
   if (data.lab !== undefined) validateLab(data.lab, imageIds);
+  // Dictionary IDs share the global ID scope (no collisions with any asset) but have
+  // their own entry limit, so a large dictionary does not crowd out the library.
+  if (data.tagDictionary !== undefined) validateTagDictionary(data.tagDictionary, (value, path) => {
+    id(value, path);
+    if (allIds.has(value as string)) fail(path, '重複IDです');
+    allIds.add(value as string);
+  });
   const settings = object(data.settings ?? { activeWorkspaceId: null, librarySort: 'title' }, 'settings');
   oneOf(settings.librarySort, ['title', 'updatedAt'], 'settings.librarySort');
+  if (settings.tagCompletion !== undefined) boolean(settings.tagCompletion, 'settings.tagCompletion');
   if (settings.activeWorkspaceId !== null && !workspaceIds.has(settings.activeWorkspaceId)) fail('settings.activeWorkspaceId', 'ワークスペースが存在しません');
   // Prompt Shuffle data is optional and versioned independently (docs/shuffle/data-model.md).
   const shuffle = data.shuffle === undefined ? undefined : normalizeShuffle(data.shuffle);
@@ -265,6 +274,47 @@ export function parseBackup(text: string): BackupDocument {
   if (document.schemaVersion !== 1 && document.schemaVersion !== 2 && document.schemaVersion !== SCHEMA_VERSION) fail('schemaVersion', '対応していないバージョンです');
   date(document.exportedAt, 'exportedAt');
   return { ...document, schemaVersion: SCHEMA_VERSION, payload: document.schemaVersion === 1 ? validateLegacyData(document.payload) : document.schemaVersion === 2 ? validatePreImageData(document.payload) : validateData(document.payload) } as BackupDocument;
+}
+
+function tagText(value: unknown, path: string): string {
+  string(value, path, TAG_LIMITS.tag);
+  const issue = tagTextIssue(value);
+  if (issue) fail(path, issue);
+  return value;
+}
+
+/** Optional tag dictionary (own schemaVersion). Unknown safe fields are kept by the caller's copy. */
+function validateTagDictionary(input: unknown, register: (value: unknown, path: string) => void) {
+  const dictionary = object(input, 'tagDictionary');
+  if (dictionary.schemaVersion !== TAG_DICTIONARY_SCHEMA_VERSION) fail('tagDictionary.schemaVersion', `対応していないタグ辞書のバージョンです（${String(dictionary.schemaVersion)}）`);
+  const tags = new Map<string, string>();
+  const aliases: { key: string; alias: string; path: string }[] = [];
+  for (const [index, item] of array(dictionary.entries, 'tagDictionary.entries', TAG_LIMITS.entries).entries()) {
+    const path = `tagDictionary.entries[${index}]`;
+    const entry = object(item, path);
+    register(entry.id, `${path}.id`);
+    const tag = tagText(entry.tag, `${path}.tag`);
+    const key = normalizeTag(tag);
+    const existing = tags.get(key);
+    if (existing !== undefined) fail(`${path}.tag`, `「${tag}」は「${existing}」と同じタグです（大文字小文字・_と空白・全角半角の違いは同じとみなします）`);
+    tags.set(key, tag);
+    const own = new Set([key]);
+    for (const [aliasIndex, value] of array(entry.aliases, `${path}.aliases`, TAG_LIMITS.aliasesPerEntry).entries()) {
+      const alias = tagText(value, `${path}.aliases[${aliasIndex}]`);
+      const aliasKey = normalizeTag(alias);
+      if (own.has(aliasKey)) fail(`${path}.aliases[${aliasIndex}]`, `別名「${alias}」はタグ「${tag}」またはその別名と同じ表記です（表記ゆれは自動で照合します）`);
+      own.add(aliasKey);
+      aliases.push({ key: aliasKey, alias, path: `${path}.aliases[${aliasIndex}]` });
+      if (aliases.length > TAG_LIMITS.totalAliases) fail('tagDictionary', `別名は合計${TAG_LIMITS.totalAliases}件までです`);
+    }
+    string(entry.note, `${path}.note`, TAG_LIMITS.note);
+    date(entry.createdAt, `${path}.createdAt`);
+    date(entry.updatedAt, `${path}.updatedAt`);
+  }
+  for (const alias of aliases) {
+    const owner = tags.get(alias.key);
+    if (owner !== undefined) fail(alias.path, `別名「${alias.alias}」は別の項目のタグ「${owner}」と同じです`);
+  }
 }
 
 function integer(value: unknown, path: string, min: number, max: number) {

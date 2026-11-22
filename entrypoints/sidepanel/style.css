@@ -171,6 +171,20 @@ progress { width: 100%; accent-color: var(--accent); }
 .diff-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .diff-text del { background: #752b38; color: #fff; }
 .diff-text ins { background: #20543d; color: #fff; }
+/* Tag completion: a listbox under the prompt textarea (the textarea keeps focus). */
+.tag-complete { position: relative; min-width: 0; }
+.tag-suggestions { position: absolute; z-index: 20; top: calc(100% + 2px); left: 0; right: 0; margin: 0; padding: 3px; list-style: none; max-height: 232px; overflow: auto; background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius-sm); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.tag-suggestions li { display: flex; align-items: baseline; gap: 6px; padding: 4px 7px; border-radius: 4px; cursor: pointer; font-size: 12px; min-width: 0; }
+.tag-suggestions li:hover, .tag-suggestions li.active { background: var(--accent-soft); }
+.tag-suggestions li.active { outline: 1px solid var(--accent); }
+.tag-suggestion-text { font-family: var(--mono); overflow-wrap: anywhere; }
+.tag-suggestion-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tag-suggestion-source { margin-left: auto; flex-shrink: 0; }
+.dictionary-list { margin: 0; padding: 0; list-style: none; display: grid; }
+.dictionary-list > li { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 0; border-top: 1px solid var(--line); min-width: 0; }
+.dictionary-list > li > div { min-width: 0; overflow-wrap: anywhere; }
+.review-list { margin: 0; padding-left: 18px; font-size: 12px; display: grid; gap: 3px; }
+.mono { font-family: var(--mono); }
 .weight-control { padding: 10px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); }
 .weight-control output { color: var(--accent); font: 700 20px var(--mono); font-variant-numeric: tabular-nums; }
 .weight-target { font-family: var(--mono); }

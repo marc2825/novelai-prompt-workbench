@@ -22,7 +22,7 @@ export function Settings({ workbench }: { workbench: Workbench }) {
   }
   return <div className="stack">
     <FullBackup workbench={workbench} />
-    <section className="panel stack" aria-label="JSONバックアップ"><div className="section-title"><h2>JSONバックアップ（テキストのみ）</h2><InfoTip label="JSONバックアップ">ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・Experiment Lab・シャッフル設定・画像メタデータ・設定をJSONに保存します。画像原本・サムネイルは含みません（画像も残すなら完全バックアップを使用）。復元後に欠けた画像は比較画面に表示され、同じPNGを再取込すると修復できます。保存エラーのときも、この書出しで画面上の作業データを退避できます。</InfoTip></div><p className="hint">画像原本を含まない軽いバックアップです。</p>
+    <section className="panel stack" aria-label="JSONバックアップ"><div className="section-title"><h2>JSONバックアップ（テキストのみ）</h2><InfoTip label="JSONバックアップ">ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・Experiment Lab・シャッフル設定・タグ辞書・画像メタデータ・設定をJSONに保存します。画像原本・サムネイルは含みません（画像も残すなら完全バックアップを使用）。復元後に欠けた画像は比較画面に表示され、同じPNGを再取込すると修復できます。保存エラーのときも、この書出しで画面上の作業データを退避できます。</InfoTip></div><p className="hint">画像原本を含まない軽いバックアップです。</p>
       <button type="button" onClick={() => { try { downloadText(exportBackup(data, now()), 'nai-prompt-workbench.json'); } catch (error) { workbench.setError(message(error)); } }}>JSONをエクスポート</button>
       <label>JSONをインポート<input type="file" accept=".json,application/json" disabled={busy} onChange={event => {
         const file = event.target.files?.[0];
@@ -34,7 +34,7 @@ export function Settings({ workbench }: { workbench: Workbench }) {
         void file.text().then(text => { setDocument(parseBackup(text)); workbench.setError(''); }).catch(error => workbench.setError(`${message(error)}。元データは変更していません`)).finally(() => setReading(false));
       }} /></label>
       {document && <div className="stack" aria-label="インポート内容プレビュー">
-        <p>取込候補: ライブラリ{document.payload.libraryEntries.length}件、カテゴリ{document.payload.categories.length}件、構成{document.payload.workspaces.length}件、プリセット{document.payload.presets.length}件、比較{document.payload.experiments.length}件、画像メタデータ{document.payload.images.length}件。書出日時: {document.exportedAt}</p>
+        <p>取込候補: ライブラリ{document.payload.libraryEntries.length}件、カテゴリ{document.payload.categories.length}件、構成{document.payload.workspaces.length}件、プリセット{document.payload.presets.length}件、比較{document.payload.experiments.length}件、画像メタデータ{document.payload.images.length}件{document.payload.tagDictionary ? `、タグ辞書${document.payload.tagDictionary.entries.length}件` : ''}。書出日時: {document.exportedAt}</p>
         <ul>{document.payload.libraryEntries.slice(0, 5).map(entry => <li key={entry.id}>{entry.title} — {entry.raw.slice(0, 120)}</li>)}</ul>
         <label>取込方法<select value={mode} onChange={event => setMode(event.target.value as 'merge' | 'replace')}><option value="merge">追加（ID衝突はエラー）</option><option value="replace">全置換（現在のデータをバックアップ）</option></select></label>
         <p className="hint">追加は現在の設定を優先、全置換はファイルの設定を復元します。どちらも直前のデータを1世代保持します。</p>
@@ -69,6 +69,9 @@ export function Settings({ workbench }: { workbench: Workbench }) {
         }).catch(error => workbench.setError(message(error)));
       }}>移行前バックアップを保存</button></div>
       {notice && <p role="status">{notice}</p>}
+    </section>
+    <section className="panel stack" aria-label="入力補完"><div className="section-title"><h2>入力補完</h2><InfoTip label="入力補完">プロンプトの入力欄でタグを途中まで入力すると、タグ辞書（ライブラリタブ）と、ライブラリの原文に出てくるタグから候補を最大8件表示します。↑↓で選び、Enter/Tabで確定、Escで閉じます。選ばない限り入力は今までどおりで、確定しても入力中のタグだけを置き換えます（重み・括弧・他の文字は変えません）。外部のタグデータは同梱・送信していません。</InfoTip></div>
+      <label className="inline"><input type="checkbox" checked={data.settings.tagCompletion !== false} onChange={event => workbench.commit(previous => ({ ...previous, settings: { ...previous.settings, tagCompletion: event.target.checked } }))} />タグの入力補完を使う</label>
     </section>
     <section className="panel stack" aria-label="デモデータ"><div className="section-title"><h2>デモデータ</h2><InfoTip label="デモデータ">起動時にはサンプルを入れません。このボタンを押したときだけ、新しいIDでサンプルのライブラリと構成を追加します（既存のデータは変更しません）。</InfoTip></div><button type="button" disabled={busy} onClick={() => {
       const demo = createDemo(newId, now());

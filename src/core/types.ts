@@ -31,6 +31,24 @@ export interface Category {
 export interface Settings {
   activeWorkspaceId: string | null;
   librarySort: 'title' | 'updatedAt';
+  /** Tag completion in prompt editors. Absent = on. */
+  tagCompletion?: boolean;
+}
+
+/** One user-defined tag. `tag` is what completion inserts; aliases only help find it. */
+export interface TagDictionaryEntry {
+  id: string;
+  tag: string;
+  aliases: string[];
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Local tag dictionary (optional; absent = empty). Has its own schemaVersion. */
+export interface TagDictionary {
+  schemaVersion: 1;
+  entries: TagDictionaryEntry[];
 }
 
 export interface WorkbenchData {
@@ -44,6 +62,8 @@ export interface WorkbenchData {
   /** Prompt Shuffle state (optional; absent = empty). Has its own schemaVersion. */
   shuffle?: ShuffleData;
   lab?: LabData;
+  /** User tag dictionary for completion and spelling-variant review. */
+  tagDictionary?: TagDictionary;
   /** Quarantined unreadable shuffle data found at load time, kept for manual recovery. */
   shuffleRecovery?: ShuffleRecovery[];
   // Forward-compatible, inert JSON fields survive backup/restore.

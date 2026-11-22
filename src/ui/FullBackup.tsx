@@ -33,7 +33,7 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
   const current = countsOf(data);
 
   return <section className="panel stack" aria-label="完全バックアップ">
-    <div className="section-title"><h2>完全バックアップ（画像原本込み・推奨）</h2><InfoTip label="完全バックアップ">ライブラリ・ワークスペース・プリセット・比較・Experiment Lab・シャッフル設定・画像メタデータに加え、画像原本とサムネイルを1つのZIPに保存します。別のChromeプロファイルや別のPCでも同じ状態に戻せます。Undo履歴とサイト連携の一時情報は含みません。ZIPは無圧縮・最大2GiBで、Experiment LabのZIP（実験の共有用）とは別の形式です。</InfoTip></div>
+    <div className="section-title"><h2>完全バックアップ（画像原本込み・推奨）</h2><InfoTip label="完全バックアップ">ライブラリ・ワークスペース・プリセット・比較・Experiment Lab・シャッフル設定・タグ辞書・画像メタデータに加え、画像原本とサムネイルを1つのZIPに保存します。別のChromeプロファイルや別のPCでも同じ状態に戻せます。Undo履歴とサイト連携の一時情報は含みません。ZIPは無圧縮・最大2GiBで、Experiment LabのZIP（実験の共有用）とは別の形式です。</InfoTip></div>
     <p className="hint">画像も含めてすべてを1つのZIPに保存し、別の環境でもそのまま復元できます。定期的な保存をおすすめします。</p>
     <button type="button" className="primary" disabled={blocked} onClick={() => void run(async () => {
       const time = now();
@@ -60,6 +60,7 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
       <p>検証済み: {inspected.name}（{mib(inspected.size)}）。書出日時 {inspected.backup.manifest.exportedAt} / {inspected.backup.manifest.generator.name} {inspected.backup.manifest.generator.version}</p>
       <div className="table-scroll"><table><thead><tr><th>項目</th><th>現在</th><th>バックアップ</th></tr></thead><tbody>
         {(Object.keys(COUNT_LABELS) as (keyof BackupCounts)[]).map(key => <tr key={key}><td>{COUNT_LABELS[key]}</td><td>{current[key]}</td><td>{inspected.backup.manifest.counts[key]}</td></tr>)}
+        <tr><td>タグ辞書</td><td>{data.tagDictionary?.entries.length ?? 0}</td><td>{inspected.backup.document.payload.tagDictionary?.entries.length ?? 0}</td></tr>
         <tr><td>画像原本（検証済み）</td><td>—</td><td>{inspected.backup.binaries.size}件・{mib(inspected.backup.imageBytes)}</td></tr>
       </tbody></table></div>
       {inspected.backup.warnings.map((warning, index) => <p className="hint" key={index}>⚠ {warning}</p>)}

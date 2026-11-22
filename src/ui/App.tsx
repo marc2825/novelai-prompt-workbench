@@ -16,6 +16,7 @@ import { recoveryJson } from '../data/recovery';
 import { Comparisons } from './Comparisons';
 import { Shuffle } from './Shuffle';
 import { InfoTip } from './InfoTip';
+import { TagCompletionContext, useTagCompletionSource } from './TagCompletion';
 
 type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
 // Ordered by workflow: build prompts → save/vary them → compare results → settings & backup.
@@ -31,6 +32,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const data = workbench.data;
   const workspace = data?.workspaces.find(item => item.id === data.settings.activeWorkspaceId);
   const compiled = useMemo(() => workspace ? compileWorkspace(workspace) : { positive: '', negative: '', warnings: [] }, [workspace]);
+  const completion = useTagCompletionSource(data);
   function addToGroup(entry: LibraryEntry, groupId: string) {
     const member = snapshotMember(entry, newId());
     if (workbench.commit(previous => ({ ...previous, workspaces: previous.workspaces.map(item => item.id === previous.settings.activeWorkspaceId ? { ...item, updatedAt: now(), groups: item.groups.map(group => group.id === groupId ? { ...group, members: [...group.members, member], selectedMemberId: group.mode === 'exclusive' && group.selectedMemberId === null ? member.id : group.selectedMemberId } : group) } : item) }))) setNotice(`「${entry.title}」を構成に追加しました。`);
@@ -61,7 +63,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     catch { workbench.setError('コピーできませんでした。出力欄を選択して手動でコピーしてください。'); }
   }
   const statusPill = <div className={`status ${workbench.storageError ? 'error' : !data ? 'loading' : workbench.saving ? 'saving' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>;
-  return <main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
+  return <TagCompletionContext.Provider value={completion}><main className={tab === 'Experiment Lab' ? 'lab-wide' : ''} onKeyDown={keyboard}>
     <header className="app-header">
       <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです。データはこの端末だけに保存され、画像の生成はNovelAI上で行います">非公式</span></div>
       <div className="header-links">{!data && statusPill}<a href={location.pathname} target="_blank" rel="noreferrer" aria-label="広いタブで開く" title="広いタブで開く（サイドパネルより広い画面で、同じデータを開きます）">↗ タブ</a></div>
@@ -128,5 +130,5 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
       </details>}
     </>}
     <footer>非公式ツール・データはこの端末のみ。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
-  </main>;
+  </main></TagCompletionContext.Provider>;
 }
