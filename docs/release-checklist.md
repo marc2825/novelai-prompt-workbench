@@ -1,6 +1,6 @@
 # 公開・配布チェックリスト
 
-GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで配布する前に確認する事項です。最終更新: 2026-11-21。チェックした項目は日付と根拠を残してください。
+GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで配布する前に確認する事項です。最終更新: 2026-11-22。チェックした項目は日付と根拠を残してください。
 
 ## 1. GitHub公開（Public・公開中）
 
@@ -12,6 +12,8 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 - [x] ライセンス: MIT（`LICENSE`、`package.json`）。依存はすべて許容的なライセンス
 - [x] セキュリティ報告: Private vulnerability reporting を有効化（2026-11-21）、[SECURITY.md](../SECURITY.md)
 - [x] CI: `contents: read`、Actionをハッシュ固定、`persist-credentials: false`、Dependabot設定（`.github/dependabot.yml`）
+- [x] 定期的なセキュリティ検査: `.github/workflows/security.yml`（依存関係の監査・PRの依存関係レビュー・Gitleaksによる全履歴の検査・CodeQL）を追加（2026-11-22）。方針と失敗時の対応は [security.md](security.md#セキュリティ検査ci)
+- [ ] `security.yml` のGitHub上での初回実行が成功し、CodeQLの結果が Security → Code scanning に表示される（マージ後に確認）
 - [x] Issue/PRテンプレート、[CONTRIBUTING.md](../CONTRIBUTING.md)、[PRIVACY.md](../PRIVACY.md)
 
 ### GitHubの設定（2026-11-21に設定済み）
@@ -39,6 +41,8 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 - [ ] 下の「手動確認」の主要項目を実機で実施（少なくとも: ReleasesのZIPを展開して読み込み、サイドパネルが開く、保存・再起動後の保持、同じフォルダへの更新）。公開前の実機確認は未実施
 
 次のバージョンからの手順: `CHANGELOG.md` に `## [X.Y.Z]` を追加し、`package.json`・`src/version.ts` を更新してmainにマージ → `git tag vX.Y.Z` → `git push origin vX.Y.Z`（[development.md](development.md#リリース)）
+
+タグを打つ前に: `main` の最新の「Security」ワークフロー（push時または週1回の実行）が成功していて、Security タブに未対応の Code scanning・Dependabot・Secret scanning の警告がないこと（ある場合は対応するか、[既知の例外](security.md#既知の例外)として記録する）。リリースのワークフロー自体はこの検査を実行しません。
 
 ## 3. Chrome Web Store での一般公開（未実施）
 
