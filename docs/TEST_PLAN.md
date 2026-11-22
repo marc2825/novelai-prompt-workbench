@@ -100,3 +100,9 @@ C08/U05（プリセット）は下記P3で実装。U08（画像A/B）は未実�
 - シャッフルの状態分離・自動停止・生成カウント: [shuffle/test-plan.md](shuffle/test-plan.md) の2026-11-18節。
 - 性能: `tests/unit/perf.test.ts`（100/500/2,000件、保存時に全ストアを読まない・再検証しないことを構造的に検証）。
 - UI: 別パネルの保存通知、タブのキーボード操作・タブ順・初回ガイド（`workbench.spec.ts`）、ツールバーでサイドパネルを開く設定（`extension.spec.ts`）。
+
+## 2026-11-22 追加（issue #22）
+
+- 構造共有: `tests/unit/structural-sharing.test.ts`（未変更ノードの共有と変更経路だけの複製、全ビルドでの深い凍結と呼び出し側の入力を凍結しないこと、共有ノードでもID重複・参照・型・10MiBを毎回検証、シャッフルの共有、取込データの完全な複製、31世代の履歴とUndo/Redo）。`perf.test.ts` は履歴が未変更の部品を共有することも確認。
+- 差分保存: `tests/unit/differential-save.test.ts`（変更レコードだけのput、並べ替えはorderだけ、削除と同じIDの復活、Undo/Redoの任意の順序、途中のquota失敗で無変更かつ次は全件、revision競合と古い基準の不使用、2画面の交互の読込・保存、取込前バックアップ、未検証の入力・読込直後は全件、画像レコードとバイナリ、固定Seedの乱択操作120回）。移行後の保存（`preset-storage.test.ts`）と差分保存後の完全バックアップ復元（`full-backup.test.ts`）。
+- 実Chromiumでの計測: `tests/perf/chromium.bench.spec.ts`（`pnpm bench:chromium`、通常のテストに含まない。結果は [development.md](development.md#性能の目安)）。`extension.spec.ts` は計測用フックが配布物に含まれないことを確認。

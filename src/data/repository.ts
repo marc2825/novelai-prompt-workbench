@@ -81,6 +81,19 @@ async function rawDump(transaction: IDBTransaction, legacy = false) {
   for (const name of ['experiments', 'images']) if (transaction.objectStoreNames.contains(name)) extraAssets[name] = await request(transaction.objectStore(name).getAll());
   return { format: 'nai-prompt-workbench-recovery', imageBinariesIncluded: false, libraryEntries: entries, categories, workspaces, presets, ...extraAssets, metadataKeys: keys, metadata };
 }
+/**
+ * Differential write of one asset store (ADR-105): `before` is exactly what the store
+ * holds. Both arrays are validateData results, whose records are frozen and shared
+ * between results, so an unchanged record is the same object; anything else is put.
+ */
+function writeChanges(store: IDBObjectStore, before: readonly { id: string }[], after: readonly { id: string }[]) {
+  const removed = new Map(before.map(record => [record.id, record]));
+  for (const record of after) {
+    if (removed.get(record.id) !== record) store.put(record);
+    removed.delete(record.id);
+  }
+  for (const id of removed.keys()) store.delete(id);
+}
 function writeMetadata(metadata: IDBObjectStore, data: WorkbenchData, revision: number) {
   const { libraryEntries: _entries, categories: _categories, workspaces: _workspaces, presets: _presets, experiments: _experiments, images: _images, settings, ...extra } = data;
   metadata.put(settings, 'settings');
@@ -109,6 +122,13 @@ async function migrateLegacy(database: IDBDatabase, transaction: IDBTransaction,
 }
 
 export class WorkbenchRepository {
+  /**
+   * What this instance itself last wrote in a committed save, and the revision it
+   * wrote. The next save writes only the differences when the database is still at
+   * that revision (every writer bumps it). Cleared by load, purge, any failure and
+   * while a save runs; backup saves and unvalidated input always write everything.
+   */
+  private committed: { data: WorkbenchData; revision: number } | null = null;
   private constructor(private readonly database: IDBDatabase) {
     database.onversionchange = () => database.close();
   }
@@ -147,6 +167,7 @@ export class WorkbenchRepository {
   close() { this.database.close(); }
 
   async load(): Promise<StoredState> {
+    this.committed = null;
     const transaction = this.database.transaction(STORES, 'readonly');
     const [state] = await Promise.all([readState(transaction), completion(transaction)]);
     // Corrupt shuffle data is isolated (kept in shuffleRecovery) instead of blocking the library.
@@ -157,6 +178,8 @@ export class WorkbenchRepository {
   async save(input: WorkbenchData, expectedRevision: number, backup = false, imageWrites: ImageWrite[] = []): Promise<number> {
     // Data produced by validateData (every commit) is not validated a second time.
     const data = isValidated(input) ? input : validateData(input);
+    const base = this.committed;
+    this.committed = null;
     // Complete asynchronous hashing before opening the transaction, which must
     // remain active until all metadata and binary writes have been queued.
     for (const image of imageWrites) {
@@ -178,8 +201,11 @@ export class WorkbenchRepository {
       if (revision !== expectedRevision) throw new StorageConflictError('別のパネルで更新されています。作業中データをエクスポートして再読込してください');
       const metadata = transaction.objectStore('metadata');
       if (previous) metadata.put({ ...previous, savedAt: new Date().toISOString(), schemaVersion: SCHEMA_VERSION }, 'previousImport');
+      // The revision check above proves that no other save happened since `base` was committed.
+      const differential = !backup && base !== null && base.revision === expectedRevision && isValidated(input);
       for (const name of ASSETS) {
         const store = transaction.objectStore(name);
+        if (differential) { writeChanges(store, base.data[name], data[name]); continue; }
         store.clear();
         for (const item of data[name]) store.put(item);
       }
@@ -192,6 +218,7 @@ export class WorkbenchRepository {
       }
       writeMetadata(metadata, data, expectedRevision + 1);
       await done;
+      this.committed = { data, revision: expectedRevision + 1 };
       return expectedRevision + 1;
     } catch (error) {
       try { transaction.abort(); } catch { /* Already completed/aborted. */ }
@@ -239,6 +266,7 @@ export class WorkbenchRepository {
   // purge bumps the revision, so a page that loaded earlier gets a conflict
   // instead of silently saving references to purged binaries.
   async purgeUnreferenced(protectedIds: readonly string[], expectedRevision?: number): Promise<{ revision: number; removed: number }> {
+    this.committed = null;
     const transaction = this.database.transaction(STORES, 'readwrite'); const done = completion(transaction); void done.catch(() => {});
     try {
       const state = await readState(transaction);

@@ -207,6 +207,35 @@ describe('complete backup (ZIP with original images)', () => {
     expect(planFullRestore(fixture(), inspected, 'replace', same).writes).toHaveLength(2);
   });
 
+  it('a restore after differential saves replaces everything; later edits are differential and keep the binaries (issue #22)', async () => {
+    const { data, binaries } = richData();
+    const { blob: zip } = await exportFullBackup(data, sourceOf(binaries), timestamp);
+    const factory = new IDBFactory();
+    const repo = await WorkbenchRepository.open('restore-after-diff', factory);
+    const before = validateData(fixture());
+    await repo.save(before, 0);
+    const current = validateData({ ...before, libraryEntries: before.libraryEntries.slice(1) }); // a differential save
+    await repo.save(current, 1);
+    const inspected = await inspectFullBackup(zip);
+    const plan = planFullRestore(current, inspected, 'replace', await repo.binaryBindings([...inspected.binaries.keys()]));
+    const restored = validateData(plan.data); // as useWorkbench.restoreFull does
+    const clear = vi.spyOn(IDBObjectStore.prototype, 'clear');
+    try {
+      await repo.save(restored, 2, true, plan.writes);
+      expect(clear.mock.contexts.map(store => (store as IDBObjectStore).name)).toEqual(['libraryEntries', 'categories', 'workspaces', 'presets', 'experiments', 'images']);
+      clear.mockClear();
+      const edited = validateData({ ...restored, libraryEntries: restored.libraryEntries.map((entry, index) => index === 0 ? { ...entry, raw: 'after restore' } : entry) });
+      await repo.save(edited, 3);
+      expect(clear).not.toHaveBeenCalled();
+      const reader = await WorkbenchRepository.open('restore-after-diff', factory);
+      expect(await reader.load()).toEqual({ data: edited, revision: 4 });
+      expect(await reader.previousImport()).toMatchObject({ revision: 2, data: { libraryEntries: current.libraryEntries } });
+      for (const [imageId, item] of binaries) expect(await zipBytes((await reader.imageBlob(imageId))!)).toEqual(await zipBytes(item.original));
+      reader.close();
+    } finally { clear.mockRestore(); }
+    repo.close();
+  });
+
   it('a quota failure while writing keeps the existing data and binaries untouched (atomic restore)', async () => {
     const { data, binaries } = richData();
     const { blob: zip } = await exportFullBackup(data, sourceOf(binaries), timestamp);
