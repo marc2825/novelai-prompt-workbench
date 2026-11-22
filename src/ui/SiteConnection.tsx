@@ -3,6 +3,8 @@ import type { Channel, CompiledPrompts } from '../core/types';
 import type { SiteClient } from '../platform/novelai/client';
 import type { SiteInspection, WriteMode, WritePreview } from '../platform/novelai/protocol';
 import { InfoTip } from './InfoTip';
+import { safePath, siteDiagnostics, type DiagnosticRead } from '../core/site-diagnostics';
+import { APP_VERSION } from '../version';
 
 export function SiteConnection({ client, compiled, onImport, onApplied }: { client?: SiteClient; compiled: CompiledPrompts; onImport: (channel: Channel, raw: string) => void; onApplied?: (preview: WritePreview) => void }) {
   const [sites, setSites] = useState<SiteInspection[]>([]);
@@ -15,6 +17,7 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
   const [issue, setIssue] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reads, setReads] = useState<DiagnosticRead[]>([]);
   const version = useRef(0);
   const site = sites.find(item => String(item.tabId) === selected);
   useEffect(() => { version.current++; setPreview(null); setRead(null); setNotice(''); }, [compiled.positive, compiled.negative, selected, channel, mode]);
@@ -41,6 +44,11 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
       setSelected(''); // Never auto-select a tab, including when only one exists.
       setNotice(result.sites.length ? `${result.sites.length}個の画像ページを検出しました。対象を選択してください。` : 'NovelAI画像ページに接続できません。ページを開くか再読込してください。コピーは利用できます。');
     })}>NovelAIの接続を確認</button>
+    {sites.length > 0 && <button type="button" className="small" onClick={() => {
+      const brands = (navigator as Navigator & { userAgentData?: { brands?: { brand: string; version: string }[] } }).userAgentData?.brands?.filter(item => !/Not.?A.?Brand/i.test(item.brand)).map(item => `${item.brand} ${item.version}`).join(', ') ?? '';
+      const text = siteDiagnostics({ appVersion: APP_VERSION, at: new Date().toISOString(), browser: brands, uiLanguage: navigator.language, sites: sites.map(item => ({ capabilities: item.capabilities, path: safePath(item.url) })), reads });
+      void navigator.clipboard.writeText(text).then(() => setNotice('診断情報をコピーしました（プロンプトの内容・URL・タイトルは含みません）。')).catch(() => setIssue('コピーできませんでした'));
+    }}>診断情報をコピー</button>}
     {sites.length > 0 && <label>対象タブ<select value={selected} disabled={busy} onChange={event => { version.current++; setSelected(event.target.value); setIssue(''); }}><option value="">対象を選択</option>{sites.map(item => <option key={item.tabId} value={item.tabId}>タブ {item.tabId}: {item.title} — {item.url}</option>)}</select></label>}
     {site && <><div className="columns"><label>反映チャンネル<select value={channel} disabled={busy} onChange={event => { version.current++; setChannel(event.target.value as Channel); }}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>反映方法<select value={mode} disabled={busy} onChange={event => { version.current++; setMode(event.target.value as WriteMode); }}><option value="insert">選択範囲へ原文どおり挿入</option><option value="replace">入力欄全体を置換</option></select></label></div>
     <p className="hint">{site.capabilities[channel].reason}</p>
@@ -52,6 +60,7 @@ export function SiteConnection({ client, compiled, onImport, onApplied }: { clie
       if (!result.ok) { setIssue(result.reason); return; }
       if (result.type !== 'read') { setIssue('予期しない読取り応答です'); return; }
       setRead({ channel, raw: result.raw, tabId: site.tabId, documentId: site.documentId });
+      setReads(previous => [...previous.filter(item => item.channel !== channel), { channel, length: result.raw.length, lines: result.raw.split('\n').length }]);
       setNotice('現在の入力を読み取りました。サイトは変更していません。');
     })}>サイトの現在値を読む</button>
     <button type="button" className="small" disabled={busy || !site?.capabilities[channel].canWrite || !!compiled.warnings.length} onClick={() => void perform(async () => {
