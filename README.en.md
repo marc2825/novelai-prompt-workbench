@@ -1,8 +1,8 @@
-# NovelAI Prompt Workbench (unofficial)
+# Spellbinder for NovelAI (unofficial)
 
 [日本語](README.md) | English
 
-A Chrome extension for building NovelAI image-generation prompts from reusable parts, varying them and comparing the results. It runs in the browser's side panel and keeps all data inside your own Chrome profile.
+A Chrome extension for building NovelAI image-generation prompts ("spells") from reusable parts, varying them and comparing the results — a binder for your spells (formerly *NovelAI Prompt Workbench*). It runs in the browser's side panel and keeps all data inside your own Chrome profile.
 
 > **Unofficial.** Not affiliated with NovelAI (Anlatan Inc.). It never generates images and never writes to NovelAI pages: you copy the prompt and paste it into NovelAI. Beta (0.x). The user interface is in Japanese; Experiment Lab can be switched to English.
 
@@ -30,11 +30,11 @@ A Chrome extension for building NovelAI image-generation prompts from reusable p
 
 No Node.js needed. This is not the Chrome Web Store version, so there are no automatic updates.
 
-1. Download the latest `novelai-prompt-workbench-<version>-chrome.zip` from [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) (not the "Source code" archives)
+1. Download the latest `spellbinder-for-novelai-<version>-chrome.zip` from [Releases](https://github.com/marc2825/spellbinder-for-novelai/releases) (not the "Source code" archives)
 2. Choose a folder and extract the ZIP into it (`manifest.json` must be directly inside the folder)
 3. Open `chrome://extensions` and turn on Developer mode
 4. Click "Load unpacked" and select that folder
-5. Open **NovelAI Prompt Workbench (unofficial)** from the extensions menu (puzzle icon) to show the side panel
+5. Open **Spellbinder for NovelAI (unofficial)** from the extensions menu (puzzle icon) to show the side panel
 
 To update: save a complete backup (Settings → 完全バックアップをZIPで保存), extract the new ZIP into **the same folder**, and press the reload button in `chrome://extensions`. **Do not load it from a different folder** — Chrome identifies unpacked extensions by folder, so your data would not appear. Details (Japanese): [docs/install.md](docs/install.md).
 

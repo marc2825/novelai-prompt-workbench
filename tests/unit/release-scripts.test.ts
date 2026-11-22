@@ -43,7 +43,7 @@ describe('release version checks', () => {
     expect(sourceVersionOf(readFileSync('src/version.ts', 'utf8'))).toBe(APP_VERSION);
     expect(isPrerelease('0.9.3')).toBe(true);
     expect(isPrerelease('1.0.0')).toBe(false);
-    expect(zipName('0.1.0')).toBe('novelai-prompt-workbench-0.1.0-chrome.zip');
+    expect(zipName('0.1.0')).toBe('spellbinder-for-novelai-0.1.0-chrome.zip');
   });
   it('the CLI fails on a tag that does not match the project version', () => {
     const mismatch = spawnSync(process.execPath, ['scripts/verify-release.mjs', '--versions-only', '--tag', 'v99.0.0'], { encoding: 'utf8' });
@@ -112,7 +112,7 @@ describe('release notes source', () => {
   });
   it('the release notes tell users not to use the source code archives GitHub attaches', () => {
     const notes = execFileSync(process.execPath, ['scripts/release-notes.mjs', APP_VERSION], { encoding: 'utf8' });
-    expect(notes).toContain(`novelai-prompt-workbench-${APP_VERSION}-chrome.zip`);
+    expect(notes).toContain(`spellbinder-for-novelai-${APP_VERSION}-chrome.zip`);
     expect(notes).toContain('「Source code (zip)」「Source code (tar.gz)」');
     expect(notes).toContain('manifest.json');
   });

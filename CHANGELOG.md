@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 変更
+- 名前を「NovelAI Prompt Workbench」から「**Spellbinder for NovelAI**」に変更（リポジトリ: `marc2825/spellbinder-for-novelai`）。リリースZIPは `spellbinder-for-novelai-<版>-chrome.zip`、バックアップのファイル名は `spellbinder-backup-…` になります。保存データ・バックアップの形式は変わらず、以前のバックアップもそのまま読み込めます。**更新は今までと同じフォルダで行ってください**（フォルダ名は変えないでください）
+
 ## [0.2.0]
 
 データ保護の強化、画像とプロンプトの整理機能、配布・検査の自動化を含むベータ版（Pre-release）です。**更新の前に「設定」→「完全バックアップをZIPで保存」でバックアップを取り、前回と同じフォルダの中身を置き換えてください。**

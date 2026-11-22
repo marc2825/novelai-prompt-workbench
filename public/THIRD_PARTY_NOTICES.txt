@@ -1,6 +1,6 @@
 THIRD-PARTY NOTICES
 
-NovelAI Prompt Workbench (MIT License, see LICENSE in the source repository)
+Spellbinder for NovelAI (MIT License, see LICENSE in the source repository)
 bundles code from the following open-source packages. Their license notices
 are reproduced below as required by their licenses.
 

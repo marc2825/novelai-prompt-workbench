@@ -1,4 +1,4 @@
-# AGENTS.md — NovelAI Prompt Workbench
+# AGENTS.md — Spellbinder for NovelAI
 
 ## Repository Overview
 Unofficial, local-first Chrome MV3 extension (side panel) for building NovelAI image prompts: library, groups/toggles, range comments, presets, tag weights, A/B comparison, Prompt Shuffle, Experiment Lab and complete backups. Requirements: `docs/REQUIREMENTS.md`. Before coding read `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/PROMPT_SEMANTICS.md` and `docs/security.md`; for shuffle work `docs/shuffle/`; for persistence/backup work `docs/backup.md`. Current status and open work: `tasks/STATUS.md`. `docs/archive/` is history, not specification. Keep this file short; docs are authoritative for details.

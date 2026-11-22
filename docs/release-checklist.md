@@ -36,14 +36,14 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 
 初回 v0.1.0:
 
-- [x] タグ `v0.1.0`（`cd1395f`）をpushし、Actions の「Release」（ci → package → publish）が成功。[Pre-releaseとして公開](https://github.com/marc2825/novelai-prompt-workbench/releases/tag/v0.1.0)（2026-11-21）
+- [x] タグ `v0.1.0`（`cd1395f`）をpushし、Actions の「Release」（ci → package → publish）が成功。[Pre-releaseとして公開](https://github.com/marc2825/spellbinder-for-novelai/releases/tag/v0.1.0)（2026-11-21）
 - [x] 公開されたZIPをダウンロードし、`.sha256` と一致、`verifyReleaseZip` の検査で問題0件（14ファイル）。SHA-256 `87e2c281…d2d9` はローカル・クリーンなclone・事前の試験実行のビルドと同一
 - [ ] 下の「手動確認」の主要項目を実機で実施（少なくとも: ReleasesのZIPを展開して読み込み、サイドパネルが開く、保存・再起動後の保持、同じフォルダへの更新）。公開前の実機確認は未実施
 
 v0.2.0（2026-11-22）:
 
 - [x] PR #51 で版を0.2.0に更新（CHANGELOG `[0.2.0]`）。タグ前に Security タブの未対応の警告 0件（Code scanning・Dependabot・Secret scanning）を確認
-- [x] タグ `v0.2.0`（`06b07d7`）をpushし、「Release」（ci → package → publish）が成功。[Pre-releaseとして公開](https://github.com/marc2825/novelai-prompt-workbench/releases/tag/v0.2.0)
+- [x] タグ `v0.2.0`（`06b07d7`）をpushし、「Release」（ci → package → publish）が成功。[Pre-releaseとして公開](https://github.com/marc2825/spellbinder-for-novelai/releases/tag/v0.2.0)
 - [x] 公開されたZIPを `.sha256` と照合し、`verifyReleaseZip` で問題0件（14ファイル、権限 `sidePanel` のみ）。SHA-256 `39fd5a0d…03d3` はローカルのビルドと同一
 - [x] 公開版 v0.1.0 のZIPから同じフォルダで0.2.0に更新し、データが残ることを確認（手元のE2E、Cross-platformワークフローの Windows・macOS・Linux）
 - [x] v0.1.0 のリリースノートに「Source code のZIPは読み込めない」の注意と、v0.2.0 への案内を追記（ZIP・タグは変更なし）

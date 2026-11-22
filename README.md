@@ -1,8 +1,8 @@
-# NovelAI Prompt Workbench（非公式）
+# Spellbinder for NovelAI（非公式）
 
 日本語 | [English](README.en.md)
 
-NovelAIの画像生成プロンプト（タグ）を、部品として登録・組み合わせ・比較するためのChrome拡張機能です。サイドパネルで動き、データは自分のChromeの中にだけ保存されます。
+NovelAIの画像生成プロンプト（いわゆる「呪文」）を、部品として登録・組み合わせ・比較するためのChrome拡張機能です。呪文（spell）を綴じておくバインダー、という意味の名前です（旧名: NovelAI Prompt Workbench）。サイドパネルで動き、データは自分のChromeの中にだけ保存されます。
 
 > **非公式ツールです。** NovelAI（Anlatan Inc.）とは提携していません。画像の生成は行わず、NovelAIのページへの書き込みもしません。プロンプトはコピーしてNovelAIに貼り付けて使います。現在はベータ版（0.x）です。
 
@@ -31,11 +31,11 @@ NovelAIの画像生成プロンプト（タグ）を、部品として登録・�
 
 Node.js などは不要です。Chrome Web Store 版ではないため、自動更新はありません。
 
-1. [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) から最新の `novelai-prompt-workbench-<バージョン>-chrome.zip` をダウンロードする（「Source code」のZIPではありません）
+1. [Releases](https://github.com/marc2825/spellbinder-for-novelai/releases) から最新の `spellbinder-for-novelai-<バージョン>-chrome.zip` をダウンロードする（「Source code」のZIPではありません）
 2. 置き場所のフォルダを1つ決めて、ZIPの中身を展開する（フォルダの直下に `manifest.json` がある状態にする。Windowsで拡張子が非表示だと `manifest` と表示されます）
 3. Chromeで `chrome://extensions` を開き、「デベロッパーモード」をONにする
 4. 「パッケージ化されていない拡張機能を読み込む」で、そのフォルダを選ぶ
-5. 拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すとサイドパネルが開く（ピン留めがおすすめ）
+5. 拡張機能メニュー（パズルのアイコン）から **Spellbinder for NovelAI (unofficial)** を押すとサイドパネルが開く（ピン留めがおすすめ）
 
 開発中の最新版を使いたい場合は、[ソースからビルド](docs/development.md)してください。
 

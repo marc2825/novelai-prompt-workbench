@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         **公開されます。** ログイン情報・Cookie・トークン、個人的なプロンプト、ログイン後の画面のスクリーンショット、個人情報を載せないでください。プロンプトはダミーの文字列で確認してください。
-        手順: [docs/REAL_SITE_CHECK.md](https://github.com/marc2825/novelai-prompt-workbench/blob/main/docs/REAL_SITE_CHECK.md)
+        手順: [docs/REAL_SITE_CHECK.md](https://github.com/marc2825/spellbinder-for-novelai/blob/main/docs/REAL_SITE_CHECK.md)
   - type: input
     id: date
     attributes:

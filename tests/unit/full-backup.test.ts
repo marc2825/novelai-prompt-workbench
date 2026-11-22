@@ -271,7 +271,7 @@ describe('complete backup (ZIP with original images)', () => {
 
   it('validates manifest shape strictly and names files deterministically', () => {
     expect(() => validateManifest({ format: 'nai-prompt-workbench-full-backup' })).toThrow(BackupError);
-    expect(fullBackupFilename('2026-11-18T06:07:08.123Z')).toBe('nai-prompt-workbench-backup-20261118-060708Z.zip');
+    expect(fullBackupFilename('2026-11-18T06:07:08.123Z')).toBe('spellbinder-backup-20261118-060708Z.zip');
   });
 
   it('package.json and the manifest share one version', () => {

@@ -91,7 +91,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   const statusPill = <div className={`status ${workbench.storageError ? 'error' : !data ? 'loading' : workbench.saving ? 'saving' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>;
   return <TagCompletionContext.Provider value={completion}><main className={tab === 'Experiment Lab' ? 'lab-wide' : 'with-preview'} onKeyDown={keyboard}>
     <header className="app-header">
-      <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>NovelAI Prompt Workbench</h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです。データはこの端末だけに保存され、画像の生成はNovelAI上で行います">非公式</span></div>
+      <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>Spellbinder<span className="app-subtitle"> for NovelAI</span></h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです。データはこの端末だけに保存され、画像の生成はNovelAI上で行います">非公式</span></div>
       <div className="header-links">{!data && statusPill}<a href={`${location.pathname}#${HASH[tab]}`} target="_blank" rel="noreferrer" aria-label="広いタブで開く" title="広いタブで開く（サイドパネルより広い画面で、同じデータを開きます）">↗ タブ</a></div>
     </header>
     {workbench.storageError && <section className="panel stack" role="alert"><p>{workbench.storageError}</p><p>元の保存データは自動削除しません。画面上の作業データを、画像も含めて完全バックアップで退避できます。</p><div className="actions">

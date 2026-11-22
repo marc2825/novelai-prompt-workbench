@@ -1,18 +1,21 @@
 # インストールと更新（GitHub Releases版）
 
+> 0.2.0 より後の版で、名前を「NovelAI Prompt Workbench」から「Spellbinder for NovelAI」に変えました。名前とZIPのファイル名が変わっただけで、データはそのまま引き継がれます（同じフォルダで更新してください）。
+
 Node.js などの開発ツールは不要です。Chrome Web Store 版ではないため、**自動更新はありません**。
 
 ## インストール
 
-1. [Releases](https://github.com/marc2825/novelai-prompt-workbench/releases) を開き、最新版の Assets から `novelai-prompt-workbench-<バージョン>-chrome.zip` をダウンロードします。
+1. [Releases](https://github.com/marc2825/spellbinder-for-novelai/releases) を開き、最新版の Assets から `spellbinder-for-novelai-<バージョン>-chrome.zip` をダウンロードします。
    - 同じ Assets にある「Source code (zip)」「Source code (tar.gz)」は、GitHubがすべてのリリースに自動で付けるソースコードです。`manifest.json` を含まず、そのままでは読み込めません（使う場合は [development.md](development.md) の手順でビルドが必要です）。
 2. 置き場所になるフォルダを1つ決めて作ります。**このフォルダは更新のたびに使い回します。** バージョン番号を含まない名前にしてください。
-   - 例（Windows）: `C:\Users\<ユーザー名>\ChromeExtensions\novelai-prompt-workbench`
-   - 例（macOS）: `~/ChromeExtensions/novelai-prompt-workbench`
+   - 例（Windows）: `C:\Users\<ユーザー名>\ChromeExtensions\spellbinder-for-novelai`
+   - 例（macOS）: `~/ChromeExtensions/spellbinder-for-novelai`
+   - **0.2.0以前（旧名 NovelAI Prompt Workbench）から使っている場合は、今のフォルダ（例: `novelai-prompt-workbench`）の名前を変えずに使い続けてください。** フォルダの名前や場所を変えると、別の拡張機能として扱われ、保存したデータが表示されなくなります。
 3. ZIPの中身をそのフォルダに展開します。フォルダの直下に `manifest.json` がある状態にします。Windowsのエクスプローラーで拡張子が非表示の場合は `manifest`（種類: JSON ファイル）と表示されます（展開ツールが `novelai-prompt-workbench-0.1.0-chrome` のようなフォルダを作った場合は、その**中身**を置き場所のフォルダへ移します）。
 4. Chromeで `chrome://extensions` を開き、右上の「デベロッパーモード」をONにします。
 5. 「パッケージ化されていない拡張機能を読み込む」を押し、置き場所のフォルダを選びます。
-6. ツールバーの拡張機能メニュー（パズルのアイコン）から **NovelAI Prompt Workbench (unofficial)** を押すと、サイドパネルが開きます。ピン留めしておくと便利です。
+6. ツールバーの拡張機能メニュー（パズルのアイコン）から **Spellbinder for NovelAI (unofficial)**（0.2.0以前の名前は NovelAI Prompt Workbench） を押すと、サイドパネルが開きます。ピン留めしておくと便利です。
 
 置き場所のフォルダは、インストール後も消したり移動したりしないでください（Chromeはこのフォルダから拡張機能を読み込み続けます）。
 
@@ -21,7 +24,7 @@ Node.js などの開発ツールは不要です。Chrome Web Store 版ではな�
 1. **更新の前に**、サイドパネルの「設定」→「完全バックアップをZIPで保存」でバックアップを保存します。
 2. Releases から新しいZIPをダウンロードします。
 3. **前回と同じ置き場所のフォルダ**の中身をすべて削除し、新しいZIPの中身を展開します（フォルダそのものは消さず、同じ場所・同じ名前のまま使います）。
-4. `chrome://extensions` を開き、NovelAI Prompt Workbench のカードにある再読み込みボタン（丸い矢印）を押します。
+4. `chrome://extensions` を開き、Spellbinder for NovelAI（旧名 NovelAI Prompt Workbench）のカードにある再読み込みボタン（丸い矢印）を押します。
 5. 開いているNovelAIのページがあれば再読み込みします。サイドパネルは開き直してください。
 
 ### なぜ同じフォルダを使うのか
@@ -41,12 +44,12 @@ Node.js などの開発ツールは不要です。Chrome Web Store 版ではな�
 
 ```bash
 # macOS / Linux
-shasum -a 256 -c novelai-prompt-workbench-<バージョン>-chrome.zip.sha256
+shasum -a 256 -c spellbinder-for-novelai-<バージョン>-chrome.zip.sha256
 ```
 
 ```powershell
 # Windows (PowerShell): 表示されたハッシュが .sha256 ファイルの値と同じことを確認
-Get-FileHash .\novelai-prompt-workbench-<バージョン>-chrome.zip -Algorithm SHA256
+Get-FileHash .\spellbinder-for-novelai-<バージョン>-chrome.zip -Algorithm SHA256
 ```
 
 リリースのZIPは、公開リポジトリの GitHub Actions がタグの付いたコミットからビルドし、テストと内容の検証（権限・含まれるファイル・バージョン）を通過したものだけが添付されます。

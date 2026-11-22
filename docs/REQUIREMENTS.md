@@ -1,7 +1,7 @@
 # 要件定義書（Product Requirements Document）
 
 - バージョン: 1.0 / 作成: 2026-11-03
-- 製品仮称: NovelAI Prompt Workbench
+- 製品名: Spellbinder for NovelAI（仮称・0.2.0までの名前: NovelAI Prompt Workbench）
 - 対象: NovelAI **画像生成**を頻繁に使い、構造化されたプロンプトを再利用したい個人
 - デスクトップChrome優先。Firefox/Safari/モバイルは初期対象外
 - この文書の必須語: **MUST**=受入必須、**SHOULD**=高優先、**LATER**=後続フェーズ

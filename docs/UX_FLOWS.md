@@ -24,7 +24,7 @@
 
 
 ```text
-┌─ NovelAI Prompt Workbench ───────────────┐
+┌─ Spellbinder for NovelAI ────────────────┐
 │ [Library] [Workspace] [Presets] [Compare]│
 ├───────────────────────────────────────────┤
 │ Library:                                   │

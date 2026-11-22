@@ -55,7 +55,7 @@ export async function sha256(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))), value => value.toString(16).padStart(2, '0')).join('');
 }
 export function fullBackupFilename(time: string): string {
-  return `nai-prompt-workbench-backup-${time.replace(/\.\d+Z$/, 'Z').replace(/[-:]/g, '').replace('T', '-')}.zip`;
+  return `spellbinder-backup-${time.replace(/\.\d+Z$/, 'Z').replace(/[-:]/g, '').replace('T', '-')}.zip`;
 }
 
 export interface BinarySource { image(id: string, thumbnail: boolean): Promise<Blob | undefined> }

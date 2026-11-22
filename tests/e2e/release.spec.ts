@@ -40,7 +40,7 @@ test('release ZIP installs from an extracted folder, keeps data across restarts 
     channel: 'chromium', headless: true, viewport: { width: 400, height: 900 },
     args: [`--disable-extensions-except=${folder}`, `--load-extension=${folder}`],
   });
-  const install = join(base, 'novelai-prompt-workbench'); // the folder a user keeps and updates in place
+  const install = join(base, 'spellbinder-for-novelai'); // the folder a user keeps and updates in place
   await extract(install);
   // manifest.json sits directly in the extracted folder, so Chrome can load that folder.
   expect(existsSync(join(install, 'manifest.json'))).toBe(true);
@@ -83,7 +83,7 @@ test('release ZIP installs from an extracted folder, keeps data across restarts 
     await context.close();
 
     // 4. Why the folder must be reused: the same files in ANOTHER folder are a different extension with empty data.
-    const elsewhere = join(base, 'novelai-prompt-workbench-0.99.0');
+    const elsewhere = join(base, 'spellbinder-for-novelai-0.99.0');
     await extract(elsewhere, '0.99.0');
     context = await launch(elsewhere);
     const other = await extensionIdOf(context);
@@ -111,6 +111,7 @@ test('updating from a previously published release ZIP into the same folder keep
   if (!existsSync(join('.output', zipName(version)))) execFileSync(process.execPath, ['node_modules/wxt/bin/wxt.mjs', 'zip'], { stdio: 'pipe' });
   const current = readZip(await readFile(join('.output', zipName(version))));
   const base = await realpath(await mkdtemp(join(tmpdir(), 'nai-update-test-')));
+  // Users of releases up to 0.2.0 extracted into a folder named after the old name; they keep it.
   const install = join(base, 'novelai-prompt-workbench'); const profile = join(base, 'chrome-profile');
   const extract = async (entries: ReturnType<typeof readZip>) => {
     // Like the update instructions: empty the folder, then extract the new ZIP into it.
