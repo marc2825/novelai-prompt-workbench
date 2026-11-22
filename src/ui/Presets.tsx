@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createWorkspace } from '../core/commands';
-import { applyPreset, comparePreset, deletePreset, diagnosePreset, duplicatePreset, overwritePreset, presetIdCount, presetStatus, renamePreset, savePreset } from '../core/presets';
+import { applyPreset, comparePreset, deletePreset, deletePresetRevision, diagnosePreset, duplicatePreset, overwritePreset, presetIdCount, presetStatus, renamePreset, restorePresetRevision, savePreset } from '../core/presets';
+import { compileWorkspace } from '../core/compose';
+import { PromptDiffView } from './PromptDiffView';
 import type { Workbench } from './useWorkbench';
 import { Empty, newId, now } from './shared';
 import { InfoTip } from './InfoTip';
@@ -25,6 +27,7 @@ export function Presets({ workbench, onEdit }: { workbench: Workbench; onEdit?: 
   const [query, setQuery] = useState('');
   const [newName, setNewName] = useState('');
   const [rename, setRename] = useState('');
+  const [viewing, setViewing] = useState<string | null>(null);
   const selectedId = choice ?? workspace?.appliedPresetId ?? '';
   const selected = data.presets.find(item => item.id === selectedId);
   const filtered = data.presets.filter(item => item.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) || item.id === selectedId);
@@ -35,6 +38,7 @@ export function Presets({ workbench, onEdit }: { workbench: Workbench; onEdit?: 
   // In the Workspace tab only select / apply / save stay visible; the Presets tab opens the details.
   const compact = !onEdit;
   useEffect(() => setRename(selected?.name ?? ''), [selected?.id, selected?.name]);
+  useEffect(() => setViewing(null), [selected?.id]);
   useEffect(() => { setChoice(null); }, [workspace?.id, workspace?.appliedPresetId]);
 
   const apply = (newWorkspace: boolean, edit: boolean) => {
@@ -57,7 +61,7 @@ export function Presets({ workbench, onEdit }: { workbench: Workbench; onEdit?: 
       <div className="actions"><button type="button" className="primary" disabled={blocked || !!comparison.after.warnings.length} onClick={() => apply(false, false)}>プリセットを適用</button>
         <button type="button" disabled={blocked || !workspace} onClick={() => {
           if (!workspace || !confirm(`「${selected.name}」を現在の構成で上書き保存しますか？保存済みの状態を変更します。Undoで戻せます。`)) return;
-          workbench.commit(previous => overwritePreset(previous, selected.id, workspace.id, now()));
+          workbench.commit(previous => overwritePreset(previous, selected.id, workspace.id, now(), newId()));
         }}>現在の構成で上書き保存</button></div>
     </>}
     <form className="actions" aria-label="プリセット作成" onSubmit={event => {
@@ -92,6 +96,20 @@ export function Presets({ workbench, onEdit }: { workbench: Workbench; onEdit?: 
           <h3>現在の構成 → 「{selected.name}」</h3>
           {comparison.total > 0 && <div className="table-scroll"><table><thead><tr><th>設定</th><th>現在</th><th>適用後</th></tr></thead><tbody>{comparison.differences.map((difference, index) => <tr key={index}><td>{difference.label}</td><td>{difference.before}</td><td>{difference.after}</td></tr>)}</tbody></table>{comparison.total > 100 && <p className="hint">先頭100件の差分を表示しています。</p>}</div>}
           {(['positive', 'negative'] as const).map(channel => <div className="columns" key={channel}><label>現在の{channel}<textarea readOnly value={comparison.before[channel]} rows={3} /></label><label>適用後の{channel}<textarea readOnly value={comparison.after[channel]} rows={3} /></label></div>)}
+          {(['positive', 'negative'] as const).map(channel => <PromptDiffView key={channel} label={`適用による${channel}の変化`} before={comparison.before[channel]} after={comparison.after[channel]} />)}
+        </div>}
+        {!!selected.revisions?.length && <div className="stack" aria-label="プリセットの保存履歴">
+          <div className="section-title"><h3>保存履歴（{selected.revisions.length}）</h3><InfoTip label="プリセットの保存履歴">「現在の構成で上書き保存」したときの直前の内容を、新しい順に最大10件残します。「この版に戻す」は今の内容も履歴に残してから入れ替えるので、何も失われません。どちらも「元に戻す」で戻せます。完全バックアップ・JSONバックアップにも含まれます。</InfoTip></div>
+          {selected.revisions.map((revision, index) => {
+            const number = index + 1; const open = viewing === revision.id;
+            return <div key={revision.id} className="member">
+              <div className="member-row"><span>版{number}: {new Date(revision.savedAt).toLocaleString()}（グループ{revision.workspaceSnapshot.groups.length}）</span>
+                <span className="toolbar"><button type="button" className="small" aria-expanded={open} onClick={() => setViewing(open ? null : revision.id)}>{open ? `版${number}の比較を閉じる` : `版${number}と比較`}</button>
+                  <button type="button" className="small" disabled={blocked} onClick={() => { if (confirm(`「${selected.name}」を版${number}（${new Date(revision.savedAt).toLocaleString()}）の内容に戻しますか？今の内容は履歴に残ります。「元に戻す」でも戻せます。`)) workbench.commit(previous => restorePresetRevision(previous, selected.id, revision.id, newId(), now())); }}>版{number}に戻す</button>
+                  <button type="button" className="small danger" disabled={blocked} onClick={() => { if (confirm(`版${number}を保存履歴から削除しますか？「元に戻す」で戻せます。`)) workbench.commit(previous => deletePresetRevision(previous, selected.id, revision.id)); }}>版{number}を削除</button></span></div>
+              {open && (() => { const old = compileWorkspace(revision.workspaceSnapshot); const now_ = compileWorkspace(selected.workspaceSnapshot); return <>{(['positive', 'negative'] as const).map(channel => <PromptDiffView key={channel} label={`版${number} → 今のプリセットの${channel}`} before={old[channel]} after={now_[channel]} />)}</>; })()}
+            </div>;
+          })}
         </div>}
       </>}
     </div></details>}

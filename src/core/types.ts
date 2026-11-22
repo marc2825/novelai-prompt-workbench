@@ -103,6 +103,15 @@ export interface Preset {
   workspaceSnapshot: PromptWorkspace;
   createdAt: string;
   updatedAt: string;
+  /** Earlier explicitly saved versions, newest first (issue #30). Optional; absent in older data. */
+  revisions?: PresetRevision[];
+}
+
+/** A version of a preset kept when it was overwritten or restored. The snapshot's id is the workspace it was taken from. */
+export interface PresetRevision {
+  id: string;
+  savedAt: string;
+  workspaceSnapshot: PromptWorkspace;
 }
 
 export interface GenerationSettings {

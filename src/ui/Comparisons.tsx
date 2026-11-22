@@ -11,6 +11,7 @@ import { PromptEditor } from './PromptEditor';
 import { downloadBlob, newId, now, Rename } from './shared';
 import { message, type Workbench } from './useWorkbench';
 import { InfoTip } from './InfoTip';
+import { diffTags } from '../core/prompt-diff';
 import { ImageLibrary } from './ImageLibrary';
 
 function SettingsEditor({ value, onSave }: { value: GenerationSettings; onSave: (value: GenerationSettings) => void }) {
@@ -52,7 +53,7 @@ function VariantDraft({ variant, onSave, onCancel }: { variant: ExperimentVarian
     <div className="actions"><button type="button" disabled={!history.past.length} onClick={() => setHistory(previous => undo(previous))}>変更案をUndo</button><button type="button" disabled={!history.future.length} onClick={() => setHistory(previous => redo(previous))}>変更案をRedo</button><button type="button" disabled={!!pendingWeights.size} onClick={() => onSave(draft)}>Bの変更を確定</button><button type="button" onClick={() => { if (confirm('Bの未保存変更案を破棄しますか？')) onCancel(); }}>変更案を破棄</button></div>
   </section>;
 }
-function PromptDiff({ a, b, label }: { a: string; b: string; label: string }) { const diff = textDifference(a, b); return <div><h4>{label} の文字差分</h4><pre className="diff-text">{diff.prefix}<del>{diff.removed}</del><ins>{diff.added}</ins>{diff.suffix}</pre>{a === b && <p>変更なし</p>}</div>; }
+function PromptDiff({ a, b, label }: { a: string; b: string; label: string }) { const diff = textDifference(a, b); const tags = diffTags(a, b); return <div><h4>{label} の文字差分</h4><pre className="diff-text">{diff.prefix}<del>{diff.removed}</del><ins>{diff.added}</ins>{diff.suffix}</pre>{a === b && <p>変更なし</p>}{a !== b && tags && <p className="hint" aria-label={`${label}のタグ単位の差分`}>タグ単位: 追加{tags.added.length}・削除{tags.removed.length}・重み変更{tags.reweighted.length}・並び替え{tags.moved.length}{tags.added.length ? `（追加: ${tags.added.slice(0, 10).map(tag => tag.raw).join('、')}）` : ''}{tags.removed.length ? `（削除: ${tags.removed.slice(0, 10).map(tag => tag.raw).join('、')}）` : ''}</p>}</div>; }
 
 function ImageNotes({ value, onSave }: { value: ImageMetadata; onSave: (value: ImageMetadata) => void }) {
   const [positive, setPositive] = useState(value.positive ?? ''); const [negative, setNegative] = useState(value.negative ?? '');
