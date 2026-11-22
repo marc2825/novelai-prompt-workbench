@@ -1,6 +1,7 @@
 import { validateLab } from './lab';
 import type { BackupDocument, PromptSpan, WorkbenchData } from '../core/types';
 import { compileWorkspace } from '../core/compose';
+import { MAX_PRESET_REVISIONS } from '../core/presets';
 import { assertCommentSpans } from '../core/comments';
 import { normalizeShuffle, validateRecoveries } from './shuffle';
 import { normalizeTag, TAG_DICTIONARY_SCHEMA_VERSION, TAG_LIMITS, tagTextIssue } from '../core/tags';
@@ -208,6 +209,16 @@ export function validateData(input: unknown): WorkbenchData {
     if (snapshot.id !== preset.sourceWorkspaceId) fail(path, '作成元IDとスナップショットIDが一致しません');
     // Snapshot IDs live in their own scope and deliberately reproduce the source.
     validateWorkspace(snapshot, `${path}.workspaceSnapshot`, new Set(), true);
+    if (preset.revisions !== undefined) {
+      const revisions = array(preset.revisions, `${path}.revisions`, MAX_PRESET_REVISIONS);
+      for (const [revisionIndex, value] of revisions.entries()) {
+        const revisionPath = `${path}.revisions[${revisionIndex}]`;
+        const revision = object(value, revisionPath);
+        register(revision.id, `${revisionPath}.id`);
+        date(revision.savedAt, `${revisionPath}.savedAt`);
+        validateWorkspace(revision.workspaceSnapshot, `${revisionPath}.workspaceSnapshot`, new Set(), true);
+      }
+    }
   }
   for (const item of workspaces) {
     const binding = object(item, 'workspace').appliedPresetId;

@@ -152,6 +152,7 @@ interface Experiment {
 - migration backupは一度だけ保持し、既存previousImportバックアップは残す。設定から移行前の資産をv2 JSONとして書出し・取込可能。元metadataを含む完全な退避もDB内に保持する。失敗時の原DBはそのまま残し、読み取れた復旧用snapshotをUIから出力できる。
 - 復旧dumpは通常import用JSONとは別。破損DBの循環・BigInt・非有限数・過深な構造は診断用文字列として明示する。正常な資産JSONは改変せず、不正データを自動修復して取り込まない。
 - 新規DBは直接v2。未知の将来版は拒否。移行失敗時は自動初期化・自動上書きしない。旧P1/P2ビルドへのDBダウングレードには対応しない。
+- 保存履歴（2026-11-22、issue #30、DB/JSON v3のまま任意フィールドとして追加）: `preset.revisions?: { id: UUID; savedAt: ISO; workspaceSnapshot }[]`（新しい順、1プリセット最大10件）。「現在の構成で上書き保存」で直前の内容を、「この版に戻す」で戻す前の内容を記録するため、明示保存した内容は失われない。revisionのIDは全体のIDスコープで一意（取込の「追加」で衝突すればエラー）、snapshotは独自のスコープで検証し、`appliedPresetId` は禁止。snapshotの `id` はその版の作成元workspace（戻すと `sourceWorkspaceId` になる）。複製では履歴をコピーしない。旧データ（フィールドなし）はそのまま有効。
 
 
 ## P4画像・A/B（DB/JSON v3）
