@@ -1,9 +1,8 @@
-import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
-import { openFold } from './helpers';
+import { openFold, extensionIdOf } from './helpers';
 import { png } from '../fixtures/png';
 
 test('built MV3 extension loads unpacked and persists across a full browser restart', async ({}, testInfo) => {
@@ -31,15 +30,14 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
   expect((manifest as unknown as { icons: Record<string, string> }).icons).toEqual({ 16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png' });
   expect([...manifest.content_scripts[0]!.matches].sort()).toEqual(['https://novelai.net/image', 'https://novelai.net/image?*', 'https://novelai.net/image/*'].sort());
 
-  // Chromium derives an unpacked extension ID from its normalized absolute path.
-  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32)
-    .replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
   const profile = await mkdtemp(join(tmpdir(), 'nai-extension-test-'));
   const launch = () => chromium.launchPersistentContext(profile, {
     channel: 'chromium', headless: true, viewport: { width: 400, height: 900 },
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
   });
   let context = await launch();
+  // Read from the service worker: the path-to-ID derivation differs by OS.
+  const id = await extensionIdOf(context);
   try {
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     await expect.poll(() => worker.evaluate(() => (globalThis as unknown as { chrome: { sidePanel: { getPanelBehavior(): Promise<{ openPanelOnActionClick?: boolean }> } } }).chrome.sidePanel.getPanelBehavior())).toEqual({ openPanelOnActionClick: true });
@@ -90,9 +88,9 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
 
 test('real Content Script messaging isolates actual tabs and rejects reload/navigation without extra permissions', async () => {
   const extensionPath = resolve('.output/chrome-mv3');
-  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
   const profile = await mkdtemp(join(tmpdir(), 'nai-content-test-'));
   const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  const id = await extensionIdOf(context);
   try {
     // The apparent NovelAI pages are served entirely from this synthetic route.
     // No live site, account, private API or external network is used by this test.
@@ -151,9 +149,9 @@ test('real Content Script messaging isolates actual tabs and rejects reload/navi
 
 test('real Content Script: shuffle reports unverified character fields, generation detection and writes as unsupported', async () => {
   const extensionPath = resolve('.output/chrome-mv3');
-  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
   const profile = await mkdtemp(join(tmpdir(), 'nai-shuffle-content-test-'));
   const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  const id = await extensionIdOf(context);
   try {
     // Synthetic page only; no live site, account or network. Contains look-alike
     // character boxes that the production adapter must NOT treat as verified.
@@ -193,9 +191,9 @@ test('real Content Script: shuffle reports unverified character fields, generati
 
 test('real Content Script: the wide Lab tab (sidepanel.html#lab) is accepted as the panel; read-only stays read-only', async () => {
   const extensionPath = resolve('.output/chrome-mv3');
-  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
   const profile = await mkdtemp(join(tmpdir(), 'nai-wide-tab-test-'));
   const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  const id = await extensionIdOf(context);
   try {
     await context.route('https://novelai.net/**', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mock wide</title><div class="prompt-input-box-prompt" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>wide positive</p></div></div><div class="prompt-input-box-undesired-content" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>wide negative</p></div></div>' }));
     const site = await context.newPage();
@@ -217,9 +215,9 @@ test('real Content Script: the wide Lab tab (sidepanel.html#lab) is accepted as 
 
 test('real Content Script: reads the Japanese UI structure (issue #4) without confusing character fields; unlisted languages fail safely', async () => {
   const extensionPath = resolve('.output/chrome-mv3');
-  const id = createHash('sha256').update(extensionPath).digest('hex').slice(0, 32).replace(/[a-f0-9]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
   const profile = await mkdtemp(join(tmpdir(), 'nai-locale-test-'));
   const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
+  const id = await extensionIdOf(context);
   // Synthetic copy of the wrapper structure reported in issue #4 (class = prompt-input-box-<visible label>).
   const box = (label: string, text: string) => `<div class="prompt-input-box prompt-input-box-${label}" data-prompt-input="true"><div class="ProseMirror" contenteditable="true"><p>${text}</p></div></div>`;
   const japanese = [box('ベースプロンプト', 'ja base'), box('除外したい要素', 'ja uc'), ...[1, 2].flatMap(n => [box(`キャラクタープロンプト-${n}`, `char ${n}`), box(`キャラクタープロンプト-${n}-除外したい要素`, `char uc ${n}`)])].join('');
