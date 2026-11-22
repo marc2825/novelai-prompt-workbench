@@ -13,7 +13,7 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 - [x] セキュリティ報告: Private vulnerability reporting を有効化（2026-11-21）、[SECURITY.md](../SECURITY.md)
 - [x] CI: `contents: read`、Actionをハッシュ固定、`persist-credentials: false`、Dependabot設定（`.github/dependabot.yml`）
 - [x] 定期的なセキュリティ検査: `.github/workflows/security.yml`（依存関係の監査・PRの依存関係レビュー・Gitleaksによる全履歴の検査・CodeQL）を追加（2026-11-22）。方針と失敗時の対応は [security.md](security.md#セキュリティ検査ci)
-- [ ] `security.yml` のGitHub上での初回実行が成功し、CodeQLの結果が Security → Code scanning に表示される（マージ後に確認）
+- [x] `security.yml` のGitHub上での初回実行が成功（2026-11-22、PR #40: 依存関係の監査・レビュー・Gitleaks・CodeQL すべてPASS）
 - [x] Issue/PRテンプレート、[CONTRIBUTING.md](../CONTRIBUTING.md)、[PRIVACY.md](../PRIVACY.md)
 
 ### GitHubの設定（2026-11-21に設定済み）
@@ -71,6 +71,8 @@ GitHubで公開中のリポジトリを、GitHub Releases・Chrome Web Storeで�
 - 同じフォルダへの上書き更新でデータが残り、別のフォルダだと別の拡張機能になる
 - **公開済みの最新リリースのZIP**（ダウンロード後に `.sha256` を照合）から、ビルドしたZIPへの同じフォルダでの更新で、データと拡張機能IDが残り、版が更新される
 - 拡張機能のファイル構成・権限・アイコン、別のタブとの保存通知、NovelAIページの読取り（模擬ページ）
+
+初回の結果（2026-11-22、PR #46・#50）: Windows（windows-2025）・macOS・Ubuntu で release・extension の7件 PASS。公開済み v0.1.0 のZIP（`.sha256` 一致）から同じフォルダへ更新してデータ保持を確認。
 
 これは**Chromeそのもの（Google Chrome）ではなくChromium**での確認です。Google Chromeはコマンドラインからの未パッケージ拡張機能の読み込みに対応しないため、次の手動確認は残ります。
 
