@@ -163,6 +163,21 @@ export function useWorkbench() {
     } catch (cause) { setError(message(cause)); return false; }
   };
 
+  // Dev/fixture builds only: the opt-in Chromium benchmark (tests/perf, `pnpm bench:chromium`)
+  // drives commits through this. import.meta.env.DEV is false in the extension build, which
+  // drops the body (tests/e2e/extension.spec.ts checks that the name is not shipped).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const target = window as unknown as Record<string, unknown>;
+    target.__workbenchBench = {
+      commit, validateData, Repository: WorkbenchRepository,
+      latest: () => current.current?.present ?? null,
+      undoDepth: () => current.current?.past.length ?? 0,
+      idle: () => !running.current && !pending.current && !failed.current,
+    };
+    return () => { delete target.__workbenchBench; };
+  }, []);
+
   /** Binary of an image record: a staged (uncommitted) import first, then IndexedDB; both must match the record. */
   const binaryFor = async (record: ImageRecord, thumbnail: boolean) => {
     const staged = imageWrites.current.get(record.id);

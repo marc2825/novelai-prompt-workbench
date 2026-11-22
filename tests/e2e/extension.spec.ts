@@ -28,6 +28,8 @@ test('built MV3 extension loads unpacked and persists across a full browser rest
   const shipped = (await readdir(extensionPath, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(extensionPath.length + 1).replaceAll('\\', '/'));
   for (const file of shipped) expect(file).toMatch(/^(manifest\.json|sidepanel\.html|background\.js|LICENSE\.txt|THIRD_PARTY_NOTICES\.txt|icon\/(16|32|48|128)\.png|chunks\/[\w-]+\.js|content-scripts\/novelai\.js|assets\/[\w-]+\.css)$/);
   expect(shipped).toEqual(expect.arrayContaining(['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt', 'icon/16.png', 'icon/32.png', 'icon/48.png', 'icon/128.png']));
+  // The dev-only benchmark hook (useWorkbench, import.meta.env.DEV) is not part of the extension build.
+  for (const file of shipped.filter(name => name.endsWith('.js'))) expect(await readFile(join(extensionPath, file), 'utf8')).not.toContain('__workbenchBench');
   expect((manifest as unknown as { icons: Record<string, string> }).icons).toEqual({ 16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 128: 'icon/128.png' });
   expect([...manifest.content_scripts[0]!.matches].sort()).toEqual(['https://novelai.net/image', 'https://novelai.net/image?*', 'https://novelai.net/image/*'].sort());
 
