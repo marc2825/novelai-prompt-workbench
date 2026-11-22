@@ -100,7 +100,7 @@ interface NovelAIAdapter {
 ## P4画像・比較実装
 
 - `core/experiments.ts`: immutable snapshot作成/複製、raw文字差分、group設定差分、未知値を含む生成設定比較、RGBA差分。snapshot合成は共通composeのみ。DOM/乱数/時計APIを持たない。
-- `core/png.ts`: PNG署名/CRC/チャンク/寸法/サイズ上限の純粋検証。`data/images.ts`がbounded DecompressionStream、標準text、交換可能metadata parser、crypto SHA-256、ブラウザdecodeとthumbnailを担当する。公式NovelAIサンプル未取得のため固有形式はunknown fallback。
+- `core/png.ts`: PNG署名/CRC/チャンク/寸法/サイズ上限の純粋検証。`data/images.ts`がbounded DecompressionStream、標準text、交換可能metadata parser、crypto SHA-256、ブラウザdecodeとthumbnailを担当する。公式NovelAIサンプル未取得のため固有形式はunknown fallback。NovelAI公式形式の入れ物（PNGテキスト・アルファチャンネル）は`core/png-stealth.ts`（行フィルタ解除とアルファ最下位ビット、純粋）と`data/novelai-metadata.ts`（展開・検証・候補）で読み、`ui/NovelAIInfo.tsx`で未確認の候補として表示する（ADR-099）。
 - `data/repository.ts`: v3にexperiments/images/imageOriginals/imageThumbnailsを追加。v1/v2 backup upgrade、revisionによる競合検出と原子保存。JSONにBlobは入れない。
 - `ui/useWorkbench.ts`: 画像writeを保存キューへstageし、metadata/slotと共にcommit。失敗時は未保存状態とBlobを維持しretry可能。Undoはmetadataのみを保持、明示purge時は履歴/backupを保護する。
 - `ui/Comparisons.tsx`: source選択→A/B固定→B案編集/preview/確定→手動copy→各PNG取込。セッションCRUD/設定diff/metadata照合と手入力/容量/欠落通知。workspaceやサイトを暗黙に更新しない。
@@ -124,3 +124,9 @@ interface NovelAIAdapter {
 - シャッフルのサイト状態: `src/core/shuffle/site-session.ts`（対象別セッション）、`src/ui/shuffle/auto-run.ts`（自動シャッフルの実行単位）。詳細は [shuffle/site-adapter.md](shuffle/site-adapter.md)。
 - 保存: 通常の保存はrevisionだけを読み、検証済みオブジェクトを再検証しない（ADR-077）。別パネル/タブの保存は `BroadcastChannel` で通知（ADR-076）。
 - 送信元URL照合の修正（`isPanelSender`、ADR-075）。
+
+## タグ辞書・入力補完（2026-11-22）
+
+- `core/tags.ts`: 照合用の正規化、キャレット位置の判定（`completionTokenAt`）、範囲置換（`applyCompletion`）、ライブラリ原文からのタグ抽出、ソート済み索引と二分探索の候補検索、表記ゆれ・重複の一覧。純粋関数で外部データ・通信なし。
+- `ui/TagCompletion.tsx`: Appが索引のsourceをContextで渡し、`PromptEditor`が使う。索引は最初の検索時に作り、ライブラリ原文・辞書が実際に変わったときだけ作り直す。確定は`insertText`（ブラウザのUndoと通常のinputイベント）で行い、使えない場合は通常の`onChange`。
+- `ui/TagDictionary.tsx`: ライブラリタブの辞書管理と読取り専用の表記ゆれ一覧。検証は`data/validation.ts`。

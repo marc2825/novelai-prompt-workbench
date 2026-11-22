@@ -165,7 +165,25 @@ interface Experiment {
 - Blob読取り時も現在snapshotのhash/寸法/バイト数とbindingを照合し、同一IDに違うmetadataを復元した際の古い画像の誤表示を防ぐ。不整合は欠落として通知し、同一PNG再取込で寸法/サイズを修復する。
 - JSON v3は画像メタデータ・比較を含み`imageBinariesIncluded:false`。原本/thumbnailを含む形式はまだ非対応。別端末復元時の欠落はimageBlobのundefinedで検知し、同一ハッシュの再取込でIDを維持して修復。
 - Undo/RedoはBlobを履歴へコピーせず、metadata/associationのみ記録する。削除後のBlobはUndo用に保持。明示purgeは現在データと全履歴、取込前backupで参照されるIDを保護する。未保存Blobは保存キュー内で保持し、quota後のretryでも再利用。
-- PNG上限20MiB/各辺8192px/16,777,216px。テキストは入力・展開後とも256KiB、128チャンク、PNG全体4096チャンク。CRC、終端、圧縮方式、デコードを検査。NovelAI固有のパーサは実サンプル未取得によりunknown fallback。標準テキストは安全な文字列のまま保持する。
+- PNG上限20MiB/各辺8192px/16,777,216px。テキストは入力・展開後とも256KiB、128チャンク、PNG全体4096チャンク。CRC、終端、圧縮方式、デコードを検査。NovelAI固有の項目は実サンプル未取得のため生成設定にしない（unknown fallback）。公式形式の入れ物は下の `metadata.novelai` に記録する。標準テキストは安全な文字列のまま保持する。
+
+## NovelAIの画像情報（DB/JSON v3のまま追加、2026-11-22）
+
+`ImageMetadata.novelai?: NovelAIImageInfo`（省略可）。正本は `src/core/types.ts`、検証は `validateNovelAIInfo`（`src/data/validation.ts`）。
+
+```ts
+interface NovelAIImageInfo {
+  sources: ('text' | 'stealth')[];          // 1〜2件・重複なし。text=PNGテキストのComment、stealth=アルファチャンネル
+  agreement: 'single' | 'match' | 'mismatch'; // 取得元1件ならsingle。2件なら全キーが一致するか
+  stealth: Record<string, string> | null;   // アルファチャンネルの内容。無い場合と、PNGテキストと同一（公式キーのみ）の場合はnull
+}
+```
+
+- NovelAI公式スクリプトの入れ物（PNGテキスト `Title` / `Description` / `Software` / `Source` / `Generation time` / `Comment` と、アルファチャンネルの `stealth_pngcomp`）が見つかったときだけ付く。見つからない画像・この項目より前に取り込んだ画像には無い（旧データはそのまま有効、DB/JSONのversionは変えない）。
+- PNGテキストの値は従来どおり `texts` に1回だけ保存し、ここへ複製しない。アルファチャンネルの内容はPNGテキストと同一なら保存しない（`agreement: 'match'`・`stealth: null`、内容はtextsのTitle以外の公式キーと同じ）。公式キー以外を含む場合と、内容が異なる場合（`mismatch`）は保存する。黙ってどちらかを選ばない。
+- 値はすべて文字列。アルファチャンネルのJSONで文字列でない値（例: `Comment` がオブジェクト）はJSON文字列にして保持し、取込時に警告を残す。
+- 検証: 取得元の数と `agreement` の整合、`text` ならtextsに `Comment` があること、`stealth` の有無と取得元・一致状態の整合、キー1〜79文字・128件以下、値262,144文字以下、全体のJSON 524,288文字以下、`__proto__` 等の危険なキーと非JSON値の拒否。未知の安全なフィールドは保持する。
+- `Comment` のJSONは保存時に解釈しない。表示のたびに `validateSafeJson` を通して読み、候補（型・範囲を満たす値だけ）を計算する。候補は利用者が確認ダイアログで採用したときだけ、比較スロットの `settings`（`evidence: 'png-metadata'`・`extrasConfirmed: false`・候補のない項目はnull）や画像の `positive` / `negative`（`promptEvidence: 'png-metadata'`）になる。取込時の `settings` は常に `unknown`。
 
 ## Prompt Shuffle（DB/JSON v3のまま追加）
 
@@ -177,3 +195,30 @@ interface Experiment {
 `WorkbenchData.lab?: LabData` はmetadata.extraに保存する。正本: `src/core/lab/types.ts`。Definitionはベース両channel・settings・XYZ Axis・共通Seedリスト・反復数・任意の参考単価。LabExperimentはUUID、Definition snapshot、条件配列、状態、日時を保持する。Condition IDは実験UUIDと決定的な展開番号の組。座標・Seed index・反復・固定Prompt/UC・settings・factor provenance、手動進捗・imageId・評価・メモを持つ。
 
 保存前に定義から再展開して固定条件の一致を検証し、未知safe fieldは保持する。画像資産は既存images/Blob storesを共有、JSONにはmetadataのみ。旧資産形式やstore変更はなくmigrationは不要。詳細と上限は [Lab仕様](lab/README.md)。
+
+## タグ辞書と入力補完（DB/JSON v3のまま追加、辞書 schemaVersion 1）
+
+正本: `src/core/types.ts`（`TagDictionary` / `TagDictionaryEntry`）、`src/core/tags.ts`、検証は `src/data/validation.ts`。
+
+```ts
+interface TagDictionary { schemaVersion: 1; entries: TagDictionaryEntry[] }
+interface TagDictionaryEntry {
+  id: string;          // UUID。全資産と同じID空間で一意
+  tag: string;         // 補完で入る表記（1〜200文字、前後空白なし）
+  aliases: string[];   // 検索用の別名（日本語名・略称など）。最大20件
+  note: string;        // メモ（最大1000文字、空可）
+  createdAt: string;
+  updatedAt: string;
+}
+// WorkbenchData.tagDictionary?: TagDictionary   （省略＝空）
+// Settings.tagCompletion?: boolean             （省略＝ON）
+```
+
+- `WorkbenchData.tagDictionary` は省略可能。`metadata.extra` に保存され、同じtransaction・revision・JSONバックアップ（完全バックアップの `data.json`）に含まれる。storeの追加・DB版の変更・migrationはない。旧データ（フィールドなし）はそのまま有効で、勝手に作成しない。
+- `settings.tagCompletion` は省略時ON。存在する場合は真偽値のみ。
+- 検証: 辞書の `schemaVersion` は1のみ。項目10,000件、別名は1項目20件・合計50,000件。タグ・別名は200文字、カンマ・改行などの制御文字・`{ } [ ] | \`・`::` を含めない（重み・括弧は入力欄の原文で付ける）。日時はISO 8601。
+- 一意性: 照合用の正規化（NFKCで全角→半角、小文字化、`_`→空白、空白の連続を1つ、前後の空白除去）で同じになるタグは重複としてエラー。別名は自分のタグ・自分の他の別名と同じ表記にできず、別の項目のタグとも同じにできない（別の項目どうしで同じ別名は可）。正規化した値は照合だけに使い、保存しない。
+- 辞書のIDは全資産と同じID空間で重複を拒否するが、ライブラリ等の合計10,000レコードの上限には数えない（辞書は独自の10,000件上限）。10MiB・JSON要素数の上限は全体で維持。
+- 取込: 全置換は入力の辞書で置換。追加は現在の項目→取込項目の順に連結し、ID衝突・同じタグ（表記ゆれを含む）・別名と他のタグの衝突はエラーで、何も変更しない。
+- 完全バックアップのmanifest `counts` のキーは変えない（旧版が厳格に検証するため）。辞書の件数はプレビューで `data.json` から表示する。
+- 未知の安全なフィールドは辞書・項目とも保持する。

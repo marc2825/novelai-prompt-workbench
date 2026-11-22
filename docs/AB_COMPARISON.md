@@ -56,7 +56,7 @@ Status: settings incomplete — cannot claim a strictly controlled comparison
 
 - 現在workspace/presetからsnapshotを固定し、Bのみ変更案を編集・preview・確定できる。A/Bのrawとcompiledはsourceの変更に追従しない。再固定は明示操作で、旧画像リンクを外す。
 - 生成設定はnullを不明とし、画像メタデータの採用も確認付き。取得元やextra条件が未確認なら「検証不能（厳密比較不可）」、既知不一致は差分を表示する。
-- 標準PNG textと手入力を提供。**NovelAI固有PNGは実サンプル未取得のためparser interfaceとunknown fallbackに限定**。syntheticなworkbench形式の構造化抽出成功を、実NovelAI対応の根拠にしない。
+- 標準PNG textと手入力を提供。**NovelAI固有PNGは実サンプル未取得のためparser interfaceとunknown fallbackに限定**（当時。2026-11-22からは公式形式の画像情報を「候補」として表示する。下の節を参照）。syntheticなworkbench形式の構造化抽出成功を、実NovelAI対応の根拠にしない。
 - 横並び/ワイプ、同期zoom/pan、サイズ違いの警告、明示resize時のみpixel diff。原本不変。詳細な上限・保存形式はDATA_MODEL、回帰結果はtasks/STATUSを参照。
 - JSONは画像metadataと比較を保存するが原本/thumbnailは含まない。元PNGは画像ライブラリから別途保存可能。復元時に欠落を検出し、同一PNGを再取込して修復する。
 - 画像ライブラリ（比較タブ下部）は全件を対象に、名前・SHA-256の先頭・プロンプトの注記・使用先（比較のA/B、Experiment Lab）で検索し、新しい順・古い順・名前順・大きい順に並べ、24件ずつページ送りで表示する。削除は比較・Labの関連付けも外し、「元に戻す」で戻せる（原本は「参照されない画像バイナリを解放」まで残る）。
@@ -67,3 +67,22 @@ Status: settings incomplete — cannot claim a strictly controlled comparison
 B変更案の自由入力・各候補の原文でタグを明示選択し、重みスライダー（0〜2、0.05刻み）と数値入力で変更後を確認する。「重みを反映」→「Bの変更を確定」で保存する。重みの未反映プレビューが開いている間はB確定を無効にする。A/元workspace/辞書は独立したsnapshotとして保持し、B確定時の旧画像解除、ローカル履歴・全体Undoは従来の経路を使う。
 
 画像比較ビューをA/B詳細より上へ配置し、重み変更→同一条件で手動生成→PNG取込→画像比較の手順を表示する。横並び・ワイプ・ピクセル差分は既存のローカル画像機能。重みを動かすだけで画像を再生成する機能はない。Mock E2Eは合成PNGで検証し、実NovelAI上の数値重み・モデル差・生成品質は未検証。
+
+## NovelAIの画像情報の候補（2026-11-22、issue #25）
+
+NovelAIが公開しているスクリプト（[novelai-image-metadata](https://github.com/NovelAI/novelai-image-metadata)、MIT）が読み書きする**入れ物の形式**だけを根拠に、取り込んだPNGから次を読み取る。
+
+- PNGテキスト（tEXt / iTXt / zTXt）の `Title` / `Description` / `Software` / `Source` / `Generation time` / `Comment`。`Comment` があるときだけNovelAI形式とみなす（他は欠けていてもよい）。
+- アルファチャンネルの埋め込み情報（stealth pnginfo）: アルファ値の最下位ビットを列優先（x外側・y内側）で読み、8ビットずつ上位ビットから詰める。ASCII `stealth_pngcomp`、32ビットのビット長、gzip圧縮したUTF-8 JSON（Title以外の同じキー）。後続の誤り訂正データは読まない。8bit RGBA・非インターレースのPNGだけを確認する。
+- 両方あるときは比較し、一致すれば「内容が一致」、異なれば両方を保持して警告する（どちらかを黙って選ばない）。
+
+**`Comment` 内の各項目の意味は公式文書に説明がなく、実際のNovelAI画像でも確認していない。** そのため取込時は生成設定を `unknown` のままにし、次のように扱う。
+
+- 比較の各スロット（A/B）と Experiment Lab の条件の「画像の情報・照合」に「NovelAIの画像情報（候補）」を表示する。原文の全項目（信頼されないテキストとして文字数を制限して表示）と、キー名から想定した対応表を示す。
+- 候補にするのは型と範囲が合う値だけ: Seed ← `Comment.seed`（0以上の安全な整数→数字文字列）、Steps ← `steps`、幅/高さ ← `width`/`height`（1〜1,000,000の整数）、Sampler ← `sampler`（空でない文字列）、Guidance ← `scale`、CFG Rescale ← `cfg_rescale`（0〜1,000,000の有限数）、モデル ← `Source`、Positive ← `Comment.prompt`、Negative ← `Comment.uc`（10万文字以内）。それ以外のキーは表示だけ。
+- 「NovelAIの候補を確認して採用（A/B）」は確認ダイアログの後、スロットの生成設定を候補で**置き換える**（取得元 `png-metadata`、追加条件は未確認、候補のない項目は不明）。固定プロンプトは変更しない。
+- 「NovelAIのPrompt候補を画像の注記に採用（A/B）」は確認ダイアログの後、画像のPositive/Negative注記を候補で置き換える（`promptEvidence: 'png-metadata'`）。
+- 2つの入れ物の内容が異なる場合は、採用する取得元を選ぶまでボタンを押せない。
+- 既存の「画像の設定を採用」は従来どおり、確認済みの設定（この拡張のworkbench形式）があるときだけ使える。
+
+この機能より前に取り込んだ画像は、PNGテキストの `Comment` だけを表示時に読み取る（アルファチャンネルは未確認）。同じPNGを取り込み直しても既存の画像情報は更新しない。自動テストは合成PNGだけで行っており、実際にNovelAIで保存したPNGでの確認はしていない。
