@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 追加
+- NovelAIが保存したPNGに含まれる画像情報（PNGテキストのComment等と、アルファチャンネルに埋め込まれた情報）を読み取り、比較とExperiment Labの「画像の情報・照合」に「NovelAIの画像情報（候補）」として表示するようにした。項目の意味は公式に確認されていないため自動では採用せず、確認ダイアログの後に比較の生成設定や画像のPrompt注記へ採用できる。実際にNovelAIで保存したPNGでは未確認（issue #25）
+
 ## [0.1.0]
 
 初回のベータ版（Pre-release）です。GitHub Releases のZIPから、Node.js なしでインストールできます。
