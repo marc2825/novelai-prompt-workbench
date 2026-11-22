@@ -1,0 +1,58 @@
+name: 実サイト確認の報告 / Real-site check report
+description: 実際のNovelAIの画像生成ページで読取りを確認した結果（docs/REAL_SITE_CHECK.md）
+labels: [real-site-check]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **公開されます。** ログイン情報・Cookie・トークン、個人的なプロンプト、ログイン後の画面のスクリーンショット、個人情報を載せないでください。プロンプトはダミーの文字列で確認してください。
+        手順: [docs/REAL_SITE_CHECK.md](https://github.com/marc2825/novelai-prompt-workbench/blob/main/docs/REAL_SITE_CHECK.md)
+  - type: input
+    id: date
+    attributes:
+      label: 確認した日 / Date
+      placeholder: 2026-11-22
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS・Chromeの版 / OS and Chrome version
+      placeholder: Windows 11 / Chrome 150.0.xxxx
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: NovelAIの表示言語 / NovelAI UI language
+      options: [日本語, English, その他 / other]
+    validations:
+      required: true
+  - type: dropdown
+    id: login
+    attributes:
+      label: ログイン状態 / Logged in
+      options: [ログイン後 / logged in, ログイン前 / logged out]
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: 確認項目の結果（1〜9）/ Results
+      description: 確認していない項目は「未確認」と書いてください
+      placeholder: |
+        1. OK
+        2. OK（改行も一致）
+        4. 未確認
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 「診断情報をコピー」の結果 / Diagnostics
+      render: markdown
+  - type: textarea
+    id: differences
+    attributes:
+      label: 模擬ページとの違い（あれば）/ Differences from the mock page
+      description: ラベルの文言や構造の違い。プロンプトの内容は書かないでください
