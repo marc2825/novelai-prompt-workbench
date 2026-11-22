@@ -1,61 +1,61 @@
 # 現在の状態と今後の作業
 
-更新: 2026-11-21。
+更新: 2026-11-22。
 
 ## 機能の状態
 
 | 機能 | 状態 | 実NovelAI |
 |---|---|---|
 | ライブラリ・ワークスペース・範囲コメント・Undo | 実装・自動テスト済み | — |
-| プリセット・タグ重み | 実装・自動テスト済み | — |
-| A/B比較・PNG取込・画像比較 | 実装・自動テスト済み | NovelAI固有PNGメタデータは未対応 |
+| タグ辞書・入力補完・表記ゆれの候補 | 実装・自動テスト済み（2026-11-22） | — |
+| プリセット（保存履歴・タグ単位の差分）・タグ重み | 実装・自動テスト済み | — |
+| A/B比較・PNG取込・画像比較・画像ライブラリ（一括取込・評価・タグ） | 実装・自動テスト済み | NovelAIのPNG情報は公式の入れ物の形式で読み、**未確認の候補**として表示。実際にNovelAIで保存したPNGでは未確認 |
 | Prompt Shuffle | 実装・自動テスト済み（Mock E2E） | 読取りとコピーのみ。書込み・キャラクター欄・生成検知は**無効** |
 | Experiment Lab | 実装・自動テスト済み | 読取りとコピーのみ。設定の自動同期なし |
-| 完全バックアップ（画像原本込みZIP） | 実装・自動テスト済み | — |
-| サイトとの読取り | 実装（観測済みの単純なProseMirrorのみ、英語・日本語） | 英語は公開ページで確認（2026-11-03）。日本語は実ページの構造報告（2026-11-19、issue #4）を模擬ページで再現して検証。修正後の実ページでの再確認・ログイン後の英語UIは未確認 |
+| 完全バックアップ（画像原本込みZIP・任意の暗号化）・未保存の変更の復元 | 実装・自動テスト済み | — |
+| サイトとの読取り | 実装（観測済みの単純なProseMirrorのみ、英語・日本語） | 英語は公開ページで確認（2026-11-03）。日本語は実ページの構造報告（issue #4）を模擬ページで再現して検証。ログイン後の英語UI・修正後の日本語UIは**未確認**（手順は [REAL_SITE_CHECK.md](../docs/REAL_SITE_CHECK.md)） |
 | サイトへの書込み | fixtureのみ | **未検証・無効** |
-| サイドパネル起動 | ツールバーボタンで開く | 実ボタンのクリックは手動確認待ち |
-| GitHub Releases配布 | ワークフロー・検証・手順を整備（リリースZIPの展開・読込・更新時のデータ保持を自動テスト） | v0.1.0 を Pre-release として公開済み（2026-11-21、[Release](https://github.com/marc2825/novelai-prompt-workbench/releases/tag/v0.1.0)） |
-| UI（ホバー説明・段階的表示） | 実装・自動テスト済み（400px幅のスクリーンショットで目視確認） | 実ブラウザ（Windows/macOS・高DPI）での目視は未実施 |
+| サイドパネル起動 | ツールバーボタンで開く | 設定値をWindows・macOS・LinuxのChromiumで自動確認。実ボタンのクリックは手動確認待ち |
+| GitHub Releases配布 | タグのpushで自動公開。リリースZIPのインストール・同じフォルダへの更新・公開版からの更新を Windows・macOS・Linux で自動確認 | v0.1.0 を Pre-release として公開済み（2026-11-21） |
+| UI（4つの領域・広いタブの2列表示・ホバー説明） | 実装・自動テスト済み（400px・1280px幅のスクリーンショットで目視確認） | Google Chrome・高DPIでの目視は未実施 |
 
 ## 検証結果（最新）
 
-2026-11-21、Linux（WSL2）、Node 24.21.0、pnpm 10.34.5、Playwright 1.64.1 Chromium。E2Eは共有ライブラリ（libnspr4/libnss3/libasound2t64）を作業用ディレクトリに展開して実行（OSへのインストールなし）。
+2026-11-22、Linux（WSL2）、Node 24.21.0、pnpm 10.34.5、Playwright 1.64.1（Chromium 156）。E2Eは共有ライブラリ（libnspr4/libnss3/libasound2t64）を作業用ディレクトリに展開して実行（OSへのインストールなし）。
 
 | 検査 | 結果 |
 |---|---|
-| `corepack pnpm install --frozen-lockfile` | PASS（lockfile・依存の変更なし） |
-| `corepack pnpm test` | 423 PASS / 0 FAIL（24ファイル） |
+| `corepack pnpm test` | 668 PASS / 0 FAIL |
 | `corepack pnpm typecheck` | PASS |
 | `corepack pnpm build` | PASS（permissions は `sidePanel` のみ） |
-| `corepack pnpm test:e2e` | 64 PASS / 0 FAIL（Mock E2E） |
+| `corepack pnpm test:e2e` | 79 PASS / 1 SKIP / 0 FAIL（Mock E2E。SKIPは `PREVIOUS_RELEASE_ZIP` 未設定時の公開版からの更新テストで、手元ではv0.1.0のZIPを指定して PASS を確認） |
+| Cross-platform（GitHub Actions、2026-11-22） | Windows（windows-2025）・macOS・Ubuntu で release・extension の7件 PASS。公開済み v0.1.0 のZIP（`.sha256` 一致）からの同じフォルダでの更新でデータ保持を確認 |
+| Security（GitHub Actions） | 依存関係の監査・依存関係のレビュー・Gitleaks（全履歴）・CodeQL（JavaScript/TypeScript・Actions）すべて PASS |
 | `corepack pnpm audit` | 既知の脆弱性 0件（実行時・開発時とも） |
-| Gitleaks 8.30.1（全コミット・作業ツリー） | 検出なし |
-| 配布ZIPの内容 | 拡張機能のファイル＋`LICENSE.txt`・`THIRD_PARTY_NOTICES.txt`のみ。source map・テスト・fixtureなし |
-| Markdownの相対リンク・アンカー | 切れなし |
+| 性能（`corepack pnpm bench:chromium`） | 2,000件で編集→保存済み 約24ms、Undo 30回のヒープ増加 約0.3MiB（[性能の目安](../docs/development.md#性能の目安)） |
 
 E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` を模擬HTMLに差し替えた実content script）。**実NovelAIのログイン後の環境での確認は実施していない。** 変更の経緯は [CHANGELOG.md](../CHANGELOG.md)・[docs/DECISIONS.md](../docs/DECISIONS.md)、過去の検証ログは [docs/archive/status-history.md](../docs/archive/status-history.md)。
 
 ## 既知の制限
 
-- 実NovelAIへの書込み・ログイン後UIのキャラクター欄・生成検知は未検証のため無効。読取りは英語（公開ページで確認）・日本語（実ページの構造報告を模擬ページで再現して検証、修正後の実ページでの再確認は未実施）のみ。
-- サイドパネルと広いタブを同時に開き、両方で編集すると、後から保存した側が保存エラーになる（データは失われず、通知から最新を読み込めるほか、JSONで退避できる）。
-- 元に戻す・やり直すは直近30操作まで。パネルを閉じると履歴は消え、NovelAIのページへの操作は戻らない。
-- 完全バックアップは最大2GiB。「追加」モードで同じ画像を共有するデータは統合できない（全置換を使う）。
-- 上限（10MiB）付近のデータでは、入力欄の1文字ごとに約0.1秒かかる（毎回の全体検証。2,000件では約30ms。目安は [docs/development.md](../docs/development.md#性能の目安)）。
+- 実NovelAIへの書込み・ログイン後UIのキャラクター欄・生成検知は未検証のため無効。読取りは英語・日本語のみ。
+- NovelAIのPNG情報は、項目の意味が公式に確認されていないため、生成条件として自動では使わない（候補として表示し、確認してから採用）。
+- サイドパネルと広いタブを同時に開き、両方で編集すると、後から保存した側が保存エラーになる（データは失われず、通知から最新を読み込める。保存エラー中も未保存分を含む完全バックアップを保存できる）。他の画面が開いている間は「画像バイナリを整理」を実行できない。
+- 元に戻す・やり直すは直近30操作まで。パネルを閉じると履歴は消える（未保存だった変更は次に開いたときに復元できる）。NovelAIのページへの操作は戻らない。
+- 完全バックアップは最大2GiB。「追加」モードで同じ画像を共有するデータは統合できない（全置換を使う）。暗号化したバックアップはパスワードを忘れると復元できない。
+- 上限（10MiB）付近のデータでは、入力欄の1文字ごとに約0.1秒かかる（毎回の全体検証）。
 - そのほかシャッフルの制約は [docs/shuffle/limitations.md](../docs/shuffle/limitations.md)。
 
 ## 今後の作業
 
-評価: 価値・コスト・リスクは 高/中/低。
+予定・保留は [ROADMAP.md](../ROADMAP.md) にまとめています。メンテナーが行う作業:
 
-### P1（配布前に必要）
-
-| 作業 | 価値 | コスト | リスク | 備考 |
-|---|---|---|---|---|
-| Windows/macOSのChromeで手動確認（サイドパネル起動・別プロファイル復元・高DPI） | 高 | 中 | 低 | 公開の前後に。手順は [release-checklist](../docs/release-checklist.md) |
-| NovelAIサポートへの問い合わせ | 高 | 低 | 低 | 規約は拡張機能に言及なし（[security.md](../docs/security.md)）。Chrome Web Store公開の前に推奨。質問案は release-checklist |
-| ストア用の連絡先・掲載文・スクリーンショット（アイコンは2026-11-21に作成済み） | 中 | 中 | 低 | 連絡先はメンテナーが決定（PRIVACY.mdはGitHub Issuesを窓口として記載） |
+| 作業 | 備考 |
+|---|---|
+| 実NovelAIでの読取りの確認（英語・日本語、ログイン後） | [REAL_SITE_CHECK.md](../docs/REAL_SITE_CHECK.md)。結果はIssueの「実サイト確認の報告」へ |
+| 実機での手動確認（実際のツールバーボタン・Google Chrome・高DPI・別プロファイルでの復元） | [release-checklist](../docs/release-checklist.md) |
+| NovelAIサポートへの問い合わせ | Chrome Web Store公開・書込みの検討の前に推奨。質問案は release-checklist |
+| ストア用の連絡先・掲載文・スクリーンショット | 連絡先はメンテナーが決定 |
 
 ### GitHubの設定（2026-11-21に設定済み）
 
@@ -67,26 +67,6 @@ E2EはすべてMock（ローカルfixture、または `https://novelai.net/**` �
 | Secret scanning・Push protection | 有効 |
 | `main` のルールセット「Protect main」 | 有効: ブランチ削除と force push を禁止。CI成功の必須化は付けていない（付けると `main` への直接pushができなくなるため。PR経由の運用に限定するなら追加可） |
 | Actions の権限 | 既定トークンは読取りのみ、PRの承認不可、初回コントリビューターのPRは承認後に実行（変更なし） |
-
-### P2（品質・使い勝手）
-
-| 作業 | 価値 | コスト | リスク | 備考 |
-|---|---|---|---|---|
-| 上限付近の入力の高速化（増分検証、または入力欄を確定時にcommit） | 低 | 中 | 中 | Undo履歴の構造共有と差分保存は2026-11-22に対応（ADR-105）。残るのは毎回の全体検証（上限付近で約66ms）。Worker化・仮想化・遅延読み込みは不要と判断（[性能の目安](../docs/development.md#性能の目安)） |
-| 完全バックアップの「追加」で同一画像を共有するデータの統合（ID付け替え） | 中 | 中 | 中 | 現在はエラーで中止 |
-| UIのi18n整理（Labの日英切替を全体へ） | 中 | 高 | 低 | |
-| Experiment Lab の設定画面の整理（生成設定・軸の段階的表示） | 中 | 中 | 低 | シャッフル・比較・ワークスペースは2026-11-21に整理済み。Labは軸の説明と容量欄のみ |
-| 大きな画面（Lab・比較）の部品共通化、狭い幅での表の操作性 | 中 | 中 | 低 | |
-| 別画面の保存を、未編集時に自動で読み込むオプション | 低 | 低 | 中 | 現在は明示操作（Undo履歴が消えるため） |
-
-### P3（実機検証が前提・将来）
-
-| 作業 | 価値 | コスト | リスク | 備考 |
-|---|---|---|---|---|
-| 実NovelAIの書込みprofile（ProseMirror）の検証と有効化 | 高 | 高 | 高 | 手順は [DOM_ADAPTER_CHECKLIST.md](../docs/DOM_ADAPTER_CHECKLIST.md)。確認できなければ無効のまま |
-| キャラクター欄・モデル表示・生成完了の実機調査 | 中 | 中 | 高 | 一意なジョブIDが無ければ自動検知は実装しない |
-| NovelAI固有PNGメタデータの解析 | 中 | 中 | 中 | 公式に保存された実サンプルが必要 |
-| ZIP64（2GiB超）の完全バックアップ | 低 | 中 | 中 | |
 
 ## 決定事項
 
