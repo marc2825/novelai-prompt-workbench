@@ -1,5 +1,5 @@
 import { compileWorkspace } from './compose';
-import type { LibraryEntry, Preset, PromptSpan, PromptWorkspace, WorkbenchData } from './types';
+import type { LibraryEntry, Preset, PresetRevision, PromptSpan, PromptWorkspace, WorkbenchData } from './types';
 
 export function captureWorkspace(workspace: PromptWorkspace): PromptWorkspace {
   const { appliedPresetId: _binding, ...snapshot } = workspace;
@@ -27,11 +27,42 @@ export function savePreset(data: WorkbenchData, workspaceId: string, id: string,
   return bind({ ...data, presets: [...data.presets, saved] }, source.id, id, now);
 }
 
-export function overwritePreset(data: WorkbenchData, id: string, workspaceId: string, now: string): WorkbenchData {
+/** Versions kept per preset; older ones are dropped when a new version is recorded. */
+export const MAX_PRESET_REVISIONS = 10;
+
+function remember(saved: Preset, revisionId: string | undefined): PresetRevision[] | undefined {
+  if (!revisionId) return saved.revisions;
+  return [{ id: revisionId, savedAt: saved.updatedAt, workspaceSnapshot: saved.workspaceSnapshot }, ...(saved.revisions ?? [])].slice(0, MAX_PRESET_REVISIONS);
+}
+function withRevisions(saved: Preset, revisions: PresetRevision[] | undefined): Preset {
+  const { revisions: _old, ...rest } = saved;
+  return revisions?.length ? { ...rest, revisions } : rest;
+}
+
+/** Saves the workspace into the preset. With `revisionId`, the previous content is kept as a version (issue #30). */
+export function overwritePreset(data: WorkbenchData, id: string, workspaceId: string, now: string, revisionId?: string): WorkbenchData {
   const saved = preset(data, id);
   const source = workspace(data, workspaceId);
-  const next = { ...saved, sourceWorkspaceId: source.id, workspaceSnapshot: captureWorkspace(source), updatedAt: now };
+  const next = withRevisions({ ...saved, sourceWorkspaceId: source.id, workspaceSnapshot: captureWorkspace(source), updatedAt: now }, remember(saved, revisionId));
   return bind({ ...data, presets: data.presets.map(item => item.id === id ? next : item) }, source.id, id, now);
+}
+
+/** Makes a kept version the preset's content again; the current content becomes a version itself (nothing is lost). */
+export function restorePresetRevision(data: WorkbenchData, id: string, revisionId: string, newRevisionId: string, now: string): WorkbenchData {
+  const saved = preset(data, id);
+  const revision = saved.revisions?.find(item => item.id === revisionId);
+  if (!revision) throw new Error('保存履歴が見つかりません');
+  const others = (saved.revisions ?? []).filter(item => item.id !== revisionId);
+  const kept = remember({ ...saved, revisions: others }, newRevisionId);
+  const next = withRevisions({ ...saved, sourceWorkspaceId: revision.workspaceSnapshot.id, workspaceSnapshot: revision.workspaceSnapshot, updatedAt: now }, kept);
+  return { ...data, presets: data.presets.map(item => item.id === id ? next : item) };
+}
+
+export function deletePresetRevision(data: WorkbenchData, id: string, revisionId: string): WorkbenchData {
+  const saved = preset(data, id);
+  if (!saved.revisions?.some(item => item.id === revisionId)) throw new Error('保存履歴が見つかりません');
+  const next = withRevisions(saved, saved.revisions.filter(item => item.id !== revisionId));
+  return { ...data, presets: data.presets.map(item => item.id === id ? next : item) };
 }
 
 export function renamePreset(data: WorkbenchData, id: string, name: string, now: string): WorkbenchData {
@@ -41,7 +72,9 @@ export function renamePreset(data: WorkbenchData, id: string, name: string, now:
 
 export function duplicatePreset(data: WorkbenchData, id: string, copyId: string, name: string, now: string): WorkbenchData {
   if (data.presets.some(item => item.id === copyId)) throw new Error('プリセットIDが重複しています');
-  const copy = { ...structuredClone(preset(data, id)), id: copyId, name, createdAt: now, updatedAt: now };
+  const { revisions: _history, ...source } = preset(data, id);
+  // Versions stay with the original: their IDs are unique across the data.
+  const copy = { ...structuredClone(source), id: copyId, name, createdAt: now, updatedAt: now };
   return { ...data, presets: [...data.presets, copy] };
 }
 

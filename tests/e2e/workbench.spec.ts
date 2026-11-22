@@ -354,3 +354,33 @@ test('workspace keeps details behind icons: member text editor, group settings, 
   await openFold(page, /^詳細（差分の内容/);
   await expect(page.getByRole('button', { name: 'プリセットを削除', exact: true })).toBeVisible();
 });
+
+test('tabs are grouped into areas, settings sits apart, and the wide tab opens the same section with the preview beside it (issue #29)', async ({ page, context }) => {
+  await page.goto('/tests/fixtures/index.html'); await saved(page);
+  const nav = page.getByRole('tablist', { name: '機能', exact: true });
+  for (const label of ['編集', 'バリエーション', '比較・実験']) await expect(nav.getByText(label, { exact: true })).toBeVisible();
+  // Area captions are visual only: the tabs keep their names and order.
+  await expect(page.getByRole('tab')).toHaveText(['ライブラリ', 'ワークスペース', 'プリセット', 'シャッフル', '比較', 'Experiment Lab', '設定']);
+  const settings = await page.getByRole('tab', { name: '設定', exact: true }).boundingBox();
+  const lab = await page.getByRole('tab', { name: 'Experiment Lab', exact: true }).boundingBox();
+  expect(settings && lab && (settings.y > lab.y + 1 || settings.x > lab.x)).toBe(true);
+  await page.getByRole('tab', { name: '設定', exact: true }).click();
+  await page.getByRole('button', { name: 'デモを追加', exact: true }).click(); await saved(page);
+  await page.getByRole('tab', { name: 'ワークスペース', exact: true }).click();
+  const link = page.getByRole('link', { name: '広いタブで開く', exact: true });
+  await expect(link).toHaveAttribute('href', /#workspace$/);
+  const wide = await context.newPage();
+  await wide.setViewportSize({ width: 1280, height: 900 });
+  await wide.goto(`/tests/fixtures/index.html#workspace`); await saved(wide);
+  await expect(wide.getByRole('tab', { name: 'ワークスペース', exact: true })).toHaveAttribute('aria-selected', 'true');
+  // Wide layout: the output preview stays open in a column to the right of the section.
+  const preview = wide.getByRole('group', { name: 'ライブプレビュー', exact: true });
+  await expect(preview.getByRole('textbox', { name: '出力 Positive', exact: true })).toBeVisible();
+  const panel = await wide.getByRole('tabpanel').boundingBox(); const side = await preview.boundingBox();
+  expect(panel && side && side.x >= panel.x + panel.width - 1).toBe(true);
+  await wide.getByRole('tab', { name: 'シャッフル', exact: true }).click();
+  await expect(preview.getByRole('textbox', { name: '出力 Positive', exact: true })).toBeVisible();
+  // The narrow panel keeps one column (preview below, collapsed on Shuffle).
+  await page.getByRole('tab', { name: 'シャッフル', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '出力 Positive', exact: true })).toBeHidden();
+});
