@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openFold, openPresetDetails, openPreview } from './helpers';
 import { unknownSettings } from '../../src/core/experiments';
 import { savePreset } from '../../src/core/presets';
 import { fixture, timestamp } from '../unit/helpers';
-import { chunk, png } from '../fixtures/png';
+import { chunk, png, stealthBytes, stealthPng } from '../fixtures/png';
 
 const field = (page: Page, name: string) => page.getByRole('textbox', { name, exact: true });
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -139,4 +139,46 @@ test('restoring changed metadata under an existing image ID rejects stale bytes 
   await expect(page.getByLabel('画像比較', { exact: true })).toContainText('メタデータと不整合'); await upload(page, 'A', bytes);
   await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible(); await expect(page.getByRole('heading', { name: '画像ライブラリ (1)', exact: true })).toBeVisible();
   await expect(page.getByLabel('比較 A', { exact: true })).toContainText('3×2');
+});
+
+// The slot's own settings editor; the attached image has a second one inside 画像情報を手入力で補完.
+const variantSettings = (slot: Locator) => slot.locator('details').filter({ has: slot.page().locator('summary', { hasText: /^生成設定の確認・手入力$/ }) }).first();
+// Synthetic PNG in NovelAI's official *container* format (text chunks + alpha-channel stealth payload).
+// Not a real NovelAI image: this does not verify real-site files or the meaning of the fields.
+test('NovelAI container values appear only as unverified candidates and are adopted after confirm', async ({ page }) => {
+  await boot(page); await create(page); const original = await field(page, 'A positive').inputValue();
+  const comment = { prompt: '<script>alert(1)</script>, 1girl', uc: 'lowres', seed: 1234567890, steps: 28, width: 96, height: 96, scale: 5.5, cfg_rescale: 0, sampler: 'k_euler_ancestral', extra_flag: true };
+  const fields = { Description: '1girl', Software: 'NovelAI', Source: 'Synthetic Model 0000', 'Generation time': '1.5', Comment: JSON.stringify(comment) };
+  await upload(page, 'A', stealthPng(stealthBytes(fields), { width: 96, height: 96, filter: 4, texts: [['Title', 'NovelAI generated image'], ...Object.entries(fields)] }), 'novelai-synthetic.png');
+  const slot = page.getByLabel('比較 A', { exact: true }); await openFold(page, /^画像の情報・照合（A/);
+  const info = page.getByRole('region', { name: 'NovelAIの画像情報（候補・A）', exact: true });
+  await expect(info).toContainText('NovelAIの公式文書で意味が確認されていない項目です。値を確認してから採用してください。'); await expect(info).toContainText('PNGテキスト・アルファチャンネル（内容が一致）');  await expect(info.getByRole('row', { name: 'Seed Comment.seed 1234567890', exact: true })).toBeVisible(); await expect(info.getByRole('row', { name: 'モデル Source Synthetic Model 0000', exact: true })).toBeVisible();
+  await expect(slot).toContainText('NovelAI固有メタデータは未検証です'); await expect(slot).toContainText('画像設定照合: 検証不能'); await expect(button(page, '画像の設定を採用')).toBeDisabled();
+  expect(await page.locator('script:not([src])').count()).toBe(0);
+  // Nothing is adopted on import, and dismissing the confirm keeps the slot unknown.
+  await variantSettings(slot).getByText('生成設定の確認・手入力', { exact: true }).click(); await expect(variantSettings(slot).getByLabel('Seed', { exact: true })).toHaveValue('');
+  page.removeAllListeners('dialog'); const messages: string[] = []; page.on('dialog', dialog => { messages.push(dialog.message()); void dialog.dismiss(); });
+  await button(page, 'NovelAIの候補を確認して採用（A）').click(); expect(messages[0]).toContain('公式に意味が確認されていない値です'); await expect(variantSettings(slot).getByLabel('Seed', { exact: true })).toHaveValue('');
+  page.removeAllListeners('dialog'); page.on('dialog', dialog => void dialog.accept());
+  await button(page, 'NovelAIの候補を確認して採用（A）').click(); await saved(page);
+  await expect(variantSettings(slot).getByLabel('Seed', { exact: true })).toHaveValue('1234567890'); await expect(variantSettings(slot).getByLabel('Steps', { exact: true })).toHaveValue('28'); await expect(variantSettings(slot).getByLabel('Guidance / CFG', { exact: true })).toHaveValue('5.5');
+  await expect(variantSettings(slot).getByLabel('モデル', { exact: true })).toHaveValue('Synthetic Model 0000'); await expect(variantSettings(slot).getByLabel('生成枚数', { exact: true })).toHaveValue('');
+  await expect(variantSettings(slot).getByRole('checkbox', { name: '追加条件をすべて確認した', exact: true })).not.toBeChecked(); await expect(field(page, 'A positive')).toHaveValue(original);
+  await button(page, 'NovelAIのPrompt候補を画像の注記に採用（A）').click(); await saved(page); await expect(slot).toContainText('画像Prompt取得元: png-metadata'); await expect(field(page, 'A positive')).toHaveValue(original);
+  const exported = await exportJson(page); const variant = exported.payload.experiments[0].variantA; const image = exported.payload.images[0];
+  expect(variant.settings).toEqual({ ...unknownSettings(), seed: '1234567890', steps: 28, width: 96, height: 96, sampler: 'k_euler_ancestral', guidance: 5.5, cfgRescale: 0, model: 'Synthetic Model 0000', evidence: 'png-metadata' });
+  expect(variant.compiled.positive).toBe(original); expect(image.metadata.novelai).toEqual({ sources: ['text', 'stealth'], agreement: 'match', stealth: null });
+  expect(image.metadata.settings).toEqual(unknownSettings()); expect([image.metadata.positive, image.metadata.negative, image.metadata.promptEvidence]).toEqual([comment.prompt, 'lowres', 'png-metadata']);
+  await page.reload(); await saved(page); await tab(page, '比較'); const reloaded = page.getByLabel('比較 A', { exact: true }); await variantSettings(reloaded).getByText('生成設定の確認・手入力', { exact: true }).click(); await expect(variantSettings(reloaded).getByLabel('Seed', { exact: true })).toHaveValue('1234567890');
+});
+
+test('disagreeing NovelAI containers are both shown and adoption requires choosing a source', async ({ page }) => {
+  await boot(page); await create(page);
+  const fields = (seed: number) => ({ Software: 'NovelAI', Comment: JSON.stringify({ seed, steps: 20 }) });
+  await upload(page, 'B', stealthPng(stealthBytes(fields(42)), { texts: Object.entries(fields(7)) as [string, string][] }));
+  await openFold(page, /^画像の情報・照合（B/); const info = page.getByRole('region', { name: 'NovelAIの画像情報（候補・B）', exact: true });
+  await expect(info.getByRole('alert')).toContainText('内容が異なります'); await expect(info.getByRole('row', { name: 'Seed Comment.seed 7', exact: true })).toBeVisible(); await expect(info.getByRole('row', { name: 'Seed Comment.seed 42', exact: true })).toBeVisible();
+  await expect(button(page, 'NovelAIの候補を確認して採用（B）')).toBeDisabled();
+  await page.getByRole('combobox', { name: '採用する取得元（B）', exact: true }).selectOption({ label: 'アルファチャンネル' }); await button(page, 'NovelAIの候補を確認して採用（B）').click(); await saved(page);
+  const slot = page.getByLabel('比較 B', { exact: true }); await variantSettings(slot).getByText('生成設定の確認・手入力', { exact: true }).click(); await expect(variantSettings(slot).getByLabel('Seed', { exact: true })).toHaveValue('42');
 });

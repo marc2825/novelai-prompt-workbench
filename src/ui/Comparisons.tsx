@@ -11,6 +11,7 @@ import { PromptEditor } from './PromptEditor';
 import { downloadBlob, newId, now, Rename } from './shared';
 import { message, type Workbench } from './useWorkbench';
 import { InfoTip } from './InfoTip';
+import { NovelAIInfo } from './NovelAIInfo';
 
 function SettingsEditor({ value, onSave }: { value: GenerationSettings; onSave: (value: GenerationSettings) => void }) {
   const [draft, setDraft] = useState(value); const [extra, setExtra] = useState(JSON.stringify(value.extra, null, 2)); const [error, setError] = useState('');
@@ -108,6 +109,9 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
           <label>{variant.label}の登録済み画像<select disabled={busy || editing} value={variant.imageId ?? ''} onChange={event => { const imageId = event.target.value || null; changeVariant(key, item => ({ ...item, imageId })); }}><option value="">画像なし</option>{data.images.map(image => <option key={image.id} value={image.id}>{image.name} / {image.hash.slice(0, 8)}</option>)}</select></label>
           {image && <><Thumbnail workbench={workbench} image={image} /><details><summary>画像の情報・照合（{variant.label}: {image.name}）</summary><div className="stack"><p>{image.name} / {image.width}×{image.height} / SHA-256 {image.hash}</p>
             {image.metadata.warnings.map((warning, i) => <p key={i}>{warning}</p>)}
+            <NovelAIInfo metadata={image.metadata} slot={variant.label}
+              onAdoptSettings={settings => { if (changeVariant(key, item => ({ ...item, settings }))) setNotice(`${variant.label}の生成設定にNovelAIの候補を採用しました（取得元 png-metadata・未確認の値）。固定プロンプトは変更していません。`); }}
+              onAdoptPrompts={prompts => { if (workbench.commit(previous => ({ ...previous, images: previous.images.map(item => item.id === image.id ? { ...item, metadata: { ...item.metadata, ...prompts, promptEvidence: 'png-metadata' as const } } : item) }))) setNotice('画像のPrompt注記にNovelAIの候補を採用しました（未確認の値）。固定プロンプトは変更していません。'); }} />
             <details><summary>抽出メタデータ（信頼されないテキスト）</summary><pre>{JSON.stringify(image.metadata, null, 2)}</pre></details>
             <p>画像Prompt取得元: {image.metadata.promptEvidence ?? 'unknown'}</p><ImageNotes value={image.metadata} onSave={metadata => { workbench.commit(previous => ({ ...previous, images: previous.images.map(item => item.id === image.id ? { ...item, metadata } : item) })); }} />
             <p>画像Prompt照合: {image.metadata.positive === null || image.metadata.negative === null ? '検証不能' : image.metadata.positive === variant.compiled.positive && image.metadata.negative === variant.compiled.negative ? '固定プロンプトと一致' : '固定プロンプトと不一致'}</p>
