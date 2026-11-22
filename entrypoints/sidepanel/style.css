@@ -223,3 +223,6 @@ progress { width: 100%; accent-color: var(--accent); }
   main.with-preview > .preview { grid-column: 2; position: sticky; top: 112px; max-height: calc(100vh - 124px); overflow: auto; }
 }
 
+.tag-diff { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; overflow-wrap: anywhere; }
+.tag-diff .added { color: var(--success); }
+.tag-diff .removed { color: var(--danger); }
