@@ -28,6 +28,6 @@ await build({
   },
 });
 if (!process.argv.includes('--build-only')) {
-  const server = await preview({ ...shared, preview: { host: '127.0.0.1', port: 4173, strictPort: true } });
-  console.log(`fixture served at ${server.resolvedUrls?.local[0] ?? 'http://127.0.0.1:4173/'}tests/fixtures/index.html`);
+  const server = await preview({ ...shared, preview: { host: '127.0.0.1', port: Number(process.env.E2E_PORT ?? 4173), strictPort: true } });
+  console.log(`fixture served at ${server.resolvedUrls?.local[0] ?? `http://127.0.0.1:${process.env.E2E_PORT ?? 4173}/`}tests/fixtures/index.html`);
 }

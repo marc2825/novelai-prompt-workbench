@@ -50,6 +50,8 @@ fixtureはReactの開発ビルド（`NODE_ENV=development`）で作るため、S
 
 Mock E2Eや模擬HTMLでの成功を、実NovelAIでの動作確認として報告しないでください。
 
+複数の作業ツリー（git worktree）で同時にE2Eを実行するときは、`E2E_PORT=4174 corepack pnpm test:e2e` のように検証用サーバーのポートを分けてください（既定は4173。同じポートだと別の作業ツリーのサーバーを使い回します）。
+
 ### Chromiumの共有ライブラリが無い環境（root権限なし）
 
 `libnspr4.so` などが見つからずChromiumが起動しない場合、OSにインストールせず作業用ディレクトリに展開します。
