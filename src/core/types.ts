@@ -141,6 +141,18 @@ export interface Experiment {
   updatedAt: string;
 }
 
+/**
+ * NovelAI's official PNG metadata containers found at import (docs/DATA_MODEL.md). The meaning of
+ * the fields is unverified: they are shown as candidates and never become settings by themselves.
+ */
+export interface NovelAIImageInfo {
+  /** 'text' = PNG text chunks with a `Comment` key (values stay in ImageMetadata.texts); 'stealth' = alpha-channel `stealth_pngcomp` payload. */
+  sources: ('text' | 'stealth')[];
+  /** 'single' with one container; with both, whether every stealth key equals the PNG text chunk of the same key. */
+  agreement: 'single' | 'match' | 'mismatch';
+  /** Stealth payload (values as strings). null when absent, or when identical to the PNG text chunks (not duplicated). */
+  stealth: Record<string, string> | null;
+}
 export interface ImageMetadata {
   promptEvidence?: 'manual' | 'png-metadata' | 'unknown';
   positive: string | null;
@@ -148,6 +160,8 @@ export interface ImageMetadata {
   settings: GenerationSettings;
   texts: Record<string, string>;
   warnings: string[];
+  /** Absent for PNGs without NovelAI containers and for images imported before this field existed. */
+  novelai?: NovelAIImageInfo;
 }
 export interface ImageRecord {
   id: string;

@@ -165,7 +165,25 @@ interface Experiment {
 - Blob読取り時も現在snapshotのhash/寸法/バイト数とbindingを照合し、同一IDに違うmetadataを復元した際の古い画像の誤表示を防ぐ。不整合は欠落として通知し、同一PNG再取込で寸法/サイズを修復する。
 - JSON v3は画像メタデータ・比較を含み`imageBinariesIncluded:false`。原本/thumbnailを含む形式はまだ非対応。別端末復元時の欠落はimageBlobのundefinedで検知し、同一ハッシュの再取込でIDを維持して修復。
 - Undo/RedoはBlobを履歴へコピーせず、metadata/associationのみ記録する。削除後のBlobはUndo用に保持。明示purgeは現在データと全履歴、取込前backupで参照されるIDを保護する。未保存Blobは保存キュー内で保持し、quota後のretryでも再利用。
-- PNG上限20MiB/各辺8192px/16,777,216px。テキストは入力・展開後とも256KiB、128チャンク、PNG全体4096チャンク。CRC、終端、圧縮方式、デコードを検査。NovelAI固有のパーサは実サンプル未取得によりunknown fallback。標準テキストは安全な文字列のまま保持する。
+- PNG上限20MiB/各辺8192px/16,777,216px。テキストは入力・展開後とも256KiB、128チャンク、PNG全体4096チャンク。CRC、終端、圧縮方式、デコードを検査。NovelAI固有の項目は実サンプル未取得のため生成設定にしない（unknown fallback）。公式形式の入れ物は下の `metadata.novelai` に記録する。標準テキストは安全な文字列のまま保持する。
+
+## NovelAIの画像情報（DB/JSON v3のまま追加、2026-11-22）
+
+`ImageMetadata.novelai?: NovelAIImageInfo`（省略可）。正本は `src/core/types.ts`、検証は `validateNovelAIInfo`（`src/data/validation.ts`）。
+
+```ts
+interface NovelAIImageInfo {
+  sources: ('text' | 'stealth')[];          // 1〜2件・重複なし。text=PNGテキストのComment、stealth=アルファチャンネル
+  agreement: 'single' | 'match' | 'mismatch'; // 取得元1件ならsingle。2件なら全キーが一致するか
+  stealth: Record<string, string> | null;   // アルファチャンネルの内容。無い場合と、PNGテキストと同一（公式キーのみ）の場合はnull
+}
+```
+
+- NovelAI公式スクリプトの入れ物（PNGテキスト `Title` / `Description` / `Software` / `Source` / `Generation time` / `Comment` と、アルファチャンネルの `stealth_pngcomp`）が見つかったときだけ付く。見つからない画像・この項目より前に取り込んだ画像には無い（旧データはそのまま有効、DB/JSONのversionは変えない）。
+- PNGテキストの値は従来どおり `texts` に1回だけ保存し、ここへ複製しない。アルファチャンネルの内容はPNGテキストと同一なら保存しない（`agreement: 'match'`・`stealth: null`、内容はtextsのTitle以外の公式キーと同じ）。公式キー以外を含む場合と、内容が異なる場合（`mismatch`）は保存する。黙ってどちらかを選ばない。
+- 値はすべて文字列。アルファチャンネルのJSONで文字列でない値（例: `Comment` がオブジェクト）はJSON文字列にして保持し、取込時に警告を残す。
+- 検証: 取得元の数と `agreement` の整合、`text` ならtextsに `Comment` があること、`stealth` の有無と取得元・一致状態の整合、キー1〜79文字・128件以下、値262,144文字以下、全体のJSON 524,288文字以下、`__proto__` 等の危険なキーと非JSON値の拒否。未知の安全なフィールドは保持する。
+- `Comment` のJSONは保存時に解釈しない。表示のたびに `validateSafeJson` を通して読み、候補（型・範囲を満たす値だけ）を計算する。候補は利用者が確認ダイアログで採用したときだけ、比較スロットの `settings`（`evidence: 'png-metadata'`・`extrasConfirmed: false`・候補のない項目はnull）や画像の `positive` / `negative`（`promptEvidence: 'png-metadata'`）になる。取込時の `settings` は常に `unknown`。
 
 ## Prompt Shuffle（DB/JSON v3のまま追加）
 
