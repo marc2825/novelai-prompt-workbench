@@ -73,7 +73,9 @@ function selection(value: unknown, path: string) {
 }
 
 /** Strict structural and referential validation. Returns a deep copy; unknown safe fields are kept. */
-export function validateShuffleData(input: unknown, path = 'shuffle'): ShuffleData {
+export function validateShuffleData(input: unknown, path = 'shuffle'): ShuffleData { return structuredClone(checkShuffleData(input, path)) as unknown as ShuffleData; }
+/** The checks of validateShuffleData without the copy: returns the input itself. */
+function checkShuffleData(input: unknown, path = 'shuffle'): Record<string, unknown> {
   const data = record(input, path);
   if (data.schemaVersion !== SHUFFLE_SCHEMA_VERSION) fail(`${path}.schemaVersion`, `対応していないシャッフル設定のバージョンです（${String(data.schemaVersion)}）`);
   const ids = new Set<string>();
@@ -171,7 +173,7 @@ export function validateShuffleData(input: unknown, path = 'shuffle'): ShuffleDa
       side(character.side, `${characterAt}.side`);
     });
   });
-  return structuredClone(data) as unknown as ShuffleData;
+  return data;
 }
 
 export type ShuffleMigration = (input: Record<string, unknown>) => Record<string, unknown>;
@@ -193,6 +195,15 @@ export function migrateShuffle(input: unknown, migrations: Readonly<Record<numbe
 }
 
 export function normalizeShuffle(input: unknown): ShuffleData { return validateShuffleData(migrateShuffle(input).data); }
+/**
+ * normalizeShuffle for validateData, which copies (and freezes) only nodes that are not
+ * shared yet: the current version is checked without a copy, so unchanged shuffle data
+ * stays shared between commits. Older versions are migrated on a copy as before.
+ */
+export function checkShuffle(input: unknown): ShuffleData {
+  if (record(input, 'shuffle').schemaVersion !== SHUFFLE_SCHEMA_VERSION) return normalizeShuffle(input);
+  return checkShuffleData(input) as unknown as ShuffleData;
+}
 
 export function validateRecoveries(input: unknown): ShuffleRecovery[] {
   return list(input, 'shuffleRecovery', SHUFFLE_LIMITS.recoveries).map((value, index) => {
