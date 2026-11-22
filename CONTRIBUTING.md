@@ -29,6 +29,7 @@ corepack pnpm test && corepack pnpm typecheck && corepack pnpm build && corepack
 - 不具合の修正には、可能なら先に失敗するテストを追加してください。既存のテストを削除・無効化して通すことはしないでください。
 - ローカル模擬ページ（fixture）での結果を、実NovelAIで確認したこととして書かないでください。
 - 実行時の依存を追加する場合は、その理由を書き、`public/THIRD_PARTY_NOTICES.txt` にライセンス表示を追加してください。
+- PRでは通常のCIに加えて「Security」ワークフロー（依存関係の監査とレビュー・Gitleaks・CodeQL）が動きます。失敗したときの対応は [docs/security.md](docs/security.md#セキュリティ検査ci) にあります。秘密情報の検出では、値をコメントなどに貼らないでください。
 
 ## ライセンス
 
