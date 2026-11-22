@@ -12,6 +12,28 @@ const COUNT_LABELS: Record<keyof BackupCounts, string> = {
 };
 const mib = (bytes: number) => `${(bytes / 1048576).toFixed(bytes < 10 * 1048576 ? 2 : 0)} MiB`;
 
+/**
+ * Writes a complete backup of the current screen state (issue #18: also while
+ * saving fails, so unsaved edits and not-yet-stored imported images can be
+ * rescued without touching the database). The snapshot is fixed when the export
+ * starts (issue #20): later edits, Undo or other pages do not change it, and an
+ * image whose binary cannot be found for that snapshot is listed by name.
+ */
+export async function saveFullBackup(workbench: Workbench, onProgress?: (text: string) => void): Promise<string> {
+  const snapshot = workbench.latest();
+  if (!snapshot) throw new Error('データを読み込めていません');
+  const unsaved = workbench.storageFailed() || workbench.saving;
+  const source = workbench.snapshotSource(snapshot);
+  try {
+    const time = now();
+    const result = await exportFullBackup(snapshot, source, time, (done, total) => onProgress?.(`画像を確認中… ${done}/${total}`));
+    downloadBlob(result.blob, fullBackupFilename(time));
+    const names = result.missing.map(id => snapshot.images.find(image => image.id === id)?.name ?? id);
+    const missing = names.length ? `原本が見つからない画像（メタデータだけを保存。復元先では欠落と表示）: ${names.slice(0, 5).join('、')}${names.length > 5 ? ` ほか${names.length - 5}件` : ''}。` : '';
+    return `完全バックアップを保存しました（画像原本${result.manifest.images.length}件・${mib(result.blob.size)}）。${unsaved ? 'まだ保存されていない変更も含めています。' : ''}${missing}${result.warnings.filter(warning => !warning.includes('メタデータだけを含めました')).join(' ')}`;
+  } finally { source.done(); }
+}
+
 /** Complete backup / restore: all text assets plus original PNGs and thumbnails, verified before anything is written. */
 export function FullBackup({ workbench }: { workbench: Workbench }) {
   const data = workbench.data!;
@@ -21,6 +43,7 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
   const [issue, setIssue] = useState('');
   const [inspected, setInspected] = useState<{ backup: InspectedBackup; name: string; size: number; free: number | null } | null>(null);
   const [mode, setMode] = useState<'replace' | 'merge'>('replace');
+  // Restoring needs a settled save. Exporting (saveFullBackup) reads a fixed snapshot and never writes, so it stays available.
   const blocked = busy || workbench.saving || !!workbench.storageError;
   const planError = useMemo(() => {
     if (!inspected) return '';
@@ -35,12 +58,7 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
   return <section className="panel stack" aria-label="完全バックアップ">
     <div className="section-title"><h2>完全バックアップ（画像原本込み・推奨）</h2><InfoTip label="完全バックアップ">ライブラリ・ワークスペース・プリセット・比較・Experiment Lab・シャッフル設定・画像メタデータに加え、画像原本とサムネイルを1つのZIPに保存します。別のChromeプロファイルや別のPCでも同じ状態に戻せます。Undo履歴とサイト連携の一時情報は含みません。ZIPは無圧縮・最大2GiBで、Experiment LabのZIP（実験の共有用）とは別の形式です。</InfoTip></div>
     <p className="hint">画像も含めてすべてを1つのZIPに保存し、別の環境でもそのまま復元できます。定期的な保存をおすすめします。</p>
-    <button type="button" className="primary" disabled={blocked} onClick={() => void run(async () => {
-      const time = now();
-      const result = await exportFullBackup(workbench.latest()!, { image: (id, thumbnail) => workbench.imageBlob(id, thumbnail) }, time, (done, total) => setProgress(`画像を確認中… ${done}/${total}`));
-      downloadBlob(result.blob, fullBackupFilename(time));
-      setNotice(`完全バックアップを保存しました（画像原本${result.manifest.images.length}件・${mib(result.blob.size)}）。${result.warnings.join(' ')}`);
-    })}>完全バックアップをZIPで保存</button>
+    <button type="button" className="primary" disabled={busy} onClick={() => void run(async () => { setNotice(await saveFullBackup(workbench, setProgress)); })}>完全バックアップをZIPで保存</button>
     <label>完全バックアップZIPを読み込む<input type="file" accept=".zip,application/zip" disabled={blocked} onChange={event => {
       const file = event.target.files?.[0];
       event.target.value = '';
@@ -78,8 +96,9 @@ export function FullBackup({ workbench }: { workbench: Workbench }) {
         const repository = workbench.repository.current;
         if (!repository) throw new Error('DBに接続できません');
         setProgress('画像を再確認して保存中…');
-        const plan = planFullRestore(workbench.latest()!, backup, mode, await repository.binaryBindings([...backup.binaries.keys()]));
-        try { await workbench.restoreFull(plan.data, plan.writes); }
+        const base = workbench.latest()!;
+        const plan = planFullRestore(base, backup, mode, await repository.binaryBindings([...backup.binaries.keys()]));
+        try { await workbench.restoreFull(plan.data, plan.writes, base); }
         catch (error) { throw new Error(`復元できませんでした: ${message(error)}。現在のデータは変更していません`); }
         setInspected(null);
         setNotice(`完全バックアップを復元しました（画像原本${backup.binaries.size}件）。「元に戻す」で復元前に戻せます。`);

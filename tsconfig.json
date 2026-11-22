@@ -1,5 +1,7 @@
 {
   "extends": "./.wxt/tsconfig.json",
+  // Agent/maintainer git worktrees under .claude/worktrees are separate checkouts.
+  "exclude": ["**/node_modules", ".output", ".claude/worktrees"],
   "compilerOptions": {
     "strict": true,
     "jsx": "react-jsx",

@@ -234,14 +234,23 @@ export class WorkbenchRepository {
 
   // Explicit cleanup is separate from deletion/Undo. Retained binaries allow Undo
   // and the previous-import backup to restore associations without losing pixels.
-  async purgeUnreferenced(protectedIds: string[]): Promise<void> {
+  // The caller passes every image ID its Undo/Redo history references and must
+  // make sure no other page (with its own history) is open (issue #16). The
+  // purge bumps the revision, so a page that loaded earlier gets a conflict
+  // instead of silently saving references to purged binaries.
+  async purgeUnreferenced(protectedIds: readonly string[], expectedRevision?: number): Promise<{ revision: number; removed: number }> {
     const transaction = this.database.transaction(STORES, 'readwrite'); const done = completion(transaction); void done.catch(() => {});
     try {
-      const state = await readState(transaction); const keep = new Set([...protectedIds, ...validateData(state.data).images.map(image => image.id)]);
+      const state = await readState(transaction);
+      if (expectedRevision !== undefined && state.revision !== expectedRevision) throw new StorageConflictError('別の画面で保存されたため、画像バイナリの整理を中止しました。最新の内容を読み込んでから再試行してください');
+      const keep = new Set([...protectedIds, ...validateData(state.data).images.map(image => image.id)]);
       const previous = await request(transaction.objectStore('metadata').get('previousImport')) as { data?: WorkbenchData } | undefined;
       for (const image of previous?.data?.images ?? []) keep.add(image.id);
-      for (const store of BINARY_STORES) { for (const key of await request(transaction.objectStore(store).getAllKeys())) if (!keep.has(String(key))) transaction.objectStore(store).delete(key); }
+      let removed = 0;
+      for (const store of BINARY_STORES) { for (const key of await request(transaction.objectStore(store).getAllKeys())) if (!keep.has(String(key))) { transaction.objectStore(store).delete(key); if (store === 'imageOriginals') removed++; } }
+      transaction.objectStore('metadata').put(state.revision + 1, 'revision');
       await done;
+      return { revision: state.revision + 1, removed };
     } catch (error) { try { transaction.abort(); } catch {} await done.catch(() => {}); throw error; }
   }
 
