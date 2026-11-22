@@ -93,7 +93,7 @@ test('purging image binaries is refused while another page is open, so its Undo 
   const b = await context.newPage(); errors.push(...await boot(b));
   // A deletes the image; its Undo history still references the binary.
   await openFold(a, /^画像ライブラリ/);
-  await button(a, '登録画像を削除').click(); await saved(a);
+  await button(a, 'keep.pngを削除').click(); await saved(a);
   await expect(a.getByRole('img', { name: '比較画像A', exact: true })).toHaveCount(0);
   await button(b, '他の画面の変更を読み込む').click(); await saved(b);
   await tab(b, '比較'); await openFold(b, /^画像ライブラリ/);

@@ -73,7 +73,7 @@ test('rejects corrupt files without replacing snapshots or existing image and un
   const corruptPixels = Buffer.concat([png().subarray(0, 33), chunk('IDAT', Buffer.from([1, 2, 3])), chunk('IEND', Buffer.alloc(0))]);
   await page.getByLabel('AにPNGを取り込む', { exact: true }).setInputFiles({ name: 'corrupt-pixels.png', mimeType: 'image/png', buffer: corruptPixels });
   await expect(page.getByRole('alert')).toContainText('画像取込失敗'); await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible();
-  await openFold(page, /^画像ライブラリ/); await button(page, '登録画像を削除').click(); await saved(page); await expect(page.getByRole('heading', { name: '画像ライブラリ (0)', exact: true })).toBeVisible();
+  await openFold(page, /^画像ライブラリ/); await button(page, 'synthetic.pngを削除').click(); await saved(page); await expect(page.getByRole('heading', { name: '画像ライブラリ (0)', exact: true })).toBeVisible();
   await button(page, '元に戻す').click(); await saved(page); await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible();
 });
 
@@ -121,7 +121,7 @@ test('manual image notes and original-file export preserve pixels and never rewr
   const slot = page.getByLabel('比較 A', { exact: true }); await openFold(page, /^画像の情報・照合（A/); await slot.getByText('画像情報を手入力で補完', { exact: true }).click();
   await slot.getByLabel('画像 Positive 注記', { exact: true }).fill('<script>手入力</script>'); await slot.getByLabel('画像 Negative 注記', { exact: true }).fill('manual negative'); await slot.getByRole('button', { name: '画像のプロンプト注記を保存', exact: true }).click(); await saved(page);
   await expect(slot).toContainText('画像Prompt取得元: manual'); await expect(field(page, 'A positive')).toHaveValue(before);
-  await openFold(page, /^画像ライブラリ/); const event = page.waitForEvent('download'); await button(page, '画像原本を保存').click(); const path = await (await event).path(); expect(await readFile(path!)).toEqual(bytes);
+  await openFold(page, /^画像ライブラリ/); const event = page.waitForEvent('download'); await button(page, 'synthetic.pngの原本を保存').click(); const path = await (await event).path(); expect(await readFile(path!)).toEqual(bytes);
   await tab(page, 'ライブラリ'); await expect.poll(() => page.evaluate(() => (window as unknown as { liveUrls: Set<string> }).liveUrls.size)).toBe(0);
   await page.reload(); await saved(page); await tab(page, '比較'); await expect(page.getByLabel('比較 A', { exact: true })).toContainText('画像Prompt取得元: manual');
 });
@@ -139,4 +139,34 @@ test('restoring changed metadata under an existing image ID rejects stale bytes 
   await expect(page.getByLabel('画像比較', { exact: true })).toContainText('メタデータと不整合'); await upload(page, 'A', bytes);
   await expect(page.getByRole('img', { name: '比較画像A', exact: true })).toBeVisible(); await expect(page.getByRole('heading', { name: '画像ライブラリ (1)', exact: true })).toBeVisible();
   await expect(page.getByLabel('比較 A', { exact: true })).toContainText('3×2');
+});
+
+test('the image library lists, searches, deletes and undoes beyond the first 50 images (issue #21)', async ({ page }) => {
+  await boot(page);
+  // 60 image records (metadata only) through a validated JSON import; thumbnails are reported missing.
+  const images = Array.from({ length: 60 }, (_, index) => ({ id: `eeeeeeee-eeee-4eee-8eee-${String(index + 1).padStart(12, '0')}`, hash: `${(index + 1).toString(16).padStart(8, '0')}${'b'.repeat(56)}`, mime: 'image/png', name: `bulk-${String(index + 1).padStart(2, '0')}.png`, width: 2, height: 2, byteLength: 100 + index, thumbnailBytes: 10, createdAt: `2026-11-01T00:${String(index).padStart(2, '0')}:00.000Z`, metadata: { positive: null, negative: null, settings: { seed: null, model: null, sampler: null, imageToImage: null, referenceImages: null, width: null, height: null, steps: null, guidance: null, cfgRescale: null, imageCount: null, extra: {}, extrasConfirmed: false, evidence: 'unknown' }, texts: {}, warnings: [] } }));
+  const document = { format: 'nai-prompt-workbench', schemaVersion: 3, exportedAt: '2026-11-22T00:00:00.000Z', imageBinariesIncluded: false, payload: { libraryEntries: [], categories: [], workspaces: [], presets: [], experiments: [], images, settings: { activeWorkspaceId: null, librarySort: 'title' } } };
+  await tab(page, '設定');
+  await page.getByLabel('JSONをインポート', { exact: true }).setInputFiles({ name: 'images.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(document)) });
+  await button(page, '確認してインポート').click(); await saved(page);
+  await tab(page, '比較'); await openFold(page, /^画像ライブラリ/);
+  await expect(page.getByRole('heading', { name: '画像ライブラリ (60)', exact: true })).toBeVisible();
+  await expect(page.getByRole('status', { name: '画像の件数', exact: true })).toHaveText('60件 / 全60件');
+  await expect(page.getByText('1 / 3 ページ', { exact: true })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'bulk-60.png', exact: true })).toBeVisible();
+  await button(page, '次の画像ページ').click(); await button(page, '次の画像ページ').click();
+  await expect(page.getByText('3 / 3 ページ', { exact: true })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'bulk-01.png', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: '画像の並び順', exact: true }).selectOption('oldest');
+  await expect(page.getByText('1 / 3 ページ', { exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: '画像を検索', exact: true }).fill('bulk-55');
+  await expect(page.getByRole('status', { name: '画像の件数', exact: true })).toHaveText('1件 / 全60件');
+  await button(page, 'bulk-55.pngを削除').click(); await saved(page);
+  await expect(page.getByRole('heading', { name: '画像ライブラリ (59)', exact: true })).toBeVisible();
+  await expect(page.getByText('一致する画像はありません。', { exact: true })).toBeVisible();
+  await button(page, '元に戻す').click(); await saved(page);
+  await expect(page.getByRole('article', { name: 'bulk-55.png', exact: true })).toBeVisible();
+  // The original was never stored (metadata-only import): saving it reports the missing binary.
+  await button(page, 'bulk-55.pngの原本を保存').click();
+  await expect(page.getByRole('alert')).toContainText('画像原本が欠落しています');
 });

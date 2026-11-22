@@ -11,6 +11,7 @@ import { PromptEditor } from './PromptEditor';
 import { downloadBlob, newId, now, Rename } from './shared';
 import { message, type Workbench } from './useWorkbench';
 import { InfoTip } from './InfoTip';
+import { ImageLibrary } from './ImageLibrary';
 
 function SettingsEditor({ value, onSave }: { value: GenerationSettings; onSave: (value: GenerationSettings) => void }) {
   const [draft, setDraft] = useState(value); const [extra, setExtra] = useState(JSON.stringify(value.extra, null, 2)); const [error, setError] = useState('');
@@ -61,7 +62,7 @@ function ImageNotes({ value, onSave }: { value: ImageMetadata; onSave: (value: I
 
 export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench; onDraftChange: (dirty: boolean) => void }) {
   const data = workbench.data!; const [selected, setSelected] = useState(''); const [source, setSource] = useState('current'); const [name, setName] = useState('新しい比較');
-  const [editing, setEditing] = useState(false); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false); const [capacity, setCapacity] = useState('容量情報は未取得です');
+  const [editing, setEditing] = useState(false); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
   const experiment = data.experiments.find(item => item.id === selected) ?? data.experiments[0];
   const sourcePreset = data.presets.find(item => item.id === source);
   const sourceWorkspace = source === 'current' ? data.workspaces.find(item => item.id === data.settings.activeWorkspaceId) : sourcePreset?.workspaceSnapshot;
@@ -123,11 +124,6 @@ export function Comparisons({ workbench, onDraftChange }: { workbench: Workbench
       </section>
     </>}
     {busy && <p role="status">画像を検証・取り込み中…</p>}
-    <details className="panel"><summary><h3>画像ライブラリ ({data.images.length})</h3></summary><div className="stack"><InfoTip label="画像ライブラリ">取り込んだPNGの原本とサムネイルをこの端末に保存します。JSONバックアップには画像を含まないため、画像も残すには「設定」の完全バックアップを使用してください。削除した画像のデータは「元に戻す」のために残り、「参照されない画像バイナリを解放」で整理できます。</InfoTip><p className="hint">登録画像の原本合計 {(data.images.reduce((sum, image) => sum + image.byteLength, 0) / 1048576).toFixed(2)} MiB / {capacity}</p>
-      <button type="button" onClick={() => { if (!navigator.storage?.estimate) { setCapacity('この環境は容量取得に非対応です'); return; } void navigator.storage.estimate().then(value => setCapacity(`ブラウザ使用 ${(Number(value.usage ?? 0) / 1048576).toFixed(1)} MiB / 割当 ${value.quota === undefined ? '不明' : (value.quota / 1048576).toFixed(1) + ' MiB'}（概算）`)).catch(cause => workbench.setError(message(cause))); }}>ストレージ容量を確認</button>
-      {data.images.slice(0, 50).map(image => <article key={image.id} className="member"><Thumbnail workbench={workbench} image={image} /><p>{image.name}</p><button type="button" onClick={() => { void workbench.imageBlob(image.id).then(blob => { if (!blob) throw new Error('画像原本が欠落しています'); downloadBlob(blob, image.name); }).catch(cause => workbench.setError(message(cause))); }}>画像原本を保存</button><button type="button" onClick={() => { if (confirm('画像メタデータと全比較の関連付けを削除しますか？Undo用の原本は保持します。')) workbench.commit(previous => ({ ...previous, images: previous.images.filter(item => item.id !== image.id), ...(previous.lab ? { lab: { ...previous.lab, experiments: previous.lab.experiments.map(e => ({ ...e, conditions: e.conditions.map(c => c.imageId === image.id ? { ...c, imageId: null, status: 'pending' as const } : c) })) } } : {}), experiments: previous.experiments.map(item => ({ ...item, variantA: item.variantA.imageId === image.id ? { ...item.variantA, imageId: null } : item.variantA, variantB: item.variantB.imageId === image.id ? { ...item.variantB, imageId: null } : item.variantB })) })); }}>登録画像を削除</button></article>)}
-      {data.images.length > 50 && <p>先頭50件を表示。全件はスロットの選択欄から選べます。</p>}
-      <button type="button" disabled={workbench.saving || busy} onClick={() => { void workbench.purgeImages().then(removed => setNotice(`現在の資産・元に戻す履歴・取込前バックアップから参照されない画像${removed}件を解放しました。`)).catch(cause => workbench.setError(message(cause))); }}>参照されない画像バイナリを解放</button>
-    </div></details>
+    <ImageLibrary workbench={workbench} busy={busy} onNotice={setNotice} />
   </div>;
 }

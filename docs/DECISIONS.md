@@ -159,3 +159,9 @@ P0/P1検証日: 2026-11-03（ユーザーのAsia/Tokyo日付）。Linux上のブ
 | ID | 決定 | 理由 | 保留点 |
 |---|---|---|---|
 | ADR-099 | 依存関係の監査（`pnpm audit`）・PRの依存関係レビュー（`actions/dependency-review-action`、moderate以上・ライセンス許可リスト）・Gitleaksによる全履歴の秘密情報の検査・CodeQL（`javascript-typescript` と `actions`）を、`ci.yml` とは別の `security.yml` で週1回・手動・`main` へのPRとpushに実行する。トークンは `contents: read`、CodeQLのジョブだけ `security-events: write`。実行時依存の勧告は常に失敗、開発用依存の勧告はPR・pushでは警告で週1回・手動の実行だけ失敗。GitleaksはActionではなく、版とSHA-256をワークフローに固定したリリースのバイナリを使い、checksumsファイルとも照合して `--redact=100` で実行する | 手動の確認（2026-11-21）だけでは、勧告の新規公開や今後のコミットに気づけない（issue #34）。`release.yml` が再利用する `ci.yml` に入れるとリリースが遅くなり、配布物に無関係な勧告でリリースやPRが止まる。開発用ツールの勧告は依存を変えなくても公開されるため、PRを止めず定期実行で必ず目に入るようにし、新たに持ち込む脆弱な依存はDependency reviewが止める。Gitleaksの公式Actionは組織のリポジトリでライセンスキーを要するなど条件があるため、シークレットや書込み権限を使わず、取得したバイナリを自分で照合できる構成にした。手順は `docs/security.md` | GitHub上での初回実行は未確認（依存関係グラフのpnpm対応、CodeQLの結果表示、forkからのPRでの結果アップロード）。Gitleaksの版はDependabotの対象外で手動更新。CodeQLの「Default setup」とは併用できない。リリース前の確認は手動（チェックリスト） |
+
+## 画像ライブラリ（2026-11-22）
+
+| ID | 決定 | 理由 | 保留点 |
+|---|---|---|---|
+| ADR-100 | 画像ライブラリは全件を対象に検索・並べ替え・24件ずつのページ送りで表示し、削除・使用先の計算を `src/core/images.ts` の純粋関数にする。比較画面から `ImageLibrary` を分離 | 先頭50件で打ち切られ、51件目以降を個別に管理できなかった（issue #21）。仮想スクロールより単純で、キーボード・読み上げでも扱いやすい。比較画面の肥大化の解消（issue #23）も兼ねる | 一括取込・分類はissue #28 |
