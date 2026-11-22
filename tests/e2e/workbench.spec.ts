@@ -317,7 +317,7 @@ test('detail texts stay hidden until hover, focus or tap, and stay inside the na
   await help.click();
   await page.mouse.move(0, 0);
   await expect(tip).toBeVisible();
-  await page.getByRole('heading', { name: 'NovelAI Prompt Workbench', exact: true }).click();
+  await page.getByRole('heading', { name: 'Spellbinder for NovelAI', exact: true }).click();
   await expect(tip).toBeHidden();
 });
 

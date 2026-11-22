@@ -1,5 +1,7 @@
 # データモデル / 永続化フォーマット（v3 / P4画像・A/B）
 
+> **名前と内部識別子**: 製品名は「Spellbinder for NovelAI」（0.2.0までは「NovelAI Prompt Workbench」）。保存データと互換性に関わる識別子は**旧名のまま変更しません**: IndexedDB名 `nai-prompt-workbench`、JSONの `format: 'nai-prompt-workbench'`、完全バックアップ `nai-prompt-workbench-full-backup`、暗号化 `nai-prompt-workbench-encrypted-backup`（先頭 `NAIWBENC`、拡張子 `.nwbenc`）、シャッフル `nai-prompt-workbench-shuffle`、未保存の退避 `nai-prompt-workbench:unsaved:`、画面のロック `nai-prompt-workbench:window:`、サイトとのプロトコル `nai-prompt-workbench/site-v1`、PNGテキストのキー `nai-prompt-workbench`。変えると既存のデータ・バックアップが読めなくなるためです。変わったのは表示名とダウンロードするファイルの名前（`spellbinder-…`）だけです。
+
 **実装の正本は `src/core/types.ts` に置き、この文書と同期する。** 日付はISO 8601文字列、IDはUUID、Seedは整数へ丸めず文字列保存。
 
 ```ts

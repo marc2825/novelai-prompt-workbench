@@ -1,6 +1,6 @@
 # ロードマップ
 
-NovelAI Prompt Workbench の方向性と、完了したこと・予定・保留を分けて記録します。**予定は確約ではありません。** 現在の状態と既知の制限は [tasks/STATUS.md](tasks/STATUS.md)、変更の履歴は [CHANGELOG.md](CHANGELOG.md) を参照してください。
+Spellbinder for NovelAI（旧名 NovelAI Prompt Workbench）の方向性と、完了したこと・予定・保留を分けて記録します。**予定は確約ではありません。** 現在の状態と既知の制限は [tasks/STATUS.md](tasks/STATUS.md)、変更の履歴は [CHANGELOG.md](CHANGELOG.md) を参照してください。
 
 ## 方向性
 

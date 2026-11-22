@@ -20,7 +20,7 @@ export function UnsavedRecovery({ workbench, onDone }: { workbench: Workbench; o
         if (!confirm(`${newer ? '現在保存されている内容を、' : ''}前回の画面の未保存の変更で置き換えますか？「元に戻す」で戻せます。${missing ? `\n画像${missing}件は原本がないため欠落として表示されます。` : ''}`)) return;
         if (workbench.restoreUnsaved(item.key)) onDone('前回の未保存の変更を復元しました。「元に戻す」で復元前に戻せます。');
       }}>未保存の変更を復元</button>
-      <button type="button" onClick={() => { try { downloadText(exportBackup(journal.data, now()), 'nai-prompt-workbench-unsaved.json'); } catch (error) { workbench.setError(message(error)); } }}>未保存の変更をJSONで保存</button>
+      <button type="button" onClick={() => { try { downloadText(exportBackup(journal.data, now()), 'spellbinder-unsaved.json'); } catch (error) { workbench.setError(message(error)); } }}>未保存の変更をJSONで保存</button>
       <button type="button" className="danger" onClick={() => { if (confirm('前回の画面の未保存の変更を破棄しますか？元に戻せません。')) { workbench.discardUnsaved(item.key); onDone('前回の未保存の変更を破棄しました。'); } }}>未保存の変更を破棄</button>
     </div>
   </section>;

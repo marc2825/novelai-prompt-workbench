@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         **公開されます。** 個人的なプロンプト、生成画像、ログイン情報・Cookie・トークン、個人情報を貼らないでください。必要ならダミーの文字列に置き換えてください。
-        脆弱性は[非公開の報告](https://github.com/marc2825/novelai-prompt-workbench/security/advisories/new)を使ってください。
+        脆弱性は[非公開の報告](https://github.com/marc2825/spellbinder-for-novelai/security/advisories/new)を使ってください。
   - type: textarea
     id: what
     attributes:

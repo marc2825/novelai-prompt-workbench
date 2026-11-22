@@ -57,10 +57,10 @@ jobs:
         id: meta
         run: |
           version=$(node -p "require('./package.json').version")
-          digest=$(cut -d' ' -f1 ".output/novelai-prompt-workbench-${version}-chrome.zip.sha256")
+          digest=$(cut -d' ' -f1 ".output/spellbinder-for-novelai-${version}-chrome.zip.sha256")
           # upload-artifact skips dot-directories such as .output, so stage the files elsewhere.
           mkdir release-files
-          cp ".output/novelai-prompt-workbench-${version}-chrome.zip" ".output/novelai-prompt-workbench-${version}-chrome.zip.sha256" release-files/
+          cp ".output/spellbinder-for-novelai-${version}-chrome.zip" ".output/spellbinder-for-novelai-${version}-chrome.zip.sha256" release-files/
           node scripts/release-notes.mjs "$version" "$digest" > release-files/release-notes.md
           echo "version=$version" >> "$GITHUB_OUTPUT"
           case "$version" in 0.*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
@@ -94,8 +94,8 @@ jobs:
         run: |
           cd release
           [ "v$VERSION" = "$TAG" ] || { echo "::error::version $VERSION does not match tag $TAG"; exit 1; }
-          sha256sum --check "novelai-prompt-workbench-${VERSION}-chrome.zip.sha256"
+          sha256sum --check "spellbinder-for-novelai-${VERSION}-chrome.zip.sha256"
           flags=""
           if [ "$PRERELEASE" = "true" ]; then flags="--prerelease"; fi
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "v$VERSION" --notes-file release-notes.md $flags \
-            "novelai-prompt-workbench-${VERSION}-chrome.zip" "novelai-prompt-workbench-${VERSION}-chrome.zip.sha256"
+            "spellbinder-for-novelai-${VERSION}-chrome.zip" "spellbinder-for-novelai-${VERSION}-chrome.zip.sha256"

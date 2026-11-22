@@ -9,7 +9,7 @@ export interface DiagnosticRead { channel: 'positive' | 'negative'; length: numb
 
 export function siteDiagnostics(input: { appVersion: string; at: string; browser: string; uiLanguage: string; sites: readonly DiagnosticSite[]; reads: readonly DiagnosticRead[] }): string {
   const lines = [
-    '## NovelAI Prompt Workbench 実サイト確認の診断情報',
+    '## Spellbinder for NovelAI 実サイト確認の診断情報',
     `- アプリの版: ${input.appVersion}`,
     `- 日時: ${input.at}`,
     `- ブラウザ: ${input.browser || '不明'}`,

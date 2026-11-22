@@ -9,8 +9,8 @@
 ## ソースからビルドして使う
 
 ```bash
-git clone https://github.com/marc2825/novelai-prompt-workbench.git
-cd novelai-prompt-workbench
+git clone https://github.com/marc2825/spellbinder-for-novelai.git
+cd spellbinder-for-novelai
 corepack pnpm install --frozen-lockfile
 corepack pnpm build
 ```
@@ -25,7 +25,7 @@ corepack pnpm test        # Vitest（単体・統合、tests/unit）
 corepack pnpm typecheck   # tsc --noEmit（strict）
 corepack pnpm build       # WXT → .output/chrome-mv3
 corepack pnpm test:e2e    # Playwright（tests/e2e）。buildの成果物を読むため必ずbuild後に実行
-corepack pnpm zip         # 配布用ZIP → .output/novelai-prompt-workbench-<version>-chrome.zip
+corepack pnpm zip         # 配布用ZIP → .output/spellbinder-for-novelai-<version>-chrome.zip
 corepack pnpm fixture     # 手動確認用のVite開発サーバ http://127.0.0.1:4173
 corepack pnpm bench:chromium  # 実Chromiumでの性能計測（任意。下記「性能の目安」）
 ```

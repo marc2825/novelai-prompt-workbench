@@ -33,7 +33,7 @@ test('complete backup restores text, comparisons, shuffle and original PNGs into
   const download = page.waitForEvent('download');
   await button(page, '完全バックアップをZIPで保存').click();
   const zip = await download;
-  expect(zip.suggestedFilename()).toMatch(/^nai-prompt-workbench-backup-\d{8}-\d{6}Z\.zip$/);
+  expect(zip.suggestedFilename()).toMatch(/^spellbinder-backup-\d{8}-\d{6}Z\.zip$/);
   const zipPath = (await zip.path())!;
   await expect(page.getByLabel('完全バックアップ', { exact: true }).getByRole('status').last()).toContainText('画像原本2件');
 
@@ -106,7 +106,7 @@ test('a password-encrypted complete backup restores only with the right password
   const download = page.waitForEvent('download');
   await button(page, '暗号化して完全バックアップを保存').click();
   const file = await download;
-  expect(file.suggestedFilename()).toMatch(/^nai-prompt-workbench-backup-\d{8}-\d{6}Z-encrypted\.nwbenc$/);
+  expect(file.suggestedFilename()).toMatch(/^spellbinder-backup-\d{8}-\d{6}Z-encrypted\.nwbenc$/);
   const path = (await file.path())!;
   const bytes = await readFile(path);
   expect(bytes.subarray(0, 8).toString('latin1')).toBe('NAIWBENC');

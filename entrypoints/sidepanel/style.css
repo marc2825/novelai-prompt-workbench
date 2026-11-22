@@ -226,3 +226,4 @@ progress { width: 100%; accent-color: var(--accent); }
 .tag-diff { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; overflow-wrap: anywhere; }
 .tag-diff .added { color: var(--success); }
 .tag-diff .removed { color: var(--danger); }
+.app-subtitle { font-weight: 400; font-size: 0.75em; color: var(--muted); }

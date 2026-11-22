@@ -4,7 +4,7 @@
 
 脆弱性は **公開のIssue・Pull Request・Discussionに書かないでください。** GitHubの非公開の脆弱性報告を使ってください。
 
-- [Report a vulnerability（新しい非公開の報告を作成）](https://github.com/marc2825/novelai-prompt-workbench/security/advisories/new)
+- [Report a vulnerability（新しい非公開の報告を作成）](https://github.com/marc2825/spellbinder-for-novelai/security/advisories/new)
 - 画面からは: リポジトリの **Security** タブ → **Report a vulnerability**
 
 報告に含めてほしいもの: 影響する機能、再現手順、想定される影響、確認したバージョンまたはコミット（`chrome://extensions` の詳細画面のバージョン、または `main` のコミット）。
@@ -24,7 +24,7 @@ NovelAIのサービス自体の脆弱性は、NovelAIに報告してください
 
 | バージョン | 対応 |
 |---|---|
-| 最新の [GitHub Release](https://github.com/marc2825/novelai-prompt-workbench/releases)（0.2.0 ベータ）と `main` ブランチ | 修正対象 |
+| 最新の [GitHub Release](https://github.com/marc2825/spellbinder-for-novelai/releases)（0.2.0 ベータ）と `main` ブランチ | 修正対象 |
 | それより前のリリース・過去のコミット | 対象外（最新のリリースに更新してください） |
 
 安全性の設計（権限、メッセージ検証、取込データの扱い）は [docs/security.md](docs/security.md) を参照してください。

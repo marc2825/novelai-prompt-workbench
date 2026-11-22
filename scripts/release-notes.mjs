@@ -12,7 +12,7 @@ const [version, digest] = process.argv.slice(2);
 if (!/^\d+\.\d+\.\d+$/.test(version ?? '')) { console.error('usage: node scripts/release-notes.mjs X.Y.Z [sha256]'); process.exit(1); }
 const section = changelogSection(readFileSync(`${root}CHANGELOG.md`, 'utf8'), version);
 if (!section) { console.error(`✖ CHANGELOG.md has no "## [${version}]" section`); process.exit(1); }
-const repository = 'https://github.com/marc2825/novelai-prompt-workbench';
+const repository = 'https://github.com/marc2825/spellbinder-for-novelai';
 process.stdout.write(`> **非公式ツールです。** NovelAI（Anlatan Inc.）とは提携していません。NovelAIの利用規約を守ってご利用ください。${isPrerelease(version) ? '\n> v0.x はベータ版（Pre-release）です。' : ''}
 
 ## インストール・更新

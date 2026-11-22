@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
-export const zipName = version => `novelai-prompt-workbench-${version}-chrome.zip`;
+export const zipName = version => `spellbinder-for-novelai-${version}-chrome.zip`;
 
 /** Files a release may contain. Anything else (source maps, tests, fixtures, dotfiles) fails verification. */
 export const ALLOWED_FILE = /^(manifest\.json|sidepanel\.html|background\.js|LICENSE\.txt|THIRD_PARTY_NOTICES\.txt|icon\/(16|32|48|128)\.png|chunks\/[\w-]+\.js|content-scripts\/novelai\.js|assets\/[\w-]+\.css)$/;

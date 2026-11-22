@@ -1,6 +1,6 @@
 ---
 name: workbench-data-safety
-description: Use when changing how NovelAI Prompt Workbench stores, validates, migrates, imports, exports, backs up or restores data — IndexedDB repository/schema, validateData, JSON backup, complete backup ZIP (manifest, images), Lab export, image binaries, undo/save queue (useWorkbench), or anything that could lose or overwrite user data.
+description: Use when changing how Spellbinder for NovelAI (formerly NovelAI Prompt Workbench) stores, validates, migrates, imports, exports, backs up or restores data — IndexedDB repository/schema, validateData, JSON backup, complete backup ZIP (manifest, images), Lab export, image binaries, undo/save queue (useWorkbench), or anything that could lose or overwrite user data.
 ---
 
 # Workbench data safety

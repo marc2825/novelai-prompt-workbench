@@ -1,6 +1,6 @@
 # プライバシーポリシー
 
-対象: Chrome拡張機能「NovelAI Prompt Workbench (unofficial)」（GitHub Releasesで配布するZIPと、このリポジトリのソースコードからビルドしたもの）
+対象: Chrome拡張機能「Spellbinder for NovelAI (unofficial)」（0.2.0以前の名前は「NovelAI Prompt Workbench (unofficial)」）（GitHub Releasesで配布するZIPと、このリポジトリのソースコードからビルドしたもの）
 最終更新: 2026-11-22
 
 この拡張機能は、NovelAI（Anlatan Inc.）とは提携していない非公式のツールです。NovelAIのサービスの利用には、NovelAIの利用規約・プライバシーポリシーが適用されます。この方針や拡張機能の機能とNovelAIの利用規約が食い違う場合は、NovelAIの利用規約が優先されます。
@@ -60,4 +60,4 @@ PNGのテキスト情報は文字列として保存・表示するだけで、�
 
 ## 9. 問い合わせ
 
-このリポジトリの [Issues](https://github.com/marc2825/novelai-prompt-workbench/issues) から問い合わせてください（公開されるため、個人情報は書かないでください）。セキュリティに関する報告は [SECURITY.md](SECURITY.md) の非公開の窓口を使ってください。
+このリポジトリの [Issues](https://github.com/marc2825/spellbinder-for-novelai/issues) から問い合わせてください（公開されるため、個人情報は書かないでください）。セキュリティに関する報告は [SECURITY.md](SECURITY.md) の非公開の窓口を使ってください。

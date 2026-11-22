@@ -17,7 +17,7 @@ Undo履歴・サイト連携の一時情報（反映前原文・確認チケッ�
 無圧縮（stored）のZIP32、最大2GiB。
 
 ```text
-nai-prompt-workbench-backup-YYYYMMDD-HHMMSSZ.zip
+spellbinder-backup-YYYYMMDD-HHMMSSZ.zip（0.2.0までは nai-prompt-workbench-backup-…）
 ├── manifest.json            形式・版・件数・全ファイルのサイズとSHA-256
 ├── data.json                通常のJSONバックアップ（単独でもJSONインポート可能）
 ├── images/<image-id>.png    画像原本（SHA-256 = ImageRecord.hash）
@@ -52,7 +52,7 @@ nai-prompt-workbench-backup-YYYYMMDD-HHMMSSZ.zip
 
 人に渡す・クラウドに置く場合は、完全バックアップで「パスワードで暗号化する」を選びます。
 
-- 形式: `nai-prompt-workbench-backup-YYYYMMDD-HHMMSSZ-encrypted.nwbenc`。先頭8バイト `NAIWBENC`、ヘッダ長（uint32 BE）、ヘッダJSON（`format: "nai-prompt-workbench-encrypted-backup"`, `version: 1`, `contents: "full-backup-zip"`, `kdf {PBKDF2, SHA-256, iterations, salt}`, `cipher {AES-GCM, 256, chunkBytes, noncePrefix}`, `plaintextBytes`）、続いて暗号化した完全バックアップZIPのチャンク。
+- 形式: `spellbinder-backup-YYYYMMDD-HHMMSSZ-encrypted.nwbenc`。先頭8バイト `NAIWBENC`、ヘッダ長（uint32 BE）、ヘッダJSON（`format: "nai-prompt-workbench-encrypted-backup"`, `version: 1`, `contents: "full-backup-zip"`, `kdf {PBKDF2, SHA-256, iterations, salt}`, `cipher {AES-GCM, 256, chunkBytes, noncePrefix}`, `plaintextBytes`）、続いて暗号化した完全バックアップZIPのチャンク。
 - 鍵: パスワード（NFC正規化）から PBKDF2-HMAC-SHA-256（既定60万回、ランダムな16バイトのsalt）で AES-256 の鍵を作ります。ブラウザ標準のWeb Cryptoだけを使い、独自の暗号は使いません。
 - 暗号化: ZIPを4MiBずつ AES-256-GCM で暗号化します（2GiBまでのファイルを一度にメモリに載せないため）。各チャンクのnonceは「ランダムな7バイト＋チャンク番号＋最後のチャンクか」で、ヘッダ全体を追加認証データにします。誤ったパスワード・ヘッダや途中のデータの改変・切り詰め・追加・チャンクの入れ替えはすべて検出し、何も書き込みません。
 - 読込時の検証: ヘッダの形式・版・反復回数（10万〜1000万回）・チャンクサイズ・元のサイズとファイルサイズの一致を、鍵を作る前に確認します。復号した後は通常の完全バックアップと同じ検証を行います。

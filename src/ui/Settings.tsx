@@ -23,7 +23,7 @@ export function Settings({ workbench }: { workbench: Workbench }) {
   return <div className="stack">
     <FullBackup workbench={workbench} />
     <section className="panel stack" aria-label="JSONバックアップ"><div className="section-title"><h2>JSONバックアップ（テキストのみ）</h2><InfoTip label="JSONバックアップ">ライブラリ・カテゴリ・ワークスペース・プリセット・比較セッション・Experiment Lab・シャッフル設定・タグ辞書・画像メタデータ・設定をJSONに保存します。画像原本・サムネイルは含みません（画像も残すなら完全バックアップを使用）。復元後に欠けた画像は比較画面に表示され、同じPNGを再取込すると修復できます。保存エラーのときも、この書出しで画面上の作業データを退避できます。JSONは暗号化されず、プロンプトがそのまま入ります（暗号化が必要なら完全バックアップを使用）。</InfoTip></div><p className="hint">画像原本を含まない軽いバックアップです。</p>
-      <button type="button" onClick={() => { try { downloadText(exportBackup(data, now()), 'nai-prompt-workbench.json'); } catch (error) { workbench.setError(message(error)); } }}>JSONをエクスポート</button>
+      <button type="button" onClick={() => { try { downloadText(exportBackup(data, now()), 'spellbinder.json'); } catch (error) { workbench.setError(message(error)); } }}>JSONをエクスポート</button>
       <label>JSONをインポート<input type="file" accept=".json,application/json" disabled={busy} onChange={event => {
         const file = event.target.files?.[0];
         event.target.value = '';
