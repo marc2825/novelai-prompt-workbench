@@ -210,6 +210,7 @@ export function validateData(input: unknown): WorkbenchData {
     if (Object.keys(texts).length > 128 || JSON.stringify(texts).length > 524_288) fail('metadata.texts', '大きすぎるメタデータです');
     for (const [key, value] of Object.entries(texts)) { string(key, 'metadata.key', 79); string(value, 'metadata.value', 262_144); }
     array(meta.warnings, 'metadata.warnings', 128).forEach(value => string(value, 'metadata.warning', 1000));
+    if (meta.novelai !== undefined) validateNovelAIInfo(meta.novelai, texts);
   }
   for (const item of experiments) {
     const experiment = object(item, 'experiment'); register(experiment.id, 'experiment.id'); title(experiment.name, 'experiment.name');
@@ -287,4 +288,22 @@ export function validateGenerationSettings(input: unknown): asserts input is imp
     if (value !== null && !['string', 'number', 'boolean'].includes(typeof value)) fail('extra', '追加設定はプリミティブ値のみです');
     if (typeof value === 'string') string(value, 'extra.value', 10_000);
   }
+}
+/** `ImageMetadata.novelai`: official container flags plus the stealth payload as a bounded string dictionary. */
+export function validateNovelAIInfo(input: unknown, texts: Readonly<Record<string, unknown>>): asserts input is import('../core/types').NovelAIImageInfo {
+  const info = object(input, 'metadata.novelai');
+  const sources = array(info.sources, 'novelai.sources', 2);
+  if (!sources.length || new Set(sources).size !== sources.length) fail('novelai.sources', '取得元は1件または2件（重複なし）です');
+  sources.forEach(source => oneOf(source, ['text', 'stealth'], 'novelai.sources'));
+  oneOf(info.agreement, ['single', 'match', 'mismatch'], 'novelai.agreement');
+  if ((sources.length === 1) !== (info.agreement === 'single')) fail('novelai.agreement', '取得元の数と一致状態が矛盾しています');
+  if (sources.includes('text') && !Object.hasOwn(texts, 'Comment')) fail('novelai.sources', 'PNGテキストのCommentがありません');
+  if (info.stealth !== null) {
+    const stealth = object(info.stealth, 'novelai.stealth');
+    const keys = Object.keys(stealth);
+    if (keys.length > 128 || JSON.stringify(stealth).length > 524_288) fail('novelai.stealth', '大きすぎるメタデータです');
+    for (const key of keys) { string(key, 'novelai.stealth.key', 79); if (!key) fail('novelai.stealth.key', '空のキーは使用できません'); string(stealth[key], 'novelai.stealth.value', 262_144); }
+  }
+  if (!sources.includes('stealth') && info.stealth !== null) fail('novelai.stealth', 'アルファチャンネルの取得元がありません');
+  if (info.stealth === null && sources.includes('stealth') && info.agreement !== 'match') fail('novelai.stealth', 'アルファチャンネルの内容がありません');
 }
