@@ -16,7 +16,7 @@
 | サイトとの読取り | 実装（観測済みの単純なProseMirrorのみ、英語・日本語） | 英語は公開ページで確認（2026-11-03）。日本語は実ページの構造報告（issue #4）を模擬ページで再現して検証。ログイン後の英語UI・修正後の日本語UIは**未確認**（手順は [REAL_SITE_CHECK.md](../docs/REAL_SITE_CHECK.md)） |
 | サイトへの書込み | fixtureのみ | **未検証・無効** |
 | サイドパネル起動 | ツールバーボタンで開く | 設定値をWindows・macOS・LinuxのChromiumで自動確認。実ボタンのクリックは手動確認待ち |
-| GitHub Releases配布 | タグのpushで自動公開。リリースZIPのインストール・同じフォルダへの更新・公開版からの更新を Windows・macOS・Linux で自動確認 | v0.1.0 を Pre-release として公開済み（2026-11-21） |
+| GitHub Releases配布 | タグのpushで自動公開。リリースZIPのインストール・同じフォルダへの更新・公開版からの更新を Windows・macOS・Linux で自動確認 | v0.2.0 を Pre-release として公開済み（2026-11-22、[Release](https://github.com/marc2825/novelai-prompt-workbench/releases/tag/v0.2.0)、SHA-256 `39fd5a0d…03d3` はローカルのビルドと同一）。v0.1.0（2026-11-21） |
 | UI（4つの領域・広いタブの2列表示・ホバー説明） | 実装・自動テスト済み（400px・1280px幅のスクリーンショットで目視確認） | Google Chrome・高DPIでの目視は未実施 |
 
 ## 検証結果（最新）
