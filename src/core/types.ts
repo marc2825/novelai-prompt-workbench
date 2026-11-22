@@ -194,4 +194,11 @@ export interface ImageRecord {
   thumbnailBytes: number;
   createdAt: string;
   metadata: ImageMetadata;
+  /** Review of the result (issue #28). Optional; absent means not reviewed. */
+  review?: ImageReview;
+  /** User tags for sorting results (not prompt tags). */
+  tags?: string[];
+  note?: string;
 }
+
+export type ImageReview = 'adopted' | 'pending' | 'rejected';

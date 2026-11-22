@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createExperiment, unknownSettings } from '../../src/core/experiments';
-import { imageLabel, imageUsage, pageOf, removeImage, searchImages } from '../../src/core/images';
+import { imageLabel, imageTags, imageUsage, pageOf, parseImageTags, removeImage, searchImages, updateImageInfo } from '../../src/core/images';
 import type { ImageRecord, WorkbenchData } from '../../src/core/types';
 import { validateData } from '../../src/data/validation';
 import { fixture, timestamp } from './helpers';
@@ -44,5 +44,38 @@ describe('image library (issue #21)', () => {
     expect(removed.experiments[0]!.variantB.imageId).toBe(id(2));
     expect(imageLabel(withImages.images[0]!, withImages.images)).not.toBe(imageLabel(withImages.images[1]!, withImages.images));
     expect(imageLabel(removed.images[0]!, removed.images)).toBe('image-1.png');
+  });
+});
+
+describe('image review, tags and notes (issue #28)', () => {
+  const base = () => validateData({ ...fixture(), images: [image(1), image(2, { name: 'b.png' }), image(3, { name: 'c.png' })] });
+  it('sets and clears review, tags and note as optional fields that survive validation and backups', () => {
+    let data = validateData(updateImageInfo(base(), id(1), { review: 'adopted', tags: parseImageTags('夜景, 候補、夜景'), note: '背景がよい' }));
+    expect(data.images[0]).toMatchObject({ review: 'adopted', tags: ['夜景', '候補'], note: '背景がよい' });
+    data = validateData(updateImageInfo(data, id(1), { review: null, tags: [], note: '' }));
+    expect(Object.keys(data.images[0]!)).not.toEqual(expect.arrayContaining(['review']));
+    expect(data.images[0]!.tags).toBeUndefined(); expect(data.images[0]!.note).toBeUndefined();
+    expect(() => parseImageTags('x'.repeat(51))).toThrow('50文字');
+    expect(() => parseImageTags(Array.from({ length: 21 }, (_, n) => `t${n}`).join(','))).toThrow('20個');
+  });
+  it('filters by review (including not reviewed) and tag, and searches tags and notes', () => {
+    let data = base();
+    data = updateImageInfo(data, id(1), { review: 'adopted', tags: ['夜景'] });
+    data = updateImageInfo(data, id(2), { review: 'rejected', note: 'ノイズが多い' });
+    const usage = new Map<string, string[]>();
+    expect(searchImages(data.images, '', usage, 'name', { review: 'adopted' }).map(item => item.id)).toEqual([id(1)]);
+    expect(searchImages(data.images, '', usage, 'name', { review: 'none' }).map(item => item.id)).toEqual([id(3)]);
+    expect(searchImages(data.images, '', usage, 'name', { tag: '夜景' }).map(item => item.id)).toEqual([id(1)]);
+    expect(searchImages(data.images, 'ノイズ', usage).map(item => item.id)).toEqual([id(2)]);
+    expect(imageTags(data.images)).toEqual(['夜景']);
+  });
+  it('rejects invalid review values, duplicate or blank tags and over-long notes', () => {
+    const data = base();
+    const withImage = (extra: object) => ({ ...data, images: [{ ...data.images[0]!, ...extra }] });
+    expect(() => validateData(withImage({ review: 'maybe' }))).toThrow('image.review');
+    expect(() => validateData(withImage({ tags: ['a', 'a'] }))).toThrow('重複');
+    expect(() => validateData(withImage({ tags: [' a'] }))).toThrow('空白');
+    expect(() => validateData(withImage({ tags: Array.from({ length: 21 }, (_, n) => `t${n}`) }))).toThrow('最大20件');
+    expect(() => validateData(withImage({ note: 'x'.repeat(2001) }))).toThrow('image.note');
   });
 });

@@ -28,6 +28,7 @@ export function serializeDocument(document: unknown): string {
 }
 export const MAX_RECORDS = 10_000;
 export const MAX_DEPTH = 32;
+export const MAX_IMAGE_TAGS = 20;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 
@@ -228,6 +229,13 @@ export function validateData(input: unknown): WorkbenchData {
     if (Object.keys(texts).length > 128 || JSON.stringify(texts).length > 524_288) fail('metadata.texts', '大きすぎるメタデータです');
     for (const [key, value] of Object.entries(texts)) { string(key, 'metadata.key', 79); string(value, 'metadata.value', 262_144); }
     array(meta.warnings, 'metadata.warnings', 128).forEach(value => string(value, 'metadata.warning', 1000));
+    if (image.review !== undefined) oneOf(image.review, ['adopted', 'pending', 'rejected'], 'image.review');
+    if (image.tags !== undefined) {
+      const tags = array(image.tags, 'image.tags', MAX_IMAGE_TAGS);
+      for (const tag of tags) { string(tag, 'image.tags', 50); if (!(tag as string).trim() || (tag as string) !== (tag as string).trim()) fail('image.tags', '空のタグ・前後の空白は使用できません'); }
+      if (new Set(tags).size !== tags.length) fail('image.tags', 'タグが重複しています');
+    }
+    if (image.note !== undefined) string(image.note, 'image.note', 2000);
     if (meta.novelai !== undefined) validateNovelAIInfo(meta.novelai, texts);
   }
   for (const item of experiments) {

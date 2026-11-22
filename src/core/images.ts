@@ -1,4 +1,4 @@
-import type { ImageRecord, WorkbenchData } from './types';
+import type { ImageRecord, ImageReview, WorkbenchData } from './types';
 
 // Pure helpers for the image library (issue #21): search, sort, paging, usage,
 // and removing an image asset together with every reference to it.
@@ -17,13 +17,44 @@ export function imageUsage(data: WorkbenchData): Map<string, string[]> {
 
 const fold = (value: string) => value.normalize('NFKC').toLowerCase();
 
+export const IMAGE_REVIEWS: Record<ImageReview, string> = { adopted: '採用', pending: '保留', rejected: '不採用' };
+export type ReviewFilter = 'all' | 'none' | ImageReview;
+export interface ImageFilter { review?: ReviewFilter; tag?: string }
+
+/** Every user tag on images, sorted, for the tag filter. */
+export function imageTags(images: readonly ImageRecord[]): string[] { return [...new Set(images.flatMap(image => image.tags ?? []))].sort((a, b) => a.localeCompare(b, 'ja')); }
+
+/** Parses a comma / 、 separated tag list: trimmed, de-duplicated, at most `max` tags of 50 characters. */
+export function parseImageTags(input: string, max = 20): string[] {
+  const tags = [...new Set(input.split(/[,、\n]/).map(tag => tag.trim()).filter(Boolean))];
+  if (tags.some(tag => tag.length > 50)) throw new Error('タグは50文字以内にしてください');
+  if (tags.length > max) throw new Error(`タグは${max}個までです`);
+  return tags;
+}
+
+/** Sets review / tags / note of one image; empty values remove the optional fields. */
+export function updateImageInfo(data: WorkbenchData, imageId: string, change: { review?: ImageReview | null; tags?: string[]; note?: string }): WorkbenchData {
+  return { ...data, images: data.images.map(image => {
+    if (image.id !== imageId) return image;
+    const { review: _review, tags: _tags, note: _note, ...rest } = image;
+    const review = change.review === undefined ? image.review : change.review ?? undefined;
+    const tags = change.tags === undefined ? image.tags : change.tags;
+    const note = change.note === undefined ? image.note : change.note;
+    return { ...rest, ...(review ? { review } : {}), ...(tags?.length ? { tags } : {}), ...(note ? { note } : {}) };
+  }) };
+}
+
 /** Case/width-insensitive search over the file name, SHA-256 prefix, prompt notes and where the image is used. */
-export function searchImages(images: readonly ImageRecord[], query: string, usage: ReadonlyMap<string, readonly string[]> = new Map(), sort: ImageSort = 'newest'): ImageRecord[] {
+export function searchImages(images: readonly ImageRecord[], query: string, usage: ReadonlyMap<string, readonly string[]> = new Map(), sort: ImageSort = 'newest', filter: ImageFilter = {}): ImageRecord[] {
   const terms = fold(query).split(/\s+/).filter(Boolean);
-  const matches = terms.length ? images.filter(image => {
-    const text = fold([image.name, image.metadata.positive ?? '', image.metadata.negative ?? '', ...(usage.get(image.id) ?? [])].join('\n'));
+  const review = filter.review ?? 'all';
+  const matches = images.filter(image => {
+    if (review !== 'all' && (review === 'none' ? !!image.review : image.review !== review)) return false;
+    if (filter.tag && !(image.tags ?? []).includes(filter.tag)) return false;
+    if (!terms.length) return true;
+    const text = fold([image.name, image.metadata.positive ?? '', image.metadata.negative ?? '', image.note ?? '', ...(image.tags ?? []), ...(usage.get(image.id) ?? [])].join('\n'));
     return terms.every(term => text.includes(term) || (/^[0-9a-f]{4,64}$/.test(term) && image.hash.startsWith(term)));
-  }) : [...images];
+  });
   const order = images.map(image => image.id);
   const position = new Map(order.map((id, index) => [id, index]));
   const byTime = (a: ImageRecord, b: ImageRecord) => a.createdAt.localeCompare(b.createdAt) || position.get(a.id)! - position.get(b.id)!;
