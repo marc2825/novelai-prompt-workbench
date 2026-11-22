@@ -1,6 +1,6 @@
 # インストールと更新（GitHub Releases版）
 
-> 0.2.0 より後の版で、名前を「NovelAI Prompt Workbench」から「Spellbinder for NovelAI」に変えました。名前とZIPのファイル名が変わっただけで、データはそのまま引き継がれます（同じフォルダで更新してください）。
+> 0.2.1 で、名前を「NovelAI Prompt Workbench」から「Spellbinder for NovelAI」に変えました。名前とZIPのファイル名が変わっただけで、データはそのまま引き継がれます（同じフォルダで更新してください）。
 
 Node.js などの開発ツールは不要です。Chrome Web Store 版ではないため、**自動更新はありません**。
 
