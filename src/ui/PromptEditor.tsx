@@ -6,6 +6,7 @@ import { newId } from './shared';
 import { message } from './useWorkbench';
 import { TagWeightControl } from './TagWeightControl';
 import { InfoTip } from './InfoTip';
+import { useTagCompletion } from './TagCompletion';
 
 export function PromptEditor({ label, value, spans, rows = 3, onChange, undo, redo, onWeightDraftChange }: {
   label: string; value: string; spans?: PromptSpan[]; rows?: number;
@@ -24,16 +25,22 @@ export function PromptEditor({ label, value, spans, rows = 3, onChange, undo, re
     return () => onWeightDraftChange?.(editorId, false);
   }, [!!activeTarget, editorId, onWeightDraftChange]);
   useEffect(() => setIssue(''), [value, spans]);
+  const completion = useTagCompletion({ label, value, readOnly: !!spans, input, onChange: raw => onChange(raw) });
   const run = (action: () => void) => { try { action(); setIssue(''); } catch (error) { setIssue(message(error)); } };
   return <div className="stack prompt-editor">
     <div className="field-head"><label htmlFor={inputId}>{label}</label><InfoTip label={`${label}の編集`}>{spans
       ? 'OFFにした範囲の原文も保持しています。下のチェックで範囲ごとにON/OFFでき、構造を解除するまで本文は読取り専用です。'
-      : 'テキストの一部を選んで「選択範囲をOFF」にすると、原文を残したまま出力から外せます。タグを1つ選んで「重みを調整」で0〜2の重みを付けます（既存の数値重みは「1.2::tag::」全体を選択）。'}</InfoTip></div>
-    <textarea id={inputId} ref={input} rows={rows} maxLength={1_000_000} readOnly={!!spans} value={value} onChange={event => onChange(event.target.value)} onKeyDown={event => {
-      if (!spans || !(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === 'z' || key === 'y') { event.preventDefault(); event.stopPropagation(); if (key === 'y' || event.shiftKey) redo(); else undo(); }
-    }} />
+      : 'テキストの一部を選んで「選択範囲をOFF」にすると、原文を残したまま出力から外せます。タグを1つ選んで「重みを調整」で0〜2の重みを付けます（既存の数値重みは「1.2::tag::」全体を選択）。タグを途中まで入力すると、タグ辞書とライブラリの原文から候補を出します（↑↓で選び、Enter/Tabで確定、Escで閉じる。設定でOFFにできます）。'}</InfoTip></div>
+    <div className="tag-complete">
+      <textarea id={inputId} ref={input} rows={rows} maxLength={1_000_000} readOnly={!!spans} value={value} {...completion.textareaProps} onChange={event => { completion.track(event); onChange(event.target.value); }} onKeyDown={event => {
+        if (completion.onKeyDown(event)) return;
+        if (!spans || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+        const key = event.key.toLowerCase();
+        if (key === 'z' || key === 'y') { event.preventDefault(); event.stopPropagation(); if (key === 'y' || event.shiftKey) redo(); else undo(); }
+      }} />
+      {completion.list}
+      {completion.announcement}
+    </div>
     <div className="actions"><button type="button" className="small" onMouseDown={event => event.preventDefault()} onClick={() => run(() => {
       if (!input.current) return;
       const next = commentRange(value, spans, input.current.selectionStart, input.current.selectionEnd, [newId(), newId(), newId()]);
