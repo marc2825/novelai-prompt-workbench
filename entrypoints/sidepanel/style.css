@@ -1,49 +1,70 @@
 /* Design tokens. Light by default, dark via prefers-color-scheme. */
+/* Design tokens (docs/design/UI_REDESIGN.md: "binder" — paper on a desk, ink, indigo).
+   Light by default, dark via prefers-color-scheme. */
 :root {
   color-scheme: light dark;
-  font-family: system-ui, 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+  font-family: 'BIZ UDPGothic', 'Hiragino Sans', 'Yu Gothic UI', 'Noto Sans JP', Meiryo, system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.55;
-  --bg: #f6f7fb;
+  --bg: #eceee8;
   --surface: #ffffff;
-  --surface-2: #f0f2f7;
-  --text: #1d2230;
-  --muted: #5f6678;
-  --line: #dde1ea;
-  --accent: #4568c4;
-  --accent-soft: #e8eefc;
+  --surface-2: #f2f3ef;
+  --text: #1e2330;
+  --muted: #4f5666;
+  --line: #d3d6ce;
+  --rule: #1e2330;
+  --accent: #2f4b8f;
+  --accent-soft: #e6eaf4;
   --accent-text: #ffffff;
-  --danger: #c23b3b;
-  --danger-soft: #fdecec;
-  --success: #2f8f5b;
-  --warning: #b7791f;
+  --danger: #b3261e;
+  --danger-soft: #fbeae8;
+  --success: #1f7a5c;
+  --warning: #8a5a00;
+  --area-library: #2f4b8f;
+  --area-edit: #1f7a5c;
+  --area-vary: #b5473c;
+  --area-compare: #6b4e9b;
+  --area-settings: #4f5666;
+  --dock-bg: #1e2330;
+  --dock-text: #f2f3ee;
+  --dock-muted: #c4c8d2;
+  --dock-copy: #e9b325;
+  --dock-copy-text: #1e2330;
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow: 0 1px 2px rgba(20, 30, 60, .06);
-  --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --shadow: none;
+  --mono: 'Cascadia Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14161d;
+    --bg: #12141a;
     --surface: #1c1f28;
     --surface-2: #252935;
-    --text: #e6e8ef;
-    --muted: #a0a6b8;
-    --line: #333949;
-    --accent: #7b9cf0;
+    --text: #e8eaf0;
+    --muted: #a3a9b8;
+    --line: #343947;
+    --rule: #a3a9b8;
+    --accent: #8fa8e8;
     --accent-soft: #24304f;
     --accent-text: #0d1220;
-    --danger: #f07a7a;
+    --danger: #f08a80;
     --danger-soft: #3a2224;
     --success: #6fcf97;
     --warning: #e0b05a;
-    --shadow: none;
+    --area-library: #3d5aa3;
+    --area-edit: #237f61;
+    --area-vary: #a8473d;
+    --area-compare: #6c509f;
+    --area-settings: #4f5666;
+    --dock-bg: #0b0d12;
+    --dock-text: #eef0f4;
+    --dock-muted: #a9aec0;
   }
 }
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 300px; background: var(--bg); color: var(--text); }
-main { max-width: 760px; margin: auto; padding: 0 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+main { max-width: 760px; margin: auto; padding: 0 6px 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .lab-wide { max-width: 1400px; }
 
 /* Typography */
@@ -55,25 +76,41 @@ p { margin: 0; overflow-wrap: anywhere; }
 pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; padding: 7px 9px; border-radius: var(--radius-sm); background: var(--surface-2); font: 12px/1.55 var(--mono); max-height: 250px; overflow: auto; }
 a { color: var(--accent); }
 
-/* App header and sticky navigation */
-.app-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; }
+/* App header */
+.app-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 2px 6px; }
 .app-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.app-title h1 { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
 .app-icon { flex-shrink: 0; border-radius: 5px; }
 .header-links { display: flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; }
-.header-links a { text-decoration: none; padding: 2px 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.header-links a { text-decoration: none; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); }
 .header-links a:hover { color: var(--accent); border-color: var(--accent); }
-.app-nav { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 4px 0 6px; display: grid; gap: 6px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: end; }
-.tab-area { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.tab-area-label { font-size: 11px; color: var(--muted); padding-left: 2px; line-height: 1.2; }
-.tab-area-tabs { display: flex; gap: 4px; }
-.tab-area.settings { flex: 0 0 auto; margin-left: auto; }
+
+/* Binder: index tabs on the left edge, the current page as a sheet of paper. */
+.binder { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: start; min-width: 0; }
+.index-rail { position: sticky; top: 0; z-index: 11; max-height: 100vh; overflow-y: auto; scrollbar-width: none; padding-top: 6px; }
+.index-rail .tabs { display: flex; flex-direction: column; gap: 6px; }
+.tab-area { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.tab-area-label { writing-mode: vertical-rl; font-size: 10px; color: var(--muted); align-self: flex-start; padding-left: 2px; line-height: 1.1; letter-spacing: .04em; }
+.tab-area-tabs { display: flex; flex-direction: column; gap: 4px; width: 100%; align-items: flex-end; }
+.index-rail [role=tab] { writing-mode: vertical-rl; text-orientation: mixed; width: 34px; min-height: 44px; padding: 8px 0; border: 0; border-radius: 8px 0 0 8px; background: var(--area); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .02em; line-height: 1; white-space: nowrap; }
+.index-rail [role=tab]:hover:enabled { border: 0; filter: brightness(1.1); }
+.index-rail [role=tab][aria-selected=true] { width: 40px; background: var(--surface); color: var(--area); box-shadow: inset 4px 0 0 var(--area); font-size: 12.5px; }
+.index-rail [role=tab]:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+.area-library { --area: var(--area-library); }
+.area-edit { --area: var(--area-edit); }
+.area-vary { --area: var(--area-vary); }
+.area-compare { --area: var(--area-compare); }
+.area-settings { --area: var(--area-settings); margin-top: 2px; }
 /* Icon only for sighted users: the alt text after the slash is empty, so the tab's name stays 「設定」. */
-.tab-area.settings button::before { content: '⚙\FE0E  ' / ''; }
-.tabs button { flex: 1 1 auto; white-space: nowrap; padding: 6px 8px; border-color: var(--line); background: var(--surface); }
-.tabs [aria-selected=true] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+.area-settings [role=tab]::before { content: '⚙\FE0E' / ''; margin-bottom: 4px; }
+.page { min-width: 0; min-height: calc(100vh - 60px); background: var(--surface); border-radius: 0 var(--radius) var(--radius) var(--radius); padding: 0 10px 0 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-content: start; }
+.page .panel:not(.group-section) { padding: 10px; }
+.page-toolbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 4px; padding: 8px 0 6px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.history-button { width: 34px; height: 34px; color: var(--text); border: 1px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; }
+.history-button:hover:enabled { border-color: var(--accent); }
+.page-notice { color: var(--success); font-size: 12px; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.toolbar .spacer { flex: 1; }
+.toolbar .spacer, .page-toolbar .spacer { flex: 1; }
 
 /* Status pills */
 .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
@@ -93,6 +130,9 @@ section[role=alert] { border-color: var(--danger); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .stack { display: grid; gap: 8px; min-width: 0; }
 .panel { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; min-width: 0; box-shadow: var(--shadow); }
+/* Workspace groups: ruled sections on the sheet instead of separate cards. */
+.group-section { border: 0; border-top: 2px solid var(--rule); border-radius: 0; padding: 6px 0 4px; background: transparent; }
+.group-chip { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
 .group-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 8px; }
 .group-head > .title { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
 .actions { display: flex; flex-wrap: wrap; align-items: end; gap: 6px; }
@@ -156,9 +196,8 @@ details.panel > summary { font-weight: 600; color: var(--text); font-size: 13px;
 .inactive .member-title, .inactive .member-raw { opacity: .5; text-decoration: line-through; }
 .entry-meta { font-size: 12px; color: var(--muted); }
 .empty { padding: 14px 4px; color: var(--muted); font-size: 13px; text-align: center; }
-.preview { border-top: 3px solid var(--accent); }
+.preview { border-top: 2px solid var(--rule); border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; padding-left: 0; padding-right: 0; }
 .preview > summary small { margin-left: 8px; font-weight: 400; }
-.preview > .stack > .info-tip { position: absolute; top: 10px; right: 12px; }
 details.fold > summary { font-weight: 600; color: var(--text); }
 summary > h2, summary > h3 { display: inline; }
 .preview textarea { min-height: 3.2em; }
@@ -214,16 +253,39 @@ progress { width: 100%; accent-color: var(--accent); }
   .columns.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Wide tab (issue #29): the output preview becomes a sticky right column so management work
-   in the main column always sees the result. The side panel keeps the single column. */
+/* Output band (docs/design/UI_REDESIGN.md): always visible at the bottom of the side panel,
+   the top of the right column in a wide tab. Underline colours match the workspace groups. */
+.output-dock { position: sticky; bottom: 0; z-index: 9; margin: 0 -10px 0 -12px; padding: 10px 12px 12px; display: grid; gap: 8px; background: var(--dock-bg); color: var(--dock-text); border-radius: var(--radius) var(--radius) 0 0; }
+.dock-head { display: flex; align-items: center; gap: 8px; }
+.dock-switch { display: flex; gap: 4px; }
+.dock-switch button { min-height: 28px; padding: 3px 12px; border-radius: 999px; border: 1px solid #6b7285; background: transparent; color: var(--dock-text); font-weight: 600; }
+.dock-switch button[aria-pressed=true] { background: var(--dock-text); color: var(--dock-bg); border-color: var(--dock-text); }
+.dock-switch button:hover:enabled { border-color: var(--dock-text); }
+.dock-count { margin-left: auto; font-size: 12px; color: var(--dock-muted); }
+.output-dock .info-tip-button { background: transparent; color: var(--dock-muted); border-color: #6b7285; }
+.dock-prompt { margin: 0; max-height: 5.6em; overflow-y: auto; font: 13.5px/1.85 var(--mono); overflow-wrap: anywhere; }
+.dock-empty { font-family: inherit; color: var(--dock-muted); font-size: 12.5px; }
+.seg { border-bottom: 3px solid var(--seg); padding-bottom: 1px; }
+.seg-free { border-bottom: 2px dotted var(--dock-muted); }
+.seg-joint { color: var(--dock-muted); }
+.dock-actions { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; }
+.dock-copy { min-height: 42px; border: 0; background: var(--dock-copy); color: var(--dock-copy-text); font-size: 14px; font-weight: 700; }
+.dock-copy:hover:enabled { border: 0; filter: brightness(1.06); }
+.dock-copy-secondary { min-height: 42px; white-space: nowrap; padding: 6px 4px; background: transparent; color: var(--dock-text); border: 1px solid #8a909e; font-weight: 600; }
+.dock-copy-secondary:hover:enabled { border-color: var(--dock-text); }
+.output-dock button:focus-visible { outline-color: var(--dock-copy); }
+
 @media (min-width: 1000px) {
-  main.with-preview { max-width: 1320px; grid-template-columns: minmax(0, 1fr) 380px; align-items: start; }
-  main.with-preview > * { grid-column: 1 / -1; }
-  main.with-preview > [role=tabpanel] { grid-column: 1; }
-  main.with-preview > .preview { grid-column: 2; position: sticky; top: 112px; max-height: calc(100vh - 124px); overflow: auto; }
+  main.wide { max-width: 1320px; }
+  .binder.with-output { grid-template-columns: 52px minmax(0, 1fr) 380px; }
+  .binder.with-output .output-column { margin-left: 16px; }
+  .binder.with-output .index-rail [role=tab][aria-selected=true] { width: 52px; }
+  .output-column { position: sticky; top: 8px; display: grid; gap: 10px; max-height: calc(100vh - 16px); overflow-y: auto; }
+  .output-column .output-dock { position: static; margin: 0; border-radius: var(--radius); }
 }
 
 .tag-diff { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; overflow-wrap: anywhere; }
 .tag-diff .added { color: var(--success); }
 .tag-diff .removed { color: var(--danger); }
 .app-subtitle { font-weight: 400; font-size: 0.75em; color: var(--muted); }
+.group-section .group-head strong { font-size: 14px; }

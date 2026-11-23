@@ -47,3 +47,47 @@ export function compileWorkspace(workspace: PromptWorkspace): CompiledPrompts {
   }
   return { ...channels, warnings };
 }
+
+/** One run of output text and where it came from (issue: colored output). */
+export interface PromptSegment {
+  text: string;
+  /** Group that produced this text; null for the free-form text of the workspace. */
+  groupId: string | null;
+  /** The ", " (or comma/space) that joins two fragments; not part of any group. */
+  separator: boolean;
+}
+
+/**
+ * The compiled prompts split into the runs that each group (or the free-form
+ * text) contributed, for display only. Joining every segment's text gives
+ * exactly `compileWorkspace(workspace)[channel]`: the same fragments are
+ * appended with the same `appendFragment`, and each step's added text is
+ * recorded. Nothing is parsed or rewritten.
+ */
+export function compileSegments(workspace: PromptWorkspace): Record<Channel, PromptSegment[]> {
+  const warnings: string[] = [];
+  const resolve = (raw: string, spans: Parameters<typeof renderCommentSpans>[1]) => {
+    try { return renderCommentSpans(raw, spans); } catch { return ''; }
+  };
+  const text: Record<Channel, string> = {
+    positive: resolve(workspace.freeformPositive, workspace.freeformPositiveSpans).trim(),
+    negative: resolve(workspace.freeformNegative, workspace.freeformNegativeSpans).trim(),
+  };
+  const segments: Record<Channel, PromptSegment[]> = {
+    positive: text.positive ? [{ text: text.positive, groupId: null, separator: false }] : [],
+    negative: text.negative ? [{ text: text.negative, groupId: null, separator: false }] : [],
+  };
+  for (const group of workspace.groups) {
+    for (const member of getEffectiveMembers(group, warnings)) {
+      const before = text[group.channel];
+      const after = appendFragment(before, resolve(member.overrideRaw ?? member.rawSnapshot, member.overrideSpans));
+      text[group.channel] = after;
+      const added = after.slice(before.length);
+      if (!added) continue;
+      const joint = before ? /^[,\s]*/.exec(added)![0] : '';
+      if (joint) segments[group.channel].push({ text: joint, groupId: null, separator: true });
+      if (added.length > joint.length) segments[group.channel].push({ text: added.slice(joint.length), groupId: group.id, separator: false });
+    }
+  }
+  return segments;
+}
