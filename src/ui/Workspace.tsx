@@ -6,6 +6,7 @@ import { Empty, newId, now, Rename, Reorder } from './shared';
 import { PromptEditor } from './PromptEditor';
 import { Presets } from './Presets';
 import { Hint } from './InfoTip';
+import { groupColor } from './groupColors';
 
 export function Workspace({ workbench }: { workbench: Workbench }) {
   const data = workbench.data!;
@@ -50,9 +51,9 @@ export function Workspace({ workbench }: { workbench: Workbench }) {
         <div className="columns"><label>チャンネル<select value={channel} onChange={event => setChannel(event.target.value as Channel)}><option value="positive">Positive</option><option value="negative">Negative</option></select></label><label>選択方式<select value={mode} onChange={event => setMode(event.target.value as SelectionMode)}><option value="multi">複数 (multi)</option><option value="exclusive">排他 (exclusive)</option></select></label></div><button type="submit" className="primary">グループ追加</button>
       </form></details>
       {!workspace.groups.length && <Empty>グループを作成し、ライブラリタブで部品を追加してください。</Empty>}
-      {workspace.groups.map((group, groupIndex) => <section className="panel stack" key={group.id} aria-label={group.name}>
+      {workspace.groups.map((group, groupIndex) => <section className="panel stack group-section" key={group.id} aria-label={group.name}>
         <div className="group-head">
-          <div className="title"><strong>{group.name}</strong><span className={`badge ${group.channel}`}>{group.channel}</span><span className="badge">{group.mode === 'exclusive' ? '排他' : '複数'} · {group.members.length}</span></div>
+          <div className="title"><span className="group-chip" aria-hidden="true" style={{ background: groupColor(groupIndex) }} /><strong>{group.name}</strong><span className={`badge ${group.channel}`}>{group.channel}</span><span className="badge">{group.mode === 'exclusive' ? '排他' : '複数'} · {group.members.length}</span></div>
           <div className="toolbar"><Reorder name={group.name} first={groupIndex === 0} last={groupIndex === workspace.groups.length - 1} onMove={direction => change(current => ({ ...current, groups: moveById(current.groups, group.id, direction) }))} /><button type="button" className="icon" aria-label="グループ設定" aria-expanded={openGroup === group.id} title="グループ設定（名前・チャンネル・方式・削除）" onClick={() => setOpenGroup(openGroup === group.id ? null : group.id)}>⚙</button><label className="inline"><input type="checkbox" checked={group.enabled} onChange={event => changeGroup(group.id, current => ({ ...current, enabled: event.target.checked }))} />グループ有効</label></div>
         </div>
         <div className="stack">

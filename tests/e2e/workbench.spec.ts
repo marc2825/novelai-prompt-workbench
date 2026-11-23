@@ -384,3 +384,35 @@ test('tabs are grouped into areas, settings sits apart, and the wide tab opens t
   await page.getByRole('tab', { name: 'シャッフル', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '出力 Positive', exact: true })).toBeHidden();
 });
+
+test('the output band stays in view on every tab, colours each part by its group, and the index tabs work with ↑↓ (UI redesign)', async ({ page }) => {
+  await page.goto('/tests/fixtures/index.html'); await saved(page);
+  const band = page.getByRole('region', { name: '出力', exact: true });
+  await expect(band).toContainText('ワークスペースを作ると、ここにプロンプトが表示されます');
+  await demo(page);
+  await page.getByRole('tab', { name: 'ワークスペース', exact: true }).click();
+  const positive = band.getByLabel('Positiveの出力', { exact: true });
+  // Every part names its source; joined, the parts are exactly the compiled prompt.
+  const compiled = await page.getByRole('textbox', { name: '出力 Positive', exact: true }).inputValue();
+  expect(await positive.evaluate(element => { const copy = element.cloneNode(true) as HTMLElement; copy.querySelectorAll('.sr-only').forEach(hidden => hidden.remove()); return copy.textContent; })).toBe(compiled);
+  await expect(positive.locator('.seg-free')).toHaveAttribute('title', '自由入力');
+  const firstGroup = await page.locator('.group-section').first().getAttribute('aria-label');
+  await expect(positive.locator('.seg:not(.seg-free)').first()).toHaveAttribute('title', `グループ「${firstGroup}」`);
+  // The chip next to the group uses the same colour as its underline in the band.
+  const chip = await page.locator('.group-section').first().locator('.group-chip').evaluate(element => getComputedStyle(element).backgroundColor);
+  const underline = await positive.locator('.seg:not(.seg-free)').first().evaluate(element => getComputedStyle(element).borderBottomColor);
+  expect(underline).toBe(chip);
+  await band.getByRole('button', { name: 'Negative', exact: true }).click();
+  await expect(band.getByLabel('Negativeの出力', { exact: true })).toContainText('[watermark]');
+  // Visible (and copyable) on a tab whose detail fold is closed, without scrolling to it.
+  await page.getByRole('tab', { name: 'シャッフル', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '出力 Positive', exact: true })).toBeHidden();
+  await expect(band.getByRole('button', { name: 'Positiveをコピー', exact: true })).toBeInViewport();
+  // Vertical index tabs: ↓ and ↑ move like → and ←.
+  await page.getByRole('tab', { name: 'シャッフル', exact: true }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('tab', { name: '比較', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('tab', { name: 'プリセット', exact: true })).toBeFocused();
+  await expect(page.getByRole('tablist', { name: '機能', exact: true })).toHaveAttribute('aria-orientation', 'vertical');
+});

@@ -18,16 +18,17 @@ import { Shuffle } from './Shuffle';
 import { InfoTip } from './InfoTip';
 import { saveFullBackup } from './FullBackup';
 import { UnsavedRecovery } from './UnsavedRecovery';
+import { OutputDock } from './OutputDock';
 import { TagCompletionContext, useTagCompletionSource } from './TagCompletion';
 
 type Tab = 'ライブラリ' | 'ワークスペース' | 'プリセット' | '比較' | '設定' | 'シャッフル' | 'Experiment Lab';
 // Four areas in workflow order (issue #29): collect parts → edit the prompt → make variations →
 // compare / experiment. Settings & backup sit apart at the end. Tab names stay stable (one tablist).
-const AREAS: { label: string; tabs: Tab[] }[] = [
-  { label: 'ライブラリ', tabs: ['ライブラリ'] },
-  { label: '編集', tabs: ['ワークスペース', 'プリセット'] },
-  { label: 'バリエーション', tabs: ['シャッフル'] },
-  { label: '比較・実験', tabs: ['比較', 'Experiment Lab'] },
+const AREAS: { label: string; key: string; tabs: Tab[] }[] = [
+  { label: 'ライブラリ', key: 'library', tabs: ['ライブラリ'] },
+  { label: '編集', key: 'edit', tabs: ['ワークスペース', 'プリセット'] },
+  { label: 'バリエーション', key: 'vary', tabs: ['シャッフル'] },
+  { label: '比較・実験', key: 'compare', tabs: ['比較', 'Experiment Lab'] },
 ];
 const TABS: Tab[] = [...AREAS.flatMap(area => area.tabs), '設定'];
 // Deep links (#workspace …): "open in a wide tab" lands on the same section. The panel's own URL is
@@ -77,7 +78,7 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
   // WAI-ARIA tabs: arrow keys / Home / End move between tabs (roving tabindex).
   function tabKeys(event: KeyboardEvent) {
     const index = TABS.indexOf(tab);
-    const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index - 1 + TABS.length) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : -1;
+    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index - 1 + TABS.length) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : -1;
     if (next < 0) return;
     event.preventDefault();
     if (select(TABS[next]!)) document.getElementById(`tab-${TABS[next]}`)?.focus();
@@ -88,8 +89,28 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     catch { workbench.setError('コピーできませんでした。出力欄を選択して手動でコピーしてください。'); }
   }
   const tabButton = (value: Tab) => <button type="button" role="tab" id={`tab-${value}`} aria-controls="main-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} key={value} onClick={() => select(value)}>{value}</button>;
+  const dock = <OutputDock workspace={workspace} compiled={compiled} onCopy={channel => void copy(channel)} />;
+  // Raw text fields and the NovelAI site connection: the detail part of the output.
+  const preview = <details className="panel preview" aria-label="ライブプレビュー" open={wide || PREVIEW_OPEN.includes(tab)}>
+    <summary>出力プレビュー<small>{workspace?.title ?? '構成なし'} · 原文・NovelAIへの反映</small></summary>
+    <div className="stack">
+      {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}>
+        <label htmlFor={`preview-${channel}`}>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}</label>
+        <textarea id={`preview-${channel}`} readOnly rows={2} value={compiled[channel]} />
+      </div>)}
+      {compiled.warnings.map((warning, index) => <p role="alert" key={index}>{warning}</p>)}
+      <SiteConnection client={siteClient} compiled={compiled} onImport={(channel, raw) => {
+        if (!workspace) { workbench.setError('先にワークスペースを作成してください'); return; }
+        workbench.commit(previous => ({ ...previous, workspaces: previous.workspaces.map(item => {
+          if (item.id !== workspace.id) return item;
+          if (channel === 'positive') { const { freeformPositiveSpans: _spans, ...rest } = item; return { ...rest, freeformPositive: raw, updatedAt: now() }; }
+          const { freeformNegativeSpans: _spans, ...rest } = item; return { ...rest, freeformNegative: raw, updatedAt: now() };
+        }) }));
+      }} />
+    </div>
+  </details>;
   const statusPill = <div className={`status ${workbench.storageError ? 'error' : !data ? 'loading' : workbench.saving ? 'saving' : ''}`} role="status">{workbench.storageError ? '保存エラー・作業データは未保存です' : !data ? 'ローカルデータを読込中…' : workbench.saving ? '保存中…' : '保存済み · この端末のみ'}</div>;
-  return <TagCompletionContext.Provider value={completion}><main className={tab === 'Experiment Lab' ? 'lab-wide' : 'with-preview'} onKeyDown={keyboard}>
+  return <TagCompletionContext.Provider value={completion}><main className={tab === 'Experiment Lab' ? 'lab-wide' : wide ? 'wide' : ''} onKeyDown={keyboard}>
     <header className="app-header">
       <div className="app-title"><img className="app-icon" src="/icon/32.png" width={20} height={20} alt="" /><h1>Spellbinder<span className="app-subtitle"> for NovelAI</span></h1><span className="badge" title="NovelAI（Anlatan Inc.）とは提携していない非公式ツールです。データはこの端末だけに保存され、画像の生成はNovelAI上で行います">非公式</span></div>
       <div className="header-links">{!data && statusPill}<a href={`${location.pathname}#${HASH[tab]}`} target="_blank" rel="noreferrer" aria-label="広いタブで開く" title="広いタブで開く（サイドパネルより広い画面で、同じデータを開きます）">↗ タブ</a></div>
@@ -110,53 +131,40 @@ export function App({ siteClient }: { siteClient?: SiteClient } = {}) {
     {data && !!workbench.unsaved.length && <UnsavedRecovery workbench={workbench} onDone={setNotice} />}
     {workbench.error && <div className="error" role="alert">{workbench.error}<button type="button" onClick={() => workbench.setError('')}>閉じる</button></div>}
     {!data && workbench.storageError && <Recovery workbench={workbench} />}
-    {data && <>
-      <nav className="app-nav" aria-label="メイン">
-        <div className="tabs" role="tablist" aria-label="機能" onKeyDown={tabKeys}>{AREAS.map(area => <div className="tab-area" role="presentation" key={area.label}>{(area.tabs.length > 1 || area.tabs[0] !== area.label) && <span className="tab-area-label" aria-hidden="true">{area.label}</span>}<div className="tab-area-tabs" role="presentation">{area.tabs.map(tabButton)}</div></div>)}<div className="tab-area settings" role="presentation"><div className="tab-area-tabs" role="presentation">{tabButton('設定')}</div></div></div>
-        <div className="toolbar history">
-          <button type="button" className="small" disabled={!workbench.canUndo || comparisonDraft} onClick={workbench.undo}><span aria-hidden="true">↶ </span>元に戻す</button>
-          <button type="button" className="small" disabled={!workbench.canRedo || comparisonDraft} onClick={workbench.redo}>やり直す<span aria-hidden="true"> ↷</span></button>
+    {data && <div className={`binder ${wide && tab !== 'Experiment Lab' ? 'with-output' : ''}`}>
+      {/* Binder index tabs (docs/design/UI_REDESIGN.md): one vertical tablist, coloured by area. */}
+      <nav className="index-rail" aria-label="メイン">
+        <div className="tabs" role="tablist" aria-label="機能" aria-orientation="vertical" onKeyDown={tabKeys}>{AREAS.map(area => <div className={`tab-area area-${area.key}`} role="presentation" key={area.key}>{(area.tabs.length > 1 || area.tabs[0] !== area.label) && <span className="tab-area-label" aria-hidden="true">{area.label}</span>}<div className="tab-area-tabs" role="presentation">{area.tabs.map(tabButton)}</div></div>)}<div className="tab-area settings area-settings" role="presentation"><div className="tab-area-tabs" role="presentation">{tabButton('設定')}</div></div></div>
+      </nav>
+      <div className="page">
+        <div className="page-toolbar">
+          <button type="button" className="icon history-button" aria-label="元に戻す" title="元に戻す（入力欄の外で Ctrl/Cmd+Z）" disabled={!workbench.canUndo || comparisonDraft} onClick={workbench.undo}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14L4 9l5-5" /><path d="M4 9h10a6 6 0 010 12h-3" /></svg></button>
+          <button type="button" className="icon history-button" aria-label="やり直す" title="やり直す（入力欄の外で Ctrl/Cmd+Y）" disabled={!workbench.canRedo || comparisonDraft} onClick={workbench.redo}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14l5-5-5-5" /><path d="M20 9H10a6 6 0 000 12h3" /></svg></button>
           <InfoTip label="元に戻す・やり直す">入力欄の外で Ctrl/Cmd+Z（元に戻す）・Ctrl/Cmd+Y（やり直す）。直近30操作まで戻せます。パネルを閉じると履歴は消え、NovelAIのページへの操作は戻りません。</InfoTip>
           <span className="spacer" />
           {statusPill}
         </div>
         <PresetStatus workbench={workbench} />
-      </nav>
-      {firstRun && tab === 'ライブラリ' && <section className="panel stack first-run" aria-label="はじめに">
-        <h2>はじめに</h2>
-        <ol className="comparison-steps"><li>「ワークスペース」で構成（グループ）を作る</li><li>「ライブラリ」に部品（タグの原文）を登録し「構成に追加」</li><li>下の「出力プレビュー」をコピーしてNovelAIに貼り付け、NovelAI上で生成する</li></ol>
-        <p className="hint">サンプルは「設定」→「デモを追加」で入ります。定期的に「設定」→「完全バックアップ」を保存してください。</p>
-      </section>}
-      {notice && <p role="status">{notice}</p>}
-      <div role="tabpanel" id="main-panel" aria-labelledby={`tab-${tab}`}>
-        {tab === 'ライブラリ' && <Library workbench={workbench} addToGroup={addToGroup} />}
-        {tab === 'ワークスペース' && <Workspace workbench={workbench} />}
-        {tab === '設定' && <Settings workbench={workbench} />}
-        {tab === 'プリセット' && <Presets workbench={workbench} onEdit={() => setTab('ワークスペース')} />}
-        {tab === '比較' && <Comparisons workbench={workbench} onDraftChange={setComparisonDraft} />}
-        {tab === 'Experiment Lab' && <Lab workbench={workbench} siteClient={siteClient} onDraftChange={setComparisonDraft} />}
-        {tab === 'シャッフル' && <Shuffle workbench={workbench} siteClient={siteClient} />}
-      </div>
-      {tab !== 'Experiment Lab' && <details className="panel preview" aria-label="ライブプレビュー" open={wide || PREVIEW_OPEN.includes(tab)}>
-        <summary>出力プレビュー<small>{workspace?.title ?? '構成なし'}</small></summary>
-        <div className="stack">
-        <InfoTip label="出力プレビュー">現在のワークスペースから合成したプロンプトです。コピーしてNovelAIに貼り付け、NovelAI上で生成してください。OFFにした部品・範囲は出力しません。</InfoTip>
-        {(['positive', 'negative'] as const).map(channel => <div className="stack" key={channel}>
-          <div className="field-head"><label htmlFor={`preview-${channel}`}>{channel === 'positive' ? '出力 Positive' : '出力 Negative'}</label><button type="button" className="small primary" onClick={() => void copy(channel)}>{channel === 'positive' ? 'Positiveをコピー' : 'Negativeをコピー'}</button></div>
-          <textarea id={`preview-${channel}`} readOnly rows={2} value={compiled[channel]} />
-        </div>)}
-        {compiled.warnings.map((warning, index) => <p role="alert" key={index}>{warning}</p>)}
-        <SiteConnection client={siteClient} compiled={compiled} onImport={(channel, raw) => {
-          if (!workspace) { workbench.setError('先にワークスペースを作成してください'); return; }
-          workbench.commit(previous => ({ ...previous, workspaces: previous.workspaces.map(item => {
-            if (item.id !== workspace.id) return item;
-            if (channel === 'positive') { const { freeformPositiveSpans: _spans, ...rest } = item; return { ...rest, freeformPositive: raw, updatedAt: now() }; }
-            const { freeformNegativeSpans: _spans, ...rest } = item; return { ...rest, freeformNegative: raw, updatedAt: now() };
-          }) }));
-        }} />
+        {firstRun && tab === 'ライブラリ' && <section className="panel stack first-run" aria-label="はじめに">
+          <h2>はじめに</h2>
+          <ol className="comparison-steps"><li>「ワークスペース」で構成（グループ）を作る</li><li>「ライブラリ」に部品（タグの原文）を登録し「構成に追加」</li><li>下の出力の帯の「Positiveをコピー」でNovelAIに貼り付け、NovelAI上で生成する</li></ol>
+          <p className="hint">サンプルは「設定」→「デモを追加」で入ります。定期的に「設定」→「完全バックアップ」を保存してください。</p>
+        </section>}
+        {notice && <p role="status" className="page-notice">{notice}</p>}
+        <div role="tabpanel" id="main-panel" aria-labelledby={`tab-${tab}`}>
+          {tab === 'ライブラリ' && <Library workbench={workbench} addToGroup={addToGroup} />}
+          {tab === 'ワークスペース' && <Workspace workbench={workbench} />}
+          {tab === '設定' && <Settings workbench={workbench} />}
+          {tab === 'プリセット' && <Presets workbench={workbench} onEdit={() => setTab('ワークスペース')} />}
+          {tab === '比較' && <Comparisons workbench={workbench} onDraftChange={setComparisonDraft} />}
+          {tab === 'Experiment Lab' && <Lab workbench={workbench} siteClient={siteClient} onDraftChange={setComparisonDraft} />}
+          {tab === 'シャッフル' && <Shuffle workbench={workbench} siteClient={siteClient} />}
         </div>
-      </details>}
-    </>}
+        {tab !== 'Experiment Lab' && !wide && preview}
+        {tab !== 'Experiment Lab' && !wide && dock}
+      </div>
+      {tab !== 'Experiment Lab' && wide && <aside className="output-column" aria-label="出力の列">{dock}{preview}</aside>}
+    </div>}
     <footer>非公式ツール・データはこの端末のみ。NovelAIの利用規約を守ってご利用ください（この拡張機能の説明より規約が優先されます）。</footer>
   </main></TagCompletionContext.Provider>;
 }
