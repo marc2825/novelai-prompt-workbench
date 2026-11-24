@@ -57,6 +57,14 @@ v0.2.1（2026-11-22、名前の変更のみ）:
 - [x] 公開版 v0.2.0（旧名のZIPを旧名のフォルダに展開）から同じフォルダで0.2.1に更新してデータ保持を確認（手元のE2E、Cross-platformの Windows・macOS・Linux）
 - [ ] 実機での手動確認（下記）は未実施
 
+v0.3.0（2026-11-24、画面のデザインの一新）:
+
+- [x] PR #56（再設計）・#57（版を0.3.0に）。タグ前に Security タブの未対応の警告 0件を確認
+- [x] タグ `v0.3.0`（`d136f29`）をpushし、「Release」が成功。[Pre-releaseとして公開](https://github.com/marc2825/spellbinder-for-novelai/releases/tag/v0.3.0)
+- [x] 公開ZIPを `.sha256` と照合し、`verifyReleaseZip` で問題0件（14ファイル、権限 `sidePanel` のみ）。SHA-256 `008ee6e2…8d31` はローカルのビルドと同一
+- [x] 公開版 v0.2.1 から同じフォルダで0.3.0に更新してデータ保持を確認（手元のE2E、Cross-platformの Windows・macOS・Linux）
+- [ ] 実機での手動確認（Google Chrome での新しい画面の見た目・高DPI・日本語フォント）は未実施
+
 次のバージョンからの手順: `CHANGELOG.md` に `## [X.Y.Z]` を追加し、`package.json`・`src/version.ts` を更新してmainにマージ → `git tag vX.Y.Z` → `git push origin vX.Y.Z`（[development.md](development.md#リリース)）
 
 タグを打つ前に: `main` の最新の「Security」ワークフロー（push時または週1回の実行）が成功していて、Security タブに未対応の Code scanning・Dependabot・Secret scanning の警告がないこと（ある場合は対応するか、[既知の例外](security.md#既知の例外)として記録する）。リリースのワークフロー自体はこの検査を実行しません。
